@@ -1,0 +1,655 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.13;
+
+import "forge-std/Test.sol";
+
+import {IUniswapV3Factory} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+
+import {UniswapV3TestLib} from "./uniswap-v3-utils/UniswapV3TestLib.sol";
+import {ERC20Mock} from "./mocks/ERC20Mock.sol";
+import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
+import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
+
+import {DopexV2PositionManager} from "../src/DopexV2PositionManager.sol";
+import {PositionManagerHandler} from "./handlers/PositionManager.handler.sol";
+import {UniswapV3SingleTickLiquidityHandler} from "../src/handlers/UniswapV3SingleTickLiquidityHandler.sol";
+
+contract PositionManagerHandlerTest is Test {
+    using TickMath for int24;
+
+    address ETH; // token1
+    address LUSD; // token0
+
+    ERC20Mock token0;
+    ERC20Mock token1;
+
+    UniswapV3TestLib uniswapV3TestLib;
+    IUniswapV3Pool pool;
+
+    uint24 fee = 500;
+
+    uint160 initSqrtPriceX96 = 1771845812700903892492222464; // 1 ETH = 2000 LUSD
+
+    address alice = makeAddr("alice"); // main LP
+    address bob = makeAddr("bob"); // protocol LP
+    address jason = makeAddr("jason"); // protocol LP
+    address trader = makeAddr("trader"); // option buyer
+    address garbage = makeAddr("garbage"); // garbage address
+    address roger = makeAddr("roger"); // roger address
+    address tango = makeAddr("tango"); // tango address
+
+    DopexV2PositionManager positionManager;
+    PositionManagerHandler positionManagerHandler;
+    UniswapV3SingleTickLiquidityHandler uniV3Handler;
+
+    function setUp() public {
+        ETH = address(new ERC20Mock());
+        LUSD = address(new ERC20Mock());
+
+        uniswapV3TestLib = new UniswapV3TestLib();
+        pool = IUniswapV3Pool(
+            uniswapV3TestLib.deployUniswapV3PoolAndInitializePrice(
+                ETH,
+                LUSD,
+                fee,
+                initSqrtPriceX96
+            )
+        );
+
+        token0 = ERC20Mock(pool.token0());
+        token1 = ERC20Mock(pool.token1());
+
+        uniswapV3TestLib.addLiquidity(
+            UniswapV3TestLib.AddLiquidityStruct({
+                user: alice,
+                pool: pool,
+                desiredTickLower: -78245, // 2500
+                desiredTickUpper: -73136, // 1500
+                desiredAmount0: 5_000_000e18,
+                desiredAmount1: 0,
+                requireMint: true
+            })
+        );
+
+        positionManager = new DopexV2PositionManager();
+
+        uniV3Handler = new UniswapV3SingleTickLiquidityHandler(
+            address(uniswapV3TestLib.factory()),
+            0xa598dd2fba360510c5a8f02f44423a4468e902df5857dbce3ca162a43a3a31ff,
+            address(uniswapV3TestLib.swapRouter())
+        );
+
+        positionManagerHandler = new PositionManagerHandler(
+            uniswapV3TestLib,
+            positionManager,
+            uniV3Handler
+        );
+
+        positionManager.updateWhitelistHandlerWithApp(
+            address(uniV3Handler),
+            garbage,
+            true
+        );
+
+        positionManager.updateWhitelistHandler(address(uniV3Handler), true);
+
+        uniV3Handler.updateWhitelistedApps(address(positionManager), true);
+    }
+
+    function testMintPosition() public {
+        uint256 amount0 = 0;
+        uint256 amount1 = 5e18;
+
+        int24 tickLower = -77420; // 2299.8
+        int24 tickUpper = -77410; // 2302.1
+
+        positionManagerHandler.mintPosition(
+            token0,
+            token1,
+            amount0,
+            amount1,
+            tickLower,
+            tickUpper,
+            pool,
+            bob
+        );
+
+        positionManagerHandler.mintPosition(
+            token0,
+            token1,
+            amount0,
+            amount1,
+            tickLower,
+            tickUpper,
+            pool,
+            jason
+        );
+    }
+
+    function testMintPositionWithSwaps() public {
+        uint256 amount0 = 0;
+        uint256 amount1 = 5e18;
+
+        int24 tickLower = -77420; // 2299.8
+        int24 tickUpper = -77410; // 2302.1
+
+        positionManagerHandler.mintPosition(
+            token0,
+            token1,
+            amount0,
+            amount1,
+            tickLower,
+            tickUpper,
+            pool,
+            bob
+        );
+
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
+                user: garbage,
+                pool: pool,
+                amountIn: 2_000_000e18,
+                zeroForOne: true,
+                requireMint: true
+            })
+        );
+
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
+                user: garbage,
+                pool: pool,
+                amountIn: 910e18,
+                zeroForOne: false,
+                requireMint: true
+            })
+        );
+
+        positionManagerHandler.mintPosition(
+            token0,
+            token1,
+            amount0,
+            amount1,
+            tickLower,
+            tickUpper,
+            pool,
+            jason
+        );
+
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
+                user: garbage,
+                pool: pool,
+                amountIn: 2_000_000e18,
+                zeroForOne: true,
+                requireMint: true
+            })
+        );
+
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
+                user: garbage,
+                pool: pool,
+                amountIn: 910e18,
+                zeroForOne: false,
+                requireMint: true
+            })
+        );
+    }
+
+    function testBurnPosition() public {
+        int24 tickLower = -77420;
+        int24 tickUpper = -77410;
+
+        testMintPositionWithSwaps();
+
+        uint256 bobBalance = uniV3Handler.balanceOf(
+            bob,
+            positionManagerHandler.getTokenId(pool, tickLower, tickUpper)
+        );
+
+        uint256 jasonBalance = uniV3Handler.balanceOf(
+            jason,
+            positionManagerHandler.getTokenId(pool, tickLower, tickUpper)
+        );
+
+        positionManagerHandler.burnPosition(
+            bobBalance,
+            tickLower,
+            tickUpper,
+            pool,
+            bob
+        );
+
+        positionManagerHandler.burnPosition(
+            jasonBalance - 1, // since you can't reset the shares
+            tickLower,
+            tickUpper,
+            pool,
+            jason
+        );
+    }
+
+    function testUsePosition() public {
+        testMintPositionWithSwaps();
+        uint256 amount0 = 0;
+        uint256 amount1 = 5e18;
+
+        int24 tickLower = -77420;
+        int24 tickUpper = -77410;
+
+        positionManagerHandler.usePosition(
+            amount0,
+            amount1,
+            tickLower,
+            tickUpper,
+            pool,
+            garbage
+        );
+
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
+                user: garbage,
+                pool: pool,
+                amountIn: 2_000_000e18,
+                zeroForOne: true,
+                requireMint: true
+            })
+        );
+
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
+                user: garbage,
+                pool: pool,
+                amountIn: 910e18,
+                zeroForOne: false,
+                requireMint: true
+            })
+        );
+    }
+
+    function testUnusePosition() public {
+        testMintPosition();
+        testUsePosition();
+
+        uint256 amount0 = 0;
+        uint256 amount1 = 5e18;
+
+        int24 tickLower = -77420;
+        int24 tickUpper = -77410;
+
+        positionManagerHandler.unusePosition(
+            token0,
+            token1,
+            amount0,
+            amount1,
+            0,
+            1e18,
+            tickLower,
+            tickUpper,
+            pool,
+            garbage
+        );
+
+        uint256 bobBalance = uniV3Handler.balanceOf(
+            bob,
+            positionManagerHandler.getTokenId(pool, tickLower, tickUpper)
+        );
+
+        uint256 jasonBalance = uniV3Handler.balanceOf(
+            jason,
+            positionManagerHandler.getTokenId(pool, tickLower, tickUpper)
+        );
+
+        positionManagerHandler.burnPosition(
+            bobBalance,
+            tickLower,
+            tickUpper,
+            pool,
+            bob
+        );
+
+        positionManagerHandler.burnPosition(
+            jasonBalance - 1, // since you can't reset the shares
+            tickLower,
+            tickUpper,
+            pool,
+            jason
+        );
+    }
+
+    function testDonation() public {
+        testMintPosition();
+
+        uint256 amount0 = 0;
+        uint256 amount1 = 0;
+
+        int24 tickLower = -77420;
+        int24 tickUpper = -77410;
+
+        vm.roll(block.number + 1);
+
+        positionManagerHandler.donatePosition(
+            token0,
+            token1,
+            amount0,
+            amount1,
+            0,
+            1e18,
+            tickLower,
+            tickUpper,
+            pool,
+            garbage
+        );
+
+        vm.roll(block.number + 5);
+
+        positionManagerHandler.mintPosition(
+            token0,
+            token1,
+            0,
+            5e18,
+            tickLower,
+            tickUpper,
+            pool,
+            roger
+        );
+
+        positionManagerHandler.mintPosition(
+            token0,
+            token1,
+            0,
+            5e18,
+            tickLower,
+            tickUpper,
+            pool,
+            tango
+        );
+
+        vm.roll(block.number + 10);
+
+        uint256 bobBalance = uniV3Handler.balanceOf(
+            bob,
+            positionManagerHandler.getTokenId(pool, tickLower, tickUpper)
+        );
+
+        uint256 jasonBalance = uniV3Handler.balanceOf(
+            jason,
+            positionManagerHandler.getTokenId(pool, tickLower, tickUpper)
+        );
+
+        uint256 rogerBalance = uniV3Handler.balanceOf(
+            roger,
+            positionManagerHandler.getTokenId(pool, tickLower, tickUpper)
+        );
+
+        uint256 tangoBalance = uniV3Handler.balanceOf(
+            tango,
+            positionManagerHandler.getTokenId(pool, tickLower, tickUpper)
+        );
+
+        positionManagerHandler.burnPosition(
+            bobBalance,
+            tickLower,
+            tickUpper,
+            pool,
+            bob
+        );
+
+        positionManagerHandler.burnPosition(
+            jasonBalance,
+            tickLower,
+            tickUpper,
+            pool,
+            jason
+        );
+        positionManagerHandler.burnPosition(
+            rogerBalance,
+            tickLower,
+            tickUpper,
+            pool,
+            roger
+        );
+        positionManagerHandler.burnPosition(
+            tangoBalance - 1, // since you can't reset the shares
+            tickLower,
+            tickUpper,
+            pool,
+            tango
+        );
+    }
+
+    function testPutOptionSim() public {
+        uint256 amount0 = 10_000e18;
+        uint256 amount1 = 0;
+
+        int24 tickLower = -75770; // ~1950
+        int24 tickUpper = -75760; // ~1952
+
+        positionManagerHandler.mintPosition(
+            token0,
+            token1,
+            amount0,
+            amount1,
+            tickLower,
+            tickUpper,
+            pool,
+            bob
+        );
+
+        positionManagerHandler.mintPosition(
+            token0,
+            token1,
+            amount0,
+            amount1,
+            tickLower,
+            tickUpper,
+            pool,
+            jason
+        );
+
+        positionManagerHandler.usePosition(
+            amount0,
+            amount1,
+            tickLower,
+            tickUpper,
+            pool,
+            garbage
+        );
+
+        // console.log("Total Token 0 Borrowed", token0.balanceOf(garbage));
+
+        (, , uint256 lu, , , , , , , , , ) = uniV3Handler.tokenIds(
+            uint256(
+                keccak256(
+                    abi.encode(
+                        address(uniV3Handler),
+                        pool,
+                        tickLower,
+                        tickUpper
+                    )
+                )
+            )
+        );
+        // console.log(tl, ts, lu);
+
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
+                user: trader,
+                pool: pool,
+                amountIn: 200e18, // pushes to 1921
+                zeroForOne: false,
+                requireMint: true
+            })
+        );
+
+        // console.log(uniswapV3TestLib.getCurrentSqrtPriceX96(pool));
+
+        // uint256 amountToSwap = token0.balanceOf(garbage);
+
+        // vm.startPrank(garbage);
+        // token0.transfer(address(1), amountToSwap);
+        // vm.stopPrank();
+
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
+                user: garbage,
+                pool: pool,
+                amountIn: token0.balanceOf(garbage), // pushes to 1925
+                zeroForOne: true,
+                requireMint: false
+            })
+        );
+
+        // console.log("Total Token 1 after Swap", token1.balanceOf(garbage));
+        // console.log(uniswapV3TestLib.getCurrentSqrtPriceX96(pool));
+
+        (uint256 a0, uint256 a1) = LiquidityAmounts.getAmountsForLiquidity(
+            uniswapV3TestLib.getCurrentSqrtPriceX96(pool),
+            tickLower.getSqrtRatioAtTick(),
+            tickUpper.getSqrtRatioAtTick(),
+            uint128(lu)
+        );
+
+        // console.log(a0, a1);
+
+        positionManagerHandler.unusePosition(
+            token0,
+            token1,
+            a0,
+            a1,
+            0,
+            1,
+            tickLower,
+            tickUpper,
+            pool,
+            garbage
+        );
+
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
+                user: garbage,
+                pool: pool,
+                amountIn: token1.balanceOf(garbage), // pushes to 1921
+                zeroForOne: false,
+                requireMint: false
+            })
+        );
+
+        // console.log("Profit: ", token0.balanceOf(garbage));
+    }
+
+    function testCallOptionSim() public {
+        uint256 amount0 = 0;
+        uint256 amount1 = 5e18;
+
+        int24 tickLower = -76260; // ~2050
+        int24 tickUpper = -76250; // ~2048
+
+        positionManagerHandler.mintPosition(
+            token0,
+            token1,
+            amount0,
+            amount1,
+            tickLower,
+            tickUpper,
+            pool,
+            bob
+        );
+
+        positionManagerHandler.mintPosition(
+            token0,
+            token1,
+            amount0,
+            amount1,
+            tickLower,
+            tickUpper,
+            pool,
+            jason
+        );
+
+        positionManagerHandler.usePosition(
+            amount0,
+            amount1,
+            tickLower,
+            tickUpper,
+            pool,
+            garbage
+        );
+
+        // console.log("Total Token 1 Borrowed", token1.balanceOf(garbage));
+
+        (, , uint256 lu, , , , , , , , , ) = uniV3Handler.tokenIds(
+            uint256(
+                keccak256(
+                    abi.encode(
+                        address(uniV3Handler),
+                        pool,
+                        tickLower,
+                        tickUpper
+                    )
+                )
+            )
+        );
+        // console.log(tl, ts, lu);
+
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
+                user: trader,
+                pool: pool,
+                amountIn: 400000e18, // pushes to 2078
+                zeroForOne: true,
+                requireMint: true
+            })
+        );
+
+        // console.log(uniswapV3TestLib.getCurrentSqrtPriceX96(pool));
+
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
+                user: garbage,
+                pool: pool,
+                amountIn: token1.balanceOf(garbage), // pushes to 2076
+                zeroForOne: false,
+                requireMint: false
+            })
+        );
+
+        // console.log("Total Token 1 after Swap", token1.balanceOf(garbage));
+        // console.log(uniswapV3TestLib.getCurrentSqrtPriceX96(pool));
+
+        (uint256 a0, uint256 a1) = LiquidityAmounts.getAmountsForLiquidity(
+            uniswapV3TestLib.getCurrentSqrtPriceX96(pool),
+            tickLower.getSqrtRatioAtTick(),
+            tickUpper.getSqrtRatioAtTick(),
+            uint128(lu)
+        );
+
+        // console.log(a0, a1);
+
+        positionManagerHandler.unusePosition(
+            token0,
+            token1,
+            a0,
+            a1,
+            1,
+            0,
+            tickLower,
+            tickUpper,
+            pool,
+            garbage
+        );
+
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
+                user: garbage,
+                pool: pool,
+                amountIn: token0.balanceOf(garbage), // pushes to 1921
+                zeroForOne: true,
+                requireMint: false
+            })
+        );
+
+        // console.log("Profit: ", token1.balanceOf(garbage));
+    }
+}
