@@ -19,6 +19,12 @@ import {FullMath} from "@uniswap/v3-core/contracts/libraries/FullMath.sol";
 import {FixedPoint128} from "@uniswap/v3-core/contracts/libraries/FixedPoint128.sol";
 import {ISwapRouter} from "v3-periphery/SwapRouter.sol";
 
+/**
+ * @title UniswapV3SingleTickLiquidityHandler
+ * @author 0xcarrot
+ * @dev This is a handler contract for providing liquidity
+ * for Uniswap V3 Style AMMs.
+ */
 contract UniswapV3SingleTickLiquidityHandler is
     ERC1155(""),
     IHandler,
@@ -132,6 +138,15 @@ contract UniswapV3SingleTickLiquidityHandler is
         swapRouter = ISwapRouter(_swapRouter);
     }
 
+    /**
+     * @notice Mints a new position for the user.
+     * @param context The address of the user minting the position.
+     * @param _mintPositionData The data required to mint the position.
+     * @dev Only whitelisted DopexV2PositionManager can call it. It auto-compounds
+     * the fees on mint. You cannot mint in range liquidity. Recommended to add liquidity
+     * on a single ticks only.
+     * @return sharesMinted The number of shares minted.
+     */
     function mintPositionHandler(
         address context,
         bytes calldata _mintPositionData
@@ -234,6 +249,14 @@ contract UniswapV3SingleTickLiquidityHandler is
         emit LogMintedPosition(context, tokenId, uint128(sharesMinted));
     }
 
+    /**
+     * @notice Burn an existing position.
+     * @param context The address of the user burning the position.
+     * @param _burnPositionData The data required to burn the position.
+     * @dev Only whitelisted DopexV2PositionManager can call it. Users will receive the fees
+     * in either token0 or token1 or both based on the fee collection.
+     * @return The number of shares burned.
+     */
     function burnPositionHandler(
         address context,
         bytes calldata _burnPositionData
@@ -327,6 +350,14 @@ contract UniswapV3SingleTickLiquidityHandler is
         return (_params.shares);
     }
 
+    /**
+     * @notice Use an existing position.
+     * @param _usePositionData The data required to use the position.
+     * @dev Only whitelisted DopexV2PositionManager can call it.
+     * @return tokens The addresses of the tokens that were unwrapped.
+     * @return amounts The amounts of the tokens that were unwrapped.
+     * @return liquidityUsed The amount of liquidity that was used.
+     */
     function usePositionHandler(
         bytes calldata _usePositionHandler
     )
@@ -388,6 +419,13 @@ contract UniswapV3SingleTickLiquidityHandler is
         return (tokens, amounts, _params.liquidityToUse);
     }
 
+    /**
+     * @notice Unuse a portion of an existing position.
+     * @param _unusePositionData The data required to unuse the position.
+     * @dev Only whitelisted DopexV2PositionManager can call it.
+     * @return amounts The amounts of the tokens that were wrapped.
+     * @return liquidityUnused The amount of liquidity that was unused.
+     */
     function unusePositionHandler(
         bytes calldata _unusePositionData
     )
@@ -460,6 +498,13 @@ contract UniswapV3SingleTickLiquidityHandler is
         return (amounts, uint256(liquidity));
     }
 
+    /**
+     * @notice Donate liquidity to an existing position.
+     * @param _donateData The data required to donate liquidity to the position.
+     * @dev Only whitelisted DopexV2PositionManager can call it.
+     * @return amounts The amounts of the tokens that were donated.
+     * @return liquidityDonated The amount of liquidity that was donated.
+     */
     function donateToPosition(
         bytes calldata _donateData
     )
@@ -534,6 +579,13 @@ contract UniswapV3SingleTickLiquidityHandler is
         return (amounts, liquidity);
     }
 
+    /**
+     * @notice Calculates the fees owed to the position.
+     * @param _tki The TokenIdInfo struct for the position.
+     * @param _pool The UniswapV3Pool contract.
+     * @param _tickLower The lower tick of the position.
+     * @param _tickUpper The upper tick of the position.
+     */
     function _feeCalculation(
         TokenIdInfo storage _tki,
         IUniswapV3Pool _pool,
@@ -573,6 +625,16 @@ contract UniswapV3SingleTickLiquidityHandler is
         }
     }
 
+    /**
+     * @notice Compounds the fees owed to the position.
+     * @param tki The TokenIdInfo struct for the position.
+     * @param _pool The UniswapV3Pool contract.
+     * @param _tickLower The lower tick of the position.
+     * @param _tickUpper The upper tick of the position.
+     * @param amount0 The amount of token 0 to add to the position.
+     * @param amount1 The amount of token 1 to add to the position.
+     * @dev Cannot auto-compound in-range positions
+     */
     function _compoundFees(
         TokenIdInfo storage tki,
         IUniswapV3Pool _pool,
@@ -637,6 +699,11 @@ contract UniswapV3SingleTickLiquidityHandler is
         }
     }
 
+    /**
+     * @notice Calculates the handler identifier for a position.
+     * @param _data The encoded position data.
+     * @return handlerIdentifierId The handler identifier for the position.
+     */
     function getHandlerIdentifier(
         bytes calldata _data
     ) external view returns (uint256 handlerIdentifierId) {
@@ -651,6 +718,12 @@ contract UniswapV3SingleTickLiquidityHandler is
             );
     }
 
+    /**
+     * @notice Calculates the amount of tokens that need to be pulled for a mint position.
+     * @param _mintPositionData The encoded mint position data.
+     * @return tokens The tokens that need to be pulled.
+     * @return amounts The amount of each token that needs to be pulled.
+     */
     function tokensToPullForMint(
         bytes calldata _mintPositionData
     ) external view returns (address[] memory, uint256[] memory) {
@@ -678,6 +751,12 @@ contract UniswapV3SingleTickLiquidityHandler is
         return (tokens, amounts);
     }
 
+    /**
+     * @notice Calculates the amount of tokens that need to be pulled for an unuse position.
+     * @param _unusePositionData The encoded unuse position data.
+     * @return tokens The tokens that need to be pulled.
+     * @return amounts The amount of each token that needs to be pulled.
+     */
     function tokensToPullForUnUse(
         bytes calldata _unusePositionData
     ) external view returns (address[] memory, uint256[] memory) {
@@ -705,6 +784,11 @@ contract UniswapV3SingleTickLiquidityHandler is
         return (tokens, amounts);
     }
 
+    /**
+     * @notice Calculates the amount of tokens that need to be pulled for a donate position.
+     * @param _donatePosition The encoded donate position data.
+     * @return tokens The tokens that need *
+     */
     function tokensToPullForDonate(
         bytes calldata _donatePosition
     ) external view returns (address[] memory, uint256[] memory) {
@@ -732,6 +816,11 @@ contract UniswapV3SingleTickLiquidityHandler is
         return (tokens, amounts);
     }
 
+    /**
+     * @notice Calculates the amount of donated liquidity that is locked.
+     * @param tokenId The tokenId of the position.
+     * @return donationLocked The amount of donated liquidity that is locked.
+     */
     function _donationLocked(uint256 tokenId) internal view returns (uint128) {
         TokenIdInfo memory tki = tokenIds[tokenId];
 
@@ -744,6 +833,13 @@ contract UniswapV3SingleTickLiquidityHandler is
         return donationLocked;
     }
 
+    /**
+     * @notice Converts an amount of assets to shares.
+     * @param assets The amount of assets.
+     * @param tokenId The tokenId of the position.
+     * @param rounding The rounding mode to use.
+     * @return shares The number of shares.
+     */
     function _convertToShares(
         uint128 assets,
         uint256 tokenId,
@@ -760,6 +856,13 @@ contract UniswapV3SingleTickLiquidityHandler is
             );
     }
 
+    /**
+     * @notice Converts an amount of shares to assets.
+     * @param shares The number of shares.
+     * @param tokenId The tokenId of the position.
+     * @param rounding The rounding mode to use.
+     * @return assets The amount of assets.
+     */
     function _convertToAssets(
         uint128 shares,
         uint256 tokenId,
@@ -776,12 +879,24 @@ contract UniswapV3SingleTickLiquidityHandler is
             );
     }
 
+    /**
+     * @notice Gets the current sqrtPriceX96 of the given UniswapV3Pool.
+     * @param pool The UniswapV3Pool to get the sqrtPriceX96 from.
+     * @return sqrtPriceX96 The current sqrtPriceX96 of the given UniswapV3Pool.
+     */
     function _getCurrentSqrtPriceX96(
         IUniswapV3Pool pool
     ) internal view returns (uint160 sqrtPriceX96) {
         (sqrtPriceX96, , , , , , ) = pool.slot0();
     }
 
+    /**
+     * @notice Computes the position key for the given owner, tickLower, and tickUpper.
+     * @param owner The owner of the position.
+     * @param tickLower The lower tick of the position.
+     * @param tickUpper The upper tick of the position.
+     * @return positionKey The position key for the given owner, tickLower, and tickUpper.
+     */
     function _computePositionKey(
         address owner,
         int24 tickLower,
@@ -791,6 +906,11 @@ contract UniswapV3SingleTickLiquidityHandler is
     }
 
     // admin functions
+    /**
+     * @notice Updates the whitelist status of the given app.
+     * @param _app The app to update the whitelist status of.
+     * @param _status The new whitelist status of the app.
+     */
     function updateWhitelistedApps(
         address _app,
         bool _status
@@ -799,6 +919,10 @@ contract UniswapV3SingleTickLiquidityHandler is
         emit LogUpdateWhitelistedApp(_app, _status);
     }
 
+    /**
+     * @notice Updates the locked block duration.
+     * @param _newLockedBlockDuration The new locked block duration.
+     */
     function updateLockedBlockDuration(
         uint64 _newLockedBlockDuration
     ) external onlyOwner {
@@ -807,6 +931,14 @@ contract UniswapV3SingleTickLiquidityHandler is
     }
 
     // SOS admin functions
+
+    /**
+     * @notice Forcefully withdraws UniswapV3 liquidity from the given position.
+     * @param pool The UniswapV3Pool to withdraw liquidity from.
+     * @param tickLower The lower tick of the position to withdraw liquidity from.
+     * @param tickUpper The upper tick of the position to withdraw liquidity from.
+     * @param liquidity The amount of liquidity to withdraw.
+     */
     function forceWithdrawUniswapV3Liquidity(
         IUniswapV3Pool pool,
         int24 tickLower,
@@ -820,6 +952,10 @@ contract UniswapV3SingleTickLiquidityHandler is
         pool.collect(msg.sender, tickLower, tickUpper, t0, t1);
     }
 
+    /**
+     * @notice Emergency withdraws the given token from the contract.
+     * @param token The token to withdraw.
+     */
     function emergencyWithdraw(address token) external onlyOwner {
         IERC20(token).transfer(
             msg.sender,
@@ -827,9 +963,16 @@ contract UniswapV3SingleTickLiquidityHandler is
         );
     }
 
+    /**
+     * @notice Emergency pauses the contract.
+     */
     function emergencyPause() external onlyOwner {
         _pause();
     }
+
+    /**
+     * @notice Emergency unpauses the contract.
+     */
 
     function emergencyUnpause() external onlyOwner {
         _unpause();
