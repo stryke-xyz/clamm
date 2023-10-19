@@ -144,10 +144,6 @@ contract DopexV2OptionPools is
         primePool = IUniswapV3Pool(_primePool);
     }
 
-    function setTokenURIFetcher(address _fetcher) external {
-        tokenURIFetcher = _fetcher;
-    }
-
     function tokenURI(uint256 id) public view override returns (string memory) {
         return ITokenURIFetcher(tokenURIFetcher).onFetchTokenURIData(id);
     }
