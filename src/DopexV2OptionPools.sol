@@ -20,6 +20,12 @@ import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {FullMath} from "@uniswap/v3-core/contracts/libraries/FullMath.sol";
 
+/**
+ * @title DopexV2OptionPools
+ * @author 0xcarrot
+ * @dev Allow traders to buy CALL and PUT options using CLAMM liquidity, which can be
+ * exercised at any time ITM.
+ */
 contract DopexV2OptionPools is
     Ownable,
     ReentrancyGuard,
@@ -144,10 +150,19 @@ contract DopexV2OptionPools is
         primePool = IUniswapV3Pool(_primePool);
     }
 
+    /**
+     * @notice Provides the tokenURI for each token
+     * @param id The token Id.
+     * @return The tokenURI string data
+     */
     function tokenURI(uint256 id) public view override returns (string memory) {
         return ITokenURIFetcher(tokenURIFetcher).onFetchTokenURIData(id);
     }
 
+    /**
+     * @notice Mints an option for the given strike and expiry.
+     * @param _params The option roll parameters.
+     */
     function mintOptionRoll(
         OptionRollParams calldata _params
     ) external nonReentrant {
@@ -284,6 +299,10 @@ contract DopexV2OptionPools is
         );
     }
 
+    /**
+     * @notice Exercises the given option roll.
+     * @param _params The exercise option roll parameters.
+     */
     function exerciseOptionRoll(
         ExerciseOptionRollParams calldata _params
     ) external nonReentrant {
@@ -385,6 +404,10 @@ contract DopexV2OptionPools is
         );
     }
 
+    /**
+     * @notice Settles the given option roll.
+     * @param _params The settle option roll parameters.
+     */
     function settleOptionRoll(
         SettleOptionRollParams calldata _params
     ) external nonReentrant {
@@ -534,6 +557,10 @@ contract DopexV2OptionPools is
         emit LogSettleOptionRoll(ownerOf(_params.optionId), _params.optionId);
     }
 
+    /**
+     * @notice Splits the given option roll into two new option rolls.
+     * @param _params The position splitter parameters.
+     */
     function positionSplitter(
         PositionSplitterParams calldata _params
     ) external nonReentrant {
@@ -579,6 +606,11 @@ contract DopexV2OptionPools is
         );
     }
 
+    /**
+     * @notice Updates the exercise delegate for the caller's option rolls.
+     * @param _delegateTo The address of the new exercise delegate.
+     * @param _status The status of the exercise delegate (true to enable, false to disable).
+     */
     function updateExerciseDelegate(
         address _delegateTo,
         bool _status
@@ -587,6 +619,12 @@ contract DopexV2OptionPools is
     }
 
     // internal
+    /**
+     * @notice Calculates the price per call asset for the given tick.
+     * @param _pool The UniswapV3 pool.
+     * @param _tick The tick.
+     * @return The price per call asset.
+     */
     function getPricePerCallAssetViaTick(
         IUniswapV3Pool _pool,
         int24 _tick
@@ -595,6 +633,11 @@ contract DopexV2OptionPools is
         return _getPrice(_pool, sqrtPriceX96);
     }
 
+    /**
+     * @notice Calculates the current price per call asset.
+     * @param _pool The UniswapV3 pool.
+     * @return The current price per call asset.
+     */
     function getCurrentPricePerCallAsset(
         IUniswapV3Pool _pool
     ) public view returns (uint256) {
@@ -602,6 +645,16 @@ contract DopexV2OptionPools is
         return _getPrice(_pool, sqrtPriceX96);
     }
 
+    /**
+     * @notice Calculates the premium amount for the given option parameters.
+     * @param isPut Whether the option is a put or call.
+     * @param expiry The expiry of the option.
+     * @param strike The strike price of the option.
+     * @param lastPrice The last price of the underlying asset.
+     * @param baseIv The base implied volatility of the underlying asset.
+     * @param amount The amount of the underlying asset.
+     * @return The premium amount.
+     */
     function getPremiumAmount(
         bool isPut,
         uint expiry,
@@ -614,12 +667,27 @@ contract DopexV2OptionPools is
             _getPremiumAmount(isPut, expiry, strike, lastPrice, baseIv, amount);
     }
 
+    /**
+     * @notice Gets the current sqrt price.
+     * @param pool The UniswapV3 pool.
+     * @return sqrtPriceX96 The current sqrt price.
+     */
     function _getCurrentSqrtPriceX96(
         IUniswapV3Pool pool
     ) internal view returns (uint160 sqrtPriceX96) {
         (sqrtPriceX96, , , , , , ) = pool.slot0();
     }
 
+    /**
+     * @notice Calculates the premium amount for the given option parameters.
+     * @param isPut Whether the option is a put or call.
+     * @param expiry The expiry of the option.
+     * @param strike The strike price of the option.
+     * @param lastPrice The last price of the underlying asset.
+     * @param baseIv The base implied volatility of the underlying asset.
+     * @param amount The amount of the underlying asset.
+     * @return premiumAmount The premium amount.
+     */
     function _getPremiumAmount(
         bool isPut,
         uint expiry,
@@ -649,6 +717,12 @@ contract DopexV2OptionPools is
             (premiumInQuote * (10 ** ERC20(callAsset).decimals())) / lastPrice;
     }
 
+    /**
+     * @notice Gets the price per call asset in quote asset units.
+     * @param _pool The UniswapV3 pool instance.
+     * @param sqrtPriceX96 The sqrt price of the pool.
+     * @return price The price per call asset in quote asset units.
+     */
     function _getPrice(
         IUniswapV3Pool _pool,
         uint160 sqrtPriceX96
@@ -688,6 +762,12 @@ contract DopexV2OptionPools is
     }
 
     // admin
+    /**
+     * @notice Updates the implied volatility (IV) for the given time to expirations (TTLs).
+     * @param _ttls The TTLs to update the IV for.
+     * @param _ttlIV The new IVs for the given TTLs.
+     * @dev Only the owner can call this function.
+     */
     function updateIVs(
         uint256[] calldata _ttls,
         uint256[] calldata _ttlIV
@@ -697,6 +777,18 @@ contract DopexV2OptionPools is
         }
     }
 
+    /**
+     * @notice Updates the addresses of the various components of the contract.
+     * @param _feeTo The address of the fee recipient.
+     * @param _tokeURIFetcher The address of the token URI fetcher.
+     * @param _dpFee The address of the Dopex fee contract.
+     * @param _optionPricing The address of the option pricing contract.
+     * @param _settler The address of the settler.
+     * @param _statusSettler Whether the settler is enabled.
+     * @param _pool The address of the UniswapV3 pool.
+     * @param _statusPools Whether the UniswapV3 pool is enabled.
+     * @dev Only the owner can call this function.
+     */
     function updateAddress(
         address _feeTo,
         address _tokeURIFetcher,
@@ -716,6 +808,11 @@ contract DopexV2OptionPools is
     }
 
     // SOS admin functions
+    /**
+     * @notice Performs an emergency withdraw of all tokens from the contract.
+     * @param token The address of the token to withdraw.
+     * @dev Only the owner can call this function.
+     */
     function emergencyWithdraw(address token) external onlyOwner {
         ERC20(token).transfer(
             msg.sender,

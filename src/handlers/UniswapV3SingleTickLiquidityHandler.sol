@@ -352,7 +352,7 @@ contract UniswapV3SingleTickLiquidityHandler is
 
     /**
      * @notice Use an existing position.
-     * @param _usePositionData The data required to use the position.
+     * @param _usePositionHandler The data required to use the position.
      * @dev Only whitelisted DopexV2PositionManager can call it.
      * @return tokens The addresses of the tokens that were unwrapped.
      * @return amounts The amounts of the tokens that were unwrapped.

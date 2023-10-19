@@ -76,7 +76,7 @@ contract DopexV2PositionManager is Ownable, ReentrancyGuard, Multicall {
      * @notice Mint a new position using the specified handler.
      * @param _handler The address of the handler to use.
      * @param _mintPositionData The data required to mint the position.
-     * @return The number of shares minted.
+     * @return sharesMinted The number of shares minted.
      */
     function mintPosition(
         IHandler _handler,
@@ -113,7 +113,7 @@ contract DopexV2PositionManager is Ownable, ReentrancyGuard, Multicall {
      * @notice Burn an existing position using the specified handler.
      * @param _handler The address of the handler to use.
      * @param _burnPositionData The data required to burn the position.
-     * @return The number of shares burned.
+     * @return sharesBurned The number of shares burned.
      */
     function burnPosition(
         IHandler _handler,
@@ -138,7 +138,9 @@ contract DopexV2PositionManager is Ownable, ReentrancyGuard, Multicall {
      * @notice Use an existing position using the specified handler.
      * @param _handler The address of the handler to use.
      * @param _usePositionData The data required to use the position.
-     * @return The tokens and amounts used, and the total liquidity used.
+     * @return tokens The tokens that will be unwrapped
+     * @return amounts The amounts that will be received
+     * @return liquidityUsed Amount of liquidity used
      */
     function usePosition(
         IHandler _handler,
@@ -167,7 +169,8 @@ contract DopexV2PositionManager is Ownable, ReentrancyGuard, Multicall {
      * @notice Unuse an existing position using the specified handler.
      * @param _handler The address of the handler to use.
      * @param _unusePositionData The data required to unuse the position.
-     * @return The tokens and amounts returned, and the total liquidity unused.
+     * @return amounts The  amounts returned
+     * @return liquidity The total liquidity unused.
      */
     function unusePosition(
         IHandler _handler,
@@ -194,8 +197,9 @@ contract DopexV2PositionManager is Ownable, ReentrancyGuard, Multicall {
     /**
      * @notice Donate to an existing position using the specified handler.
      * @param _handler The address of the handler to use.
-     * @param _donatePositionData The data required to donate to the position.
-     * @return The tokens and amounts donated, and the total liquidity donated.
+     * @param _donatePosition The data required to donate to the position.
+     * @return amounts The tokens and amounts donated. T
+     * @return liquidity The total liquidity donated.
      */
     function donateToPosition(
         IHandler _handler,
