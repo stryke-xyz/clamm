@@ -26,7 +26,7 @@ import {ISwapRouter} from "v3-periphery/SwapRouter.sol";
  * for Uniswap V3 Style AMMs.
  */
 contract UniswapV3SingleTickLiquidityHandler is
-    ERC1155(""),
+    ERC1155("UNI-V3-STLH"),
     IHandler,
     Ownable,
     Pausable,
@@ -89,15 +89,22 @@ contract UniswapV3SingleTickLiquidityHandler is
 
     // events
     event LogMintedPosition(
-        address user,
         uint256 tokenId,
-        uint128 sharesMinted
+        uint128 liquidityMinted,
+        address pool,
+        address user,
+        int24 tickLower,
+        int24 tickUpper
     );
     event LogBurnedPosition(
-        address user,
         uint256 tokenId,
-        uint128 sharesBurned
+        uint128 liquidityBurned,
+        address pool,
+        address user,
+        int24 tickLower,
+        int24 tickUpper
     );
+
     event LogFeeCompound(
         IUniswapV3Pool pool,
         int24 tickLower,
@@ -246,7 +253,14 @@ contract UniswapV3SingleTickLiquidityHandler is
 
         _mint(context, tokenId, sharesMinted, "");
 
-        emit LogMintedPosition(context, tokenId, uint128(sharesMinted));
+        emit LogMintedPosition(
+            tokenId,
+            liquidity,
+            address(_params.pool),
+            context,
+            _params.tickLower,
+            _params.tickUpper
+        );
     }
 
     /**
@@ -346,7 +360,14 @@ contract UniswapV3SingleTickLiquidityHandler is
 
         _burn(context, tokenId, _params.shares);
 
-        emit LogBurnedPosition(context, tokenId, _params.shares);
+        emit LogBurnedPosition(
+            tokenId,
+            liquidityToBurn,
+            address(_params.pool),
+            context,
+            _params.tickLower,
+            _params.tickUpper
+        );
         return (_params.shares);
     }
 
