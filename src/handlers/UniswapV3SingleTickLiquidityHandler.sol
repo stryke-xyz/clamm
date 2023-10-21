@@ -107,6 +107,7 @@ contract UniswapV3SingleTickLiquidityHandler is
 
     event LogFeeCompound(
         IUniswapV3Pool pool,
+        uint256 tokenId,
         int24 tickLower,
         int24 tickUpper,
         uint128 liquidity
@@ -219,7 +220,7 @@ contract UniswapV3SingleTickLiquidityHandler is
             );
 
             _compoundFees(
-                tki,
+                tokenId,
                 _params.pool,
                 _params.tickLower,
                 _params.tickUpper,
@@ -648,7 +649,7 @@ contract UniswapV3SingleTickLiquidityHandler is
 
     /**
      * @notice Compounds the fees owed to the position.
-     * @param tki The TokenIdInfo struct for the position.
+     * @param tkiIndex The TokenIdInfo index.
      * @param _pool The UniswapV3Pool contract.
      * @param _tickLower The lower tick of the position.
      * @param _tickUpper The upper tick of the position.
@@ -657,7 +658,7 @@ contract UniswapV3SingleTickLiquidityHandler is
      * @dev Cannot auto-compound in-range positions
      */
     function _compoundFees(
-        TokenIdInfo storage tki,
+        uint256 tkiIndex,
         IUniswapV3Pool _pool,
         int24 _tickLower,
         int24 _tickUpper,
@@ -666,6 +667,8 @@ contract UniswapV3SingleTickLiquidityHandler is
     ) internal {
         if (amount0 > 0 && amount1 > 0)
             revert UniswapV3SingleTickLiquidityHandler__InRangeLP();
+
+        TokenIdInfo storage tki = tokenIds[tkiIndex];
 
         if (tki.tokensOwed0 > 0 || tki.tokensOwed1 > 0) {
             (uint256 a0, uint256 a1) = _pool.collect(
@@ -716,7 +719,7 @@ contract UniswapV3SingleTickLiquidityHandler is
                 );
             tki.totalLiquidity += liquidity;
 
-            emit LogFeeCompound(_pool, _tickLower, _tickUpper, liquidity);
+            emit LogFeeCompound(_pool, tkiIndex, _tickLower, _tickUpper, liquidity);
         }
     }
 
