@@ -99,6 +99,7 @@ contract DopexV2OptionPools is
         uint256 newTokenId,
         address to
     );
+    event LogIVUpdate(uint256[] ttl, uint256[] iv);
 
     // errors
     error DopexV2OptionPools__IVNotSet();
@@ -775,6 +776,7 @@ contract DopexV2OptionPools is
         for (uint256 i; i < _ttls.length; i++) {
             ttlToVEID[_ttls[i]] = _ttlIV[i];
         }
+        emit LogIVUpdate(_ttls, _ttlIV);
     }
 
     /**
