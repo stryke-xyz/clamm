@@ -100,6 +100,13 @@ contract DopexV2OptionPools is
         address to
     );
     event LogIVUpdate(uint256[] ttl, uint256[] iv);
+    event LogOptionsPoolInitialized(
+        address _optionPricing,
+        address _dpFee,
+        address _callAsset,
+        address _putAsset,
+        address _primePool
+    );
 
     // errors
     error DopexV2OptionPools__IVNotSet();
@@ -149,6 +156,14 @@ contract DopexV2OptionPools is
         optionPricing = IOptionPricing(_optionPricing);
 
         primePool = IUniswapV3Pool(_primePool);
+
+        emit LogOptionsPoolInitialized(
+            _optionPricing,
+            _dpFee,
+            _callAsset,
+            _putAsset,
+            _primePool
+        );
     }
 
     /**
