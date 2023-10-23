@@ -104,8 +104,12 @@ contract DopexV2OptionPools is
         address _optionPricing,
         address _dpFee,
         address _callAsset,
-        address _putAsset,
-        address _primePool
+        address _putAsset
+    );
+    event LogUpdateAddress(
+        address _tokeURIFetcher,
+        address _dpFee,
+        address _optionPricing
     );
 
     // errors
@@ -161,8 +165,7 @@ contract DopexV2OptionPools is
             _optionPricing,
             _dpFee,
             _callAsset,
-            _putAsset,
-            _primePool
+            _putAsset
         );
     }
 
@@ -822,6 +825,12 @@ contract DopexV2OptionPools is
         optionPricing = IOptionPricing(_optionPricing);
         settlers[_settler] = _statusSettler;
         approvedPools[_pool] = _statusPools;
+
+        emit LogUpdateAddress(
+            _tokeURIFetcher,
+            _dpFee,
+            _optionPricing
+        );
     }
 
     // SOS admin functions
