@@ -101,15 +101,15 @@ contract DopexV2OptionPools is
     );
     event LogIVUpdate(uint256[] ttl, uint256[] iv);
     event LogOptionsPoolInitialized(
-        address _optionPricing,
-        address _dpFee,
-        address _callAsset,
-        address _putAsset
+        address optionPricing,
+        address dpFee,
+        address callAsset,
+        address putAsset
     );
     event LogUpdateAddress(
-        address _tokeURIFetcher,
-        address _dpFee,
-        address _optionPricing
+        address tokeURIFetcher,
+        address dpFee,
+        address optionPricing
     );
 
     // errors
@@ -826,11 +826,7 @@ contract DopexV2OptionPools is
         settlers[_settler] = _statusSettler;
         approvedPools[_pool] = _statusPools;
 
-        emit LogUpdateAddress(
-            _tokeURIFetcher,
-            _dpFee,
-            _optionPricing
-        );
+        emit LogUpdateAddress(_tokeURIFetcher, _dpFee, _optionPricing);
     }
 
     // SOS admin functions
