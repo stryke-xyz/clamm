@@ -85,12 +85,13 @@ contract DopexV2OptionPools is
         uint256 tokenId,
         bool isCall,
         uint256 premiumAmount,
-        uint256 totalAsssetWithdrawn
+        uint256 totalAssetWithdrawn
     );
     event LogExerciseOptionRoll(
         address user,
         uint256 tokenId,
-        uint256 totalProfit
+        uint256 totalProfit,
+        uint256 totalAssetRelcked
     );
     event LogSettleOptionRoll(address user, uint256 tokenId);
     event LogSplitOptionRoll(
@@ -339,7 +340,7 @@ contract DopexV2OptionPools is
             revert DopexV2OptionPools__OptionExpired();
 
         uint256 totalProfit;
-
+        uint256 totalAssetRelocked;
         for (uint256 i; i < oData.opTickArrayLen; i++) {
             OptionTicks storage opTick = opTickMap[_params.optionId][i];
 
@@ -358,6 +359,8 @@ contract DopexV2OptionPools is
                     opTick.tickUpper.getSqrtRatioAtTick(),
                     uint128(_params.liquidityToExercise[i])
                 );
+
+            totalAssetRelocked += amountToSwap;
 
             uint256 prevBalance = ERC20(oData.isCall ? putAsset : callAsset)
                 .balanceOf(address(this));
@@ -419,7 +422,8 @@ contract DopexV2OptionPools is
         emit LogExerciseOptionRoll(
             ownerOf(_params.optionId),
             _params.optionId,
-            totalProfit
+            totalProfit,
+            totalAssetRelocked
         );
     }
 
