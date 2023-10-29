@@ -91,7 +91,7 @@ contract DopexV2OptionPools is
         address user,
         uint256 tokenId,
         uint256 totalProfit,
-        uint256 totalAssetRelcked
+        uint256 totalAssetRelocked
     );
     event LogSettleOptionRoll(address user, uint256 tokenId);
     event LogSplitOptionRoll(
