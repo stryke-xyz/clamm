@@ -26,7 +26,7 @@ import {ISwapRouter} from "v3-periphery/SwapRouter.sol";
  * for Uniswap V3 Style AMMs.
  */
 contract UniswapV3SingleTickLiquidityHandler is
-    ERC1155("UNI-V3-STLH"),
+    ERC1155(""),
     IHandler,
     Ownable,
     Pausable,
@@ -719,7 +719,13 @@ contract UniswapV3SingleTickLiquidityHandler is
                 );
             tki.totalLiquidity += liquidity;
 
-            emit LogFeeCompound(_pool, tkiIndex, _tickLower, _tickUpper, liquidity);
+            emit LogFeeCompound(
+                _pool,
+                tkiIndex,
+                _tickLower,
+                _tickUpper,
+                liquidity
+            );
         }
     }
 
