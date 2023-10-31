@@ -7,9 +7,9 @@ import {Math} from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {ERC1155} from "openzeppelin-contracts/contracts/token/ERC1155/ERC1155.sol";
-import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import {Pausable} from "openzeppelin-contracts/contracts/security/Pausable.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
+import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
 
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {LiquidityManager} from "../uniswap-v3/LiquidityManager.sol";
@@ -28,8 +28,8 @@ import {ISwapRouter} from "v3-periphery/SwapRouter.sol";
 contract UniswapV3SingleTickLiquidityHandler is
     ERC1155(""),
     IHandler,
-    Ownable,
     Pausable,
+    AccessControl,
     ReentrancyGuard,
     LiquidityManager
 {
@@ -132,6 +132,8 @@ contract UniswapV3SingleTickLiquidityHandler is
     uint64 public lockedBlockDuration = DEFAULT_LOCKED_BLOCK_DURATION;
     uint64 public newLockedBlockDuration;
 
+    bytes32 constant PAUSER_ROLE = keccak256("P");
+
     // modifiers
     modifier onlyWhitelisted() {
         if (!whitelistedApps[msg.sender])
@@ -145,6 +147,8 @@ contract UniswapV3SingleTickLiquidityHandler is
         address _swapRouter
     ) LiquidityManager(_factory, _pool_init_code_hash) {
         swapRouter = ISwapRouter(_swapRouter);
+        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _setRoleAdmin(PAUSER_ROLE, DEFAULT_ADMIN_ROLE);
     }
 
     /**
@@ -926,7 +930,7 @@ contract UniswapV3SingleTickLiquidityHandler is
     function updateWhitelistedApps(
         address _app,
         bool _status
-    ) external onlyOwner {
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         whitelistedApps[_app] = _status;
         emit LogUpdateWhitelistedApp(_app, _status);
     }
@@ -937,7 +941,7 @@ contract UniswapV3SingleTickLiquidityHandler is
      */
     function updateLockedBlockDuration(
         uint64 _newLockedBlockDuration
-    ) external onlyOwner {
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         newLockedBlockDuration = _newLockedBlockDuration;
         emit LogUpdatedLockedBlockDuration(_newLockedBlockDuration);
     }
@@ -956,7 +960,7 @@ contract UniswapV3SingleTickLiquidityHandler is
         int24 tickLower,
         int24 tickUpper,
         uint128 liquidity
-    ) external onlyOwner {
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         pool.burn(tickLower, tickUpper, liquidity);
         (, , , uint128 t0, uint128 t1) = pool.positions(
             _computePositionKey(address(this), tickLower, tickUpper)
@@ -968,7 +972,9 @@ contract UniswapV3SingleTickLiquidityHandler is
      * @notice Emergency withdraws the given token from the contract.
      * @param token The token to withdraw.
      */
-    function emergencyWithdraw(address token) external onlyOwner {
+    function emergencyWithdraw(
+        address token
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         IERC20(token).transfer(
             msg.sender,
             IERC20(token).balanceOf(address(this))
@@ -978,7 +984,7 @@ contract UniswapV3SingleTickLiquidityHandler is
     /**
      * @notice Emergency pauses the contract.
      */
-    function emergencyPause() external onlyOwner {
+    function emergencyPause() external onlyRole(PAUSER_ROLE) {
         _pause();
     }
 
@@ -986,7 +992,12 @@ contract UniswapV3SingleTickLiquidityHandler is
      * @notice Emergency unpauses the contract.
      */
 
-    function emergencyUnpause() external onlyOwner {
+    function emergencyUnpause() external onlyRole(PAUSER_ROLE) {
         _unpause();
     }
+
+    // no reason override?
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public view override(ERC1155, AccessControl) returns (bool) {}
 }
