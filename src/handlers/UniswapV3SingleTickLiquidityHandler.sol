@@ -197,6 +197,9 @@ contract UniswapV3SingleTickLiquidityHandler is
                 uint128(_params.liquidity)
             );
 
+        if (amount0 > 0 && amount1 > 0)
+            revert UniswapV3SingleTickLiquidityHandler__InRangeLP();
+
         (uint128 liquidity, , , ) = addLiquidity(
             LiquidityManager.AddLiquidityParams({
                 token0: tki.token0,
@@ -219,14 +222,70 @@ contract UniswapV3SingleTickLiquidityHandler is
                 _params.tickUpper
             );
 
-            _compoundFees(
-                tokenId,
-                _params.pool,
-                _params.tickLower,
-                _params.tickUpper,
-                amount0,
-                amount1
-            );
+            // compound fees
+            if (tki.tokensOwed0 > 0 || tki.tokensOwed1 > 0) {
+                (uint256 a0, uint256 a1) = _params.pool.collect(
+                    address(this),
+                    _params.tickLower,
+                    _params.tickUpper,
+                    uint128(tki.tokensOwed0),
+                    uint128(tki.tokensOwed1)
+                );
+
+                (tki.tokensOwed0, tki.tokensOwed1) = (0, 0);
+
+                bool isAmount0 = amount0 > 0;
+
+                IERC20(isAmount0 ? tki.token1 : tki.token0).safeApprove(
+                    address(swapRouter),
+                    isAmount0 ? a1 : a0
+                );
+
+                uint256 amountOut = swapRouter.exactInputSingle(
+                    ISwapRouter.ExactInputSingleParams({
+                        tokenIn: isAmount0 ? tki.token1 : tki.token0,
+                        tokenOut: isAmount0 ? tki.token0 : tki.token1,
+                        fee: tki.fee,
+                        recipient: address(this),
+                        deadline: block.timestamp + 5 days,
+                        amountIn: isAmount0 ? a1 : a0,
+                        amountOutMinimum: 0,
+                        sqrtPriceLimitX96: 0
+                    })
+                );
+
+                (
+                    uint128 liquidityFee,
+                    ,
+                    ,
+
+                ) = UniswapV3SingleTickLiquidityHandler(address(this))
+                        .addLiquidity(
+                            LiquidityManager.AddLiquidityParams({
+                                token0: tki.token0,
+                                token1: tki.token1,
+                                fee: tki.fee,
+                                recipient: address(this),
+                                tickLower: _params.tickLower,
+                                tickUpper: _params.tickUpper,
+                                amount0Desired: a0 +
+                                    (isAmount0 ? amountOut : 0),
+                                amount1Desired: a1 +
+                                    (isAmount0 ? 0 : amountOut),
+                                amount0Min: a0 + (isAmount0 ? amountOut : 0),
+                                amount1Min: a1 + (isAmount0 ? 0 : amountOut)
+                            })
+                        );
+                tki.totalLiquidity += liquidityFee;
+
+                emit LogFeeCompound(
+                    _params.pool,
+                    tokenId,
+                    _params.tickLower,
+                    _params.tickUpper,
+                    liquidityFee
+                );
+            }
 
             uint128 shares = _convertToShares(
                 liquidity,
@@ -644,88 +703,6 @@ contract UniswapV3SingleTickLiquidityHandler is
 
             _tki.feeGrowthInside0LastX128 = feeGrowthInside0LastX128;
             _tki.feeGrowthInside1LastX128 = feeGrowthInside1LastX128;
-        }
-    }
-
-    /**
-     * @notice Compounds the fees owed to the position.
-     * @param tkiIndex The TokenIdInfo index.
-     * @param _pool The UniswapV3Pool contract.
-     * @param _tickLower The lower tick of the position.
-     * @param _tickUpper The upper tick of the position.
-     * @param amount0 The amount of token 0 to add to the position.
-     * @param amount1 The amount of token 1 to add to the position.
-     * @dev Cannot auto-compound in-range positions
-     */
-    function _compoundFees(
-        uint256 tkiIndex,
-        IUniswapV3Pool _pool,
-        int24 _tickLower,
-        int24 _tickUpper,
-        uint256 amount0,
-        uint256 amount1
-    ) internal {
-        if (amount0 > 0 && amount1 > 0)
-            revert UniswapV3SingleTickLiquidityHandler__InRangeLP();
-
-        TokenIdInfo storage tki = tokenIds[tkiIndex];
-
-        if (tki.tokensOwed0 > 0 || tki.tokensOwed1 > 0) {
-            (uint256 a0, uint256 a1) = _pool.collect(
-                address(this),
-                _tickLower,
-                _tickUpper,
-                uint128(tki.tokensOwed0),
-                uint128(tki.tokensOwed1)
-            );
-
-            (tki.tokensOwed0, tki.tokensOwed1) = (0, 0);
-
-            bool isAmount0 = amount0 > 0;
-
-            IERC20(isAmount0 ? tki.token1 : tki.token0).safeApprove(
-                address(swapRouter),
-                isAmount0 ? a1 : a0
-            );
-
-            uint256 amountOut = swapRouter.exactInputSingle(
-                ISwapRouter.ExactInputSingleParams({
-                    tokenIn: isAmount0 ? tki.token1 : tki.token0,
-                    tokenOut: isAmount0 ? tki.token0 : tki.token1,
-                    fee: tki.fee,
-                    recipient: address(this),
-                    deadline: block.timestamp + 5 days,
-                    amountIn: isAmount0 ? a1 : a0,
-                    amountOutMinimum: 0,
-                    sqrtPriceLimitX96: 0
-                })
-            );
-
-            (uint128 liquidity, , , ) = UniswapV3SingleTickLiquidityHandler(
-                address(this)
-            ).addLiquidity(
-                    LiquidityManager.AddLiquidityParams({
-                        token0: tki.token0,
-                        token1: tki.token1,
-                        fee: tki.fee,
-                        recipient: address(this),
-                        tickLower: _tickLower,
-                        tickUpper: _tickUpper,
-                        amount0Desired: a0 + (isAmount0 ? amountOut : 0),
-                        amount1Desired: a1 + (isAmount0 ? 0 : amountOut),
-                        amount0Min: a0 + (isAmount0 ? amountOut : 0),
-                        amount1Min: a1 + (isAmount0 ? 0 : amountOut)
-                    })
-                );
-            tki.totalLiquidity += liquidity;
-
-            emit LogFeeCompound(
-                _pool,
-                tkiIndex,
-                _tickLower,
-                _tickUpper,
-                liquidity
-            );
         }
     }
 
