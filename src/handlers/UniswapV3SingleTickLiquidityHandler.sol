@@ -148,7 +148,6 @@ contract UniswapV3SingleTickLiquidityHandler is
     ) LiquidityManager(_factory, _pool_init_code_hash) {
         swapRouter = ISwapRouter(_swapRouter);
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _setRoleAdmin(PAUSER_ROLE, DEFAULT_ADMIN_ROLE);
     }
 
     /**
@@ -991,13 +990,17 @@ contract UniswapV3SingleTickLiquidityHandler is
     /**
      * @notice Emergency unpauses the contract.
      */
-
     function emergencyUnpause() external onlyRole(PAUSER_ROLE) {
         _unpause();
     }
 
-    // no reason override?
+    /**
+     * @notice Emergency unpauses the contract.
+     * @param interfaceId The Id of the interface
+     */
     function supportsInterface(
         bytes4 interfaceId
-    ) public view override(ERC1155, AccessControl) returns (bool) {}
+    ) public view override(ERC1155, AccessControl) returns (bool) {
+        return super.supportsInterface(interfaceId);
+    }
 }
