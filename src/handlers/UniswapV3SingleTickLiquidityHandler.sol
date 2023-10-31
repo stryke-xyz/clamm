@@ -237,23 +237,26 @@ contract UniswapV3SingleTickLiquidityHandler is
 
                 bool isAmount0 = amount0 > 0;
 
-                IERC20(isAmount0 ? tki.token1 : tki.token0).safeApprove(
-                    address(swapRouter),
-                    isAmount0 ? a1 : a0
-                );
+                uint256 amountOut;
+                if (isAmount0 ? a1 > 0 : a0 > 0) {
+                    IERC20(isAmount0 ? tki.token1 : tki.token0).safeApprove(
+                        address(swapRouter),
+                        isAmount0 ? a1 : a0
+                    );
 
-                uint256 amountOut = swapRouter.exactInputSingle(
-                    ISwapRouter.ExactInputSingleParams({
-                        tokenIn: isAmount0 ? tki.token1 : tki.token0,
-                        tokenOut: isAmount0 ? tki.token0 : tki.token1,
-                        fee: tki.fee,
-                        recipient: address(this),
-                        deadline: block.timestamp + 5 days,
-                        amountIn: isAmount0 ? a1 : a0,
-                        amountOutMinimum: 0,
-                        sqrtPriceLimitX96: 0
-                    })
-                );
+                    amountOut = swapRouter.exactInputSingle(
+                        ISwapRouter.ExactInputSingleParams({
+                            tokenIn: isAmount0 ? tki.token1 : tki.token0,
+                            tokenOut: isAmount0 ? tki.token0 : tki.token1,
+                            fee: tki.fee,
+                            recipient: address(this),
+                            deadline: block.timestamp + 5 days,
+                            amountIn: isAmount0 ? a1 : a0,
+                            amountOutMinimum: 0,
+                            sqrtPriceLimitX96: 0
+                        })
+                    );
+                }
 
                 (
                     uint128 liquidityFee,

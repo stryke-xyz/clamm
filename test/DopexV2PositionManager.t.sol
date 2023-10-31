@@ -127,6 +127,102 @@ contract PositionManagerHandlerTest is Test {
         );
     }
 
+    function testMintPositionWithOneSwap() public {
+        uint256 amount0 = 0;
+        uint256 amount1 = 5e18;
+
+        uint256 amount01 = 10_000e18;
+        uint256 amount11 = 0;
+
+        int24 tickLower = -77420; // 2299.8
+        int24 tickUpper = -77410; // 2302.1
+
+        positionManagerHandler.mintPosition(
+            token0,
+            token1,
+            amount0,
+            amount1,
+            tickLower,
+            tickUpper,
+            pool,
+            bob
+        );
+
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
+                user: garbage,
+                pool: pool,
+                amountIn: 2_000_000e18,
+                zeroForOne: true,
+                requireMint: true
+            })
+        );
+
+        positionManagerHandler.mintPosition(
+            token0,
+            token1,
+            amount01,
+            amount11,
+            tickLower,
+            tickUpper,
+            pool,
+            jason
+        );
+    }
+
+    function testMintPositionWithOneSwap2() public {
+        uint256 amount0 = 0;
+        uint256 amount1 = 5e18;
+
+        uint256 amount01 = 10_000e18;
+        uint256 amount11 = 0;
+
+        int24 tickLower = -77420; // 2299.8
+        int24 tickUpper = -77410; // 2302.1
+
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
+                user: garbage,
+                pool: pool,
+                amountIn: 2_000_000e18,
+                zeroForOne: true,
+                requireMint: true
+            })
+        );
+
+        positionManagerHandler.mintPosition(
+            token0,
+            token1,
+            amount01,
+            amount11,
+            tickLower,
+            tickUpper,
+            pool,
+            bob
+        );
+
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
+                user: garbage,
+                pool: pool,
+                amountIn: 910e18,
+                zeroForOne: false,
+                requireMint: true
+            })
+        );
+
+        positionManagerHandler.mintPosition(
+            token0,
+            token1,
+            amount0,
+            amount1,
+            tickLower,
+            tickUpper,
+            pool,
+            jason
+        );
+    }
+
     function testMintPositionWithSwaps() public {
         uint256 amount0 = 0;
         uint256 amount1 = 5e18;
