@@ -106,6 +106,7 @@ contract UniswapV3SingleTickLiquidityHandler is
     );
 
     event LogFeeCompound(
+        address handler,
         IUniswapV3Pool pool,
         uint256 tokenId,
         int24 tickLower,
@@ -279,6 +280,7 @@ contract UniswapV3SingleTickLiquidityHandler is
                 tki.totalLiquidity += liquidityFee;
 
                 emit LogFeeCompound(
+                    address(this),
                     _params.pool,
                     tokenId,
                     _params.tickLower,
