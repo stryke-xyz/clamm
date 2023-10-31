@@ -202,7 +202,7 @@ contract OptionPoolsTest is Test {
         );
     }
 
-    function testBuyCallOptionRoll() public {
+    function testBuyCallOption() public {
         vm.startPrank(trader);
         uint256 l = LiquidityAmounts.getLiquidityForAmount1(
             tickLowerCalls.getSqrtRatioAtTick(),
@@ -233,8 +233,8 @@ contract OptionPoolsTest is Test {
             liquidityToUse: l
         });
 
-        optionPools.mintOptionRoll(
-            DopexV2OptionPools.OptionRollParams({
+        optionPools.mintOption(
+            DopexV2OptionPools.OptionParams({
                 optionTicks: opTicks,
                 tickLower: tickLowerCalls,
                 tickUpper: tickUpperCalls,
@@ -260,7 +260,7 @@ contract OptionPoolsTest is Test {
         vm.stopPrank();
     }
 
-    function testBuyPutOptionRoll() public {
+    function testBuyPutOption() public {
         vm.startPrank(trader);
 
         uint256 l = LiquidityAmounts.getLiquidityForAmount0(
@@ -292,8 +292,8 @@ contract OptionPoolsTest is Test {
             liquidityToUse: l
         });
 
-        optionPools.mintOptionRoll(
-            DopexV2OptionPools.OptionRollParams({
+        optionPools.mintOption(
+            DopexV2OptionPools.OptionParams({
                 optionTicks: opTicks,
                 tickLower: tickLowerPuts,
                 tickUpper: tickUpperPuts,
@@ -319,8 +319,8 @@ contract OptionPoolsTest is Test {
         vm.stopPrank();
     }
 
-    function testExerciseCallOptionRoll() public {
-        testBuyCallOptionRoll();
+    function testExerciseCallOption() public {
+        testBuyCallOption();
 
         uint256 optionId = 2;
 
@@ -351,8 +351,8 @@ contract OptionPoolsTest is Test {
 
         bytes memory swapData = abi.encode(pool.fee(), 0);
 
-        optionPools.exerciseOptionRoll(
-            DopexV2OptionPools.ExerciseOptionRollParams({
+        optionPools.exerciseOption(
+            DopexV2OptionPools.ExerciseOptionParams({
                 optionId: optionId,
                 swapper: srs,
                 swapData: swapData,
@@ -365,8 +365,8 @@ contract OptionPoolsTest is Test {
         vm.stopPrank();
     }
 
-    function testExercisePutOptionRoll() public {
-        testBuyPutOptionRoll();
+    function testExercisePutOption() public {
+        testBuyPutOption();
 
         uint256 optionId = 2;
 
@@ -395,8 +395,8 @@ contract OptionPoolsTest is Test {
         liquidityToExercise[0] = liquidityToUse;
         bytes memory swapData = abi.encode(pool.fee(), 0);
 
-        optionPools.exerciseOptionRoll(
-            DopexV2OptionPools.ExerciseOptionRollParams({
+        optionPools.exerciseOption(
+            DopexV2OptionPools.ExerciseOptionParams({
                 optionId: optionId,
                 swapper: srs,
                 swapData: swapData,
@@ -409,8 +409,8 @@ contract OptionPoolsTest is Test {
         vm.stopPrank();
     }
 
-    function testSettleOptionCallOTMRoll() public {
-        testBuyCallOptionRoll();
+    function testSettleOptionCallOTM() public {
+        testBuyCallOption();
         uint256 prevTime = block.timestamp + 20 minutes;
         vm.warp(block.timestamp + 1201 seconds);
         uint256 optionId = 2;
@@ -429,8 +429,8 @@ contract OptionPoolsTest is Test {
         liquidityToSettle[0] = liquidityToUse;
         bytes memory swapData = abi.encode(pool.fee(), 0);
 
-        optionPools.settleOptionRoll(
-            DopexV2OptionPools.SettleOptionRollParams({
+        optionPools.settleOption(
+            DopexV2OptionPools.SettleOptionParams({
                 optionId: optionId,
                 swapper: srs,
                 swapData: swapData,
@@ -439,8 +439,8 @@ contract OptionPoolsTest is Test {
         );
     }
 
-    function testSettleOptionPutOTMRoll() public {
-        testBuyPutOptionRoll();
+    function testSettleOptionPutOTM() public {
+        testBuyPutOption();
         uint256 prevTime = block.timestamp + 20 minutes;
 
         vm.warp(block.timestamp + 1201 seconds);
@@ -461,8 +461,8 @@ contract OptionPoolsTest is Test {
         liquidityToSettle[0] = liquidityToUse;
         bytes memory swapData = abi.encode(pool.fee(), 0);
 
-        optionPools.settleOptionRoll(
-            DopexV2OptionPools.SettleOptionRollParams({
+        optionPools.settleOption(
+            DopexV2OptionPools.SettleOptionParams({
                 optionId: optionId,
                 swapper: srs,
                 swapData: swapData,
@@ -471,8 +471,8 @@ contract OptionPoolsTest is Test {
         );
     }
 
-    function testSettleOptionCallITMRoll() public {
-        testBuyCallOptionRoll();
+    function testSettleOptionCallITM() public {
+        testBuyCallOption();
         uint256 prevTime = block.timestamp + 20 minutes;
         vm.warp(block.timestamp + 1201 seconds);
 
@@ -502,8 +502,8 @@ contract OptionPoolsTest is Test {
         liquidityToSettle[0] = liquidityToUse;
         bytes memory swapData = abi.encode(pool.fee(), 0);
 
-        optionPools.settleOptionRoll(
-            DopexV2OptionPools.SettleOptionRollParams({
+        optionPools.settleOption(
+            DopexV2OptionPools.SettleOptionParams({
                 optionId: optionId,
                 swapper: srs,
                 swapData: swapData,
@@ -514,8 +514,8 @@ contract OptionPoolsTest is Test {
         console.log(token0.balanceOf(address(this)));
     }
 
-    function testSettleOptionPutITMRoll() public {
-        testBuyPutOptionRoll();
+    function testSettleOptionPutITM() public {
+        testBuyPutOption();
         uint256 prevTime = block.timestamp + 20 minutes;
 
         vm.warp(block.timestamp + 1201 seconds);
@@ -545,8 +545,8 @@ contract OptionPoolsTest is Test {
         liquidityToSettle[0] = liquidityToUse;
         bytes memory swapData = abi.encode(pool.fee(), 0);
 
-        optionPools.settleOptionRoll(
-            DopexV2OptionPools.SettleOptionRollParams({
+        optionPools.settleOption(
+            DopexV2OptionPools.SettleOptionParams({
                 optionId: optionId,
                 swapper: srs,
                 swapData: swapData,
@@ -558,7 +558,7 @@ contract OptionPoolsTest is Test {
     }
 
     function testSplitPosition() public {
-        testBuyCallOptionRoll();
+        testBuyCallOption();
 
         uint256 optionId = 2;
         (uint256 len, , , , ) = optionPools.opData(optionId);

@@ -50,7 +50,7 @@ contract DopexV2OptionPools is
         uint256 liquidityToUse;
     }
 
-    struct OptionRollParams {
+    struct OptionParams {
         OptionTicks[] optionTicks;
         int24 tickLower;
         int24 tickUpper;
@@ -59,14 +59,14 @@ contract DopexV2OptionPools is
         uint256 maxFeeAllowed;
     }
 
-    struct ExerciseOptionRollParams {
+    struct ExerciseOptionParams {
         uint256 optionId;
         ISwapper swapper;
         bytes swapData;
         uint256[] liquidityToExercise;
     }
 
-    struct SettleOptionRollParams {
+    struct SettleOptionParams {
         uint256 optionId;
         ISwapper swapper;
         bytes swapData;
@@ -80,21 +80,21 @@ contract DopexV2OptionPools is
     }
 
     // events
-    event LogMintOptionRoll(
+    event LogMintOption(
         address user,
         uint256 tokenId,
         bool isCall,
         uint256 premiumAmount,
         uint256 totalAssetWithdrawn
     );
-    event LogExerciseOptionRoll(
+    event LogExerciseOption(
         address user,
         uint256 tokenId,
         uint256 totalProfit,
         uint256 totalAssetRelocked
     );
-    event LogSettleOptionRoll(address user, uint256 tokenId);
-    event LogSplitOptionRoll(
+    event LogSettleOption(address user, uint256 tokenId);
+    event LogSplitOption(
         address user,
         uint256 tokenId,
         uint256 newTokenId,
@@ -181,11 +181,9 @@ contract DopexV2OptionPools is
 
     /**
      * @notice Mints an option for the given strike and expiry.
-     * @param _params The option roll parameters.
+     * @param _params The option  parameters.
      */
-    function mintOptionRoll(
-        OptionRollParams calldata _params
-    ) external nonReentrant {
+    function mintOption(OptionParams calldata _params) external nonReentrant {
         optionIds += 1;
 
         uint256[] memory amountsPerOptionTicks = new uint256[](
@@ -310,7 +308,7 @@ contract DopexV2OptionPools is
 
         _safeMint(msg.sender, optionIds);
 
-        emit LogMintOptionRoll(
+        emit LogMintOption(
             msg.sender,
             optionIds,
             _params.isCall,
@@ -320,11 +318,11 @@ contract DopexV2OptionPools is
     }
 
     /**
-     * @notice Exercises the given option roll.
-     * @param _params The exercise option roll parameters.
+     * @notice Exercises the given option .
+     * @param _params The exercise option  parameters.
      */
-    function exerciseOptionRoll(
-        ExerciseOptionRollParams calldata _params
+    function exerciseOption(
+        ExerciseOptionParams calldata _params
     ) external nonReentrant {
         if (
             ownerOf(_params.optionId) != msg.sender &&
@@ -419,7 +417,7 @@ contract DopexV2OptionPools is
             totalProfit
         );
 
-        emit LogExerciseOptionRoll(
+        emit LogExerciseOption(
             ownerOf(_params.optionId),
             _params.optionId,
             totalProfit,
@@ -428,11 +426,11 @@ contract DopexV2OptionPools is
     }
 
     /**
-     * @notice Settles the given option roll.
-     * @param _params The settle option roll parameters.
+     * @notice Settles the given option .
+     * @param _params The settle option  parameters.
      */
-    function settleOptionRoll(
-        SettleOptionRollParams calldata _params
+    function settleOption(
+        SettleOptionParams calldata _params
     ) external nonReentrant {
         if (!settlers[msg.sender])
             revert DopexV2OptionPools__NotApprovedSettler();
@@ -577,11 +575,11 @@ contract DopexV2OptionPools is
             } else {}
         }
 
-        emit LogSettleOptionRoll(ownerOf(_params.optionId), _params.optionId);
+        emit LogSettleOption(ownerOf(_params.optionId), _params.optionId);
     }
 
     /**
-     * @notice Splits the given option roll into two new option rolls.
+     * @notice Splits the given option  into two new option.
      * @param _params The position splitter parameters.
      */
     function positionSplitter(
@@ -621,7 +619,7 @@ contract DopexV2OptionPools is
 
         _safeMint(_params.to, optionIds);
 
-        emit LogSplitOptionRoll(
+        emit LogSplitOption(
             ownerOf(_params.optionId),
             _params.optionId,
             optionIds,
@@ -630,7 +628,7 @@ contract DopexV2OptionPools is
     }
 
     /**
-     * @notice Updates the exercise delegate for the caller's option rolls.
+     * @notice Updates the exercise delegate for the caller's option.
      * @param _delegateTo The address of the new exercise delegate.
      * @param _status The status of the exercise delegate (true to enable, false to disable).
      */
