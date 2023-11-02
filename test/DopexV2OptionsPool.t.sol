@@ -18,7 +18,7 @@ import {DopexV2OptionPools} from "../src/DopexV2OptionPools.sol";
 
 import {OptionPricing} from "../src/pricing/OptionPricing.sol";
 import {VolatilityEngine} from "../src/volatility-engine/VolatilityEngine.sol";
-import {DopexFee} from "../src/pricing/DopexFee.sol";
+import {DopexFee} from "../src/mocks/DopexFee.sol";
 import {SwapRouterSwapper} from "../src/swapper/SwapRouterSwapper.sol";
 
 import {IOptionPricing} from "../src/pricing/IOptionPricing.sol";

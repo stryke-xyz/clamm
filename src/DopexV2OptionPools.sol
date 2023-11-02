@@ -5,7 +5,7 @@ import {IDopexV2PositionManager} from "./interfaces/IDopexV2PositionManager.sol"
 
 import {IOptionPricing} from "./pricing/IOptionPricing.sol";
 import {IHandler} from "./interfaces/IHandler.sol";
-import {IDopexFee} from "./interfaces/IDopexFee.sol";
+import {IDopexV2ClammFeeStrategy} from "./pricing/fees/IDopexV2ClammFeeStrategy.sol";
 import {ISwapper} from "./interfaces/ISwapper.sol";
 import {ITokenURIFetcher} from "./interfaces/ITokenURIFetcher.sol";
 
@@ -125,7 +125,7 @@ contract DopexV2OptionPools is
     error DopexV2OptionPools__NotEnoughAfterSwap();
     error DopexV2OptionPools__NotApprovedSettler();
 
-    IDopexFee public dpFee;
+    IDopexV2ClammFeeStrategy public dpFee;
     IOptionPricing public optionPricing;
     IDopexV2PositionManager public positionManager;
     IUniswapV3Pool public primePool;
@@ -156,7 +156,7 @@ contract DopexV2OptionPools is
         callAsset = _callAsset;
         putAsset = _putAsset;
 
-        dpFee = IDopexFee(_dpFee);
+        dpFee = IDopexV2ClammFeeStrategy(_dpFee);
 
         optionPricing = IOptionPricing(_optionPricing);
 
@@ -260,7 +260,16 @@ contract DopexV2OptionPools is
         );
         uint256 protocolFees;
         if (feeTo != address(0)) {
-            protocolFees = dpFee.onFeeReqReceive();
+            protocolFees = dpFee.onFeeReqReceive(
+                address(this),
+                _params.isCall,
+                _params.isCall
+                    ? totalAssetWithdrawn
+                    : (totalAssetWithdrawn *
+                        (10 ** ERC20(putAsset).decimals())) / strike,
+                getCurrentPricePerCallAsset(primePool),
+                premiumAmount
+            );
             ERC20(assetToUse).transferFrom(msg.sender, feeTo, protocolFees);
         }
 
@@ -823,7 +832,7 @@ contract DopexV2OptionPools is
     ) external onlyOwner {
         feeTo = _feeTo;
         tokenURIFetcher = _tokeURIFetcher;
-        dpFee = IDopexFee(_dpFee);
+        dpFee = IDopexV2ClammFeeStrategy(_dpFee);
         optionPricing = IOptionPricing(_optionPricing);
         settlers[_settler] = _statusSettler;
         approvedPools[_pool] = _statusPools;
