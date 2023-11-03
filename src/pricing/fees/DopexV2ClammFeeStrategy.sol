@@ -37,9 +37,10 @@ contract DopexV2ClammFeeStrategy is IDopexV2ClammFeeStrategy, Ownable {
         FeeStruct memory _feeStruct
     ) external onlyOwner {
         registeredOptionPools[_optionPool] = true;
-        feeStructs[_optionPool] = _feeStruct;
 
-        emit OptionPoolRegistered(_optionPool, _feeStruct);
+        updateFees(_optionPool, _feeStruct);
+
+        emit OptionPoolRegistered(_optionPool);
     }
 
     /// @notice Updates the fee struct of an option pool
@@ -49,7 +50,16 @@ contract DopexV2ClammFeeStrategy is IDopexV2ClammFeeStrategy, Ownable {
     function updateFees(
         address _optionPool,
         FeeStruct memory _feeStruct
-    ) external onlyOwner {
+    ) public onlyOwner {
+        require(
+            _feeStruct.feePercentage < FEE_PERCENT_PRECISION,
+            "Fee percentage cannot be 100 or more"
+        );
+        require(
+            _feeStruct.maxFeePercentageOnPremium < FEE_PERCENT_PRECISION,
+            "Max Fee percentage cannot be 100 or more"
+        );
+
         feeStructs[_optionPool] = _feeStruct;
 
         emit FeeUpdate(_optionPool, _feeStruct);
@@ -79,7 +89,7 @@ contract DopexV2ClammFeeStrategy is IDopexV2ClammFeeStrategy, Ownable {
 
     error OptionPoolNotRegistered(address optionPool);
 
-    event OptionPoolRegistered(address optionPool, FeeStruct feeStruct);
+    event OptionPoolRegistered(address optionPool);
 
     event FeeUpdate(address optionPool, FeeStruct feeStruct);
 }
