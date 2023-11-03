@@ -278,23 +278,23 @@ contract DopexV2OptionPools is
         );
         ERC20(assetToUse).approve(address(positionManager), premiumAmount);
 
-        uint128 l = LiquidityAmounts.getLiquidityForAmounts(
-            _getCurrentSqrtPriceX96(primePool),
-            _params.tickLower.getSqrtRatioAtTick(),
-            _params.tickUpper.getSqrtRatioAtTick(),
-            isAmount0 ? premiumAmount : 0,
-            isAmount0 ? 0 : premiumAmount
-        );
-
         for (uint i; i < _params.optionTicks.length; i++) {
-            uint256 amountLToDonate = (amountsPerOptionTicks[i] * l) /
-                totalAssetWithdrawn;
+            uint256 premiumAmountEarned = (amountsPerOptionTicks[i] *
+                premiumAmount) / totalAssetWithdrawn;
+
+            uint128 liquidityToDonate = LiquidityAmounts.getLiquidityForAmounts(
+                _getCurrentSqrtPriceX96(_params.optionTicks[i].pool),
+                _params.optionTicks[i].tickLower.getSqrtRatioAtTick(),
+                _params.optionTicks[i].tickUpper.getSqrtRatioAtTick(),
+                isAmount0 ? premiumAmountEarned : 0,
+                isAmount0 ? 0 : premiumAmountEarned
+            );
 
             bytes memory donatePositionData = abi.encode(
                 _params.optionTicks[i].pool,
                 _params.optionTicks[i].tickLower,
                 _params.optionTicks[i].tickUpper,
-                amountLToDonate
+                liquidityToDonate
             );
             positionManager.donateToPosition(
                 _params.optionTicks[i]._handler,
