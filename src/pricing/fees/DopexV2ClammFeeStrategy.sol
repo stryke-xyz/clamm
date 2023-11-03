@@ -8,31 +8,18 @@ import {IDopexV2ClammFeeStrategy} from "./IDopexV2ClammFeeStrategy.sol";
 // Contracts
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 
-interface IDopexV2OptionPools {
-    function callAsset() external view returns (address);
-
-    function putAsset() external view returns (address);
-}
-
 /// @title DopexV2ClammFeeStrategy
 /// @author witherblock
 /// @notice Computes the fee for an option purchase on Dopex V2 CLAMM
 contract DopexV2ClammFeeStrategy is IDopexV2ClammFeeStrategy, Ownable {
-    /// @dev Option Pool address => OptionPoolInfo Struct
-    mapping(address => OptionPoolInfo) public optionPoolInfo;
+    /// @dev Option Pool address => bool (is registered or not)
+    mapping(address => bool) public registeredOptionPools;
 
     /// @dev Option Pool address => Fee Struct
     mapping(address => FeeStruct) public feeStructs;
 
     /// @dev The precision in which fee percent is set (fee percent should always be divided by 1e6 to get the correct vaue)
     uint256 public constant FEE_PERCENT_PRECISION = 1e4;
-
-    struct OptionPoolInfo {
-        /// @dev Decimals of the call asset ERC20 token
-        uint256 callAssetDecimals;
-        /// @dev Decimals of the put asset ERC20 token
-        uint256 putAssetDecimals;
-    }
 
     struct FeeStruct {
         /// @dev Fee percentage on the notional value
@@ -49,21 +36,10 @@ contract DopexV2ClammFeeStrategy is IDopexV2ClammFeeStrategy, Ownable {
         address _optionPool,
         FeeStruct memory _feeStruct
     ) external onlyOwner {
-        optionPoolInfo[_optionPool] = OptionPoolInfo({
-            callAssetDecimals: IERC20Metadata(
-                IDopexV2OptionPools(_optionPool).callAsset()
-            ).decimals(),
-            putAssetDecimals: IERC20Metadata(
-                IDopexV2OptionPools(_optionPool).putAsset()
-            ).decimals()
-        });
+        registeredOptionPools[_optionPool] = true;
         feeStructs[_optionPool] = _feeStruct;
 
-        emit OptionPoolRegistered(
-            _optionPool,
-            _feeStruct,
-            optionPoolInfo[_optionPool]
-        );
+        emit OptionPoolRegistered(_optionPool, _feeStruct);
     }
 
     /// @notice Updates the fee struct of an option pool
@@ -82,24 +58,17 @@ contract DopexV2ClammFeeStrategy is IDopexV2ClammFeeStrategy, Ownable {
     /// @inheritdoc	IDopexV2ClammFeeStrategy
     function onFeeReqReceive(
         address _optionPool,
-        bool _isCall,
         uint256 _amount,
-        uint256 _price,
         uint256 _premium
     ) external view returns (uint256 fee) {
         uint256 feePercentage = feeStructs[_optionPool].feePercentage;
-        uint256 decimals = _isCall
-            ? optionPoolInfo[_optionPool].callAssetDecimals
-            : optionPoolInfo[_optionPool].callAssetDecimals;
 
         // If decimals is 0 it means that the option pool was not registered
-        if (decimals == 0) {
+        if (registeredOptionPools[_optionPool]) {
             revert OptionPoolNotRegistered(_optionPool);
         }
 
-        fee =
-            (feePercentage * _amount * _price) /
-            (10 ** (decimals) * FEE_PERCENT_PRECISION * 100);
+        fee = (feePercentage * _amount) / (FEE_PERCENT_PRECISION * 100);
 
         uint256 maxFee = (_premium *
             feeStructs[_optionPool].maxFeePercentageOnPremium) /
@@ -110,11 +79,7 @@ contract DopexV2ClammFeeStrategy is IDopexV2ClammFeeStrategy, Ownable {
 
     error OptionPoolNotRegistered(address optionPool);
 
-    event OptionPoolRegistered(
-        address optionPool,
-        FeeStruct feeStruct,
-        OptionPoolInfo optionPoolInfo
-    );
+    event OptionPoolRegistered(address optionPool, FeeStruct feeStruct);
 
     event FeeUpdate(address optionPool, FeeStruct feeStruct);
 }

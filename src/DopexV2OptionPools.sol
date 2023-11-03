@@ -262,12 +262,7 @@ contract DopexV2OptionPools is
         if (feeTo != address(0)) {
             protocolFees = dpFee.onFeeReqReceive(
                 address(this),
-                _params.isCall,
-                _params.isCall
-                    ? totalAssetWithdrawn
-                    : (totalAssetWithdrawn *
-                        (10 ** ERC20(putAsset).decimals())) / strike,
-                getCurrentPricePerCallAsset(primePool),
+                totalAssetWithdrawn,
                 premiumAmount
             );
             ERC20(assetToUse).transferFrom(msg.sender, feeTo, protocolFees);
