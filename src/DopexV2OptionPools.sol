@@ -772,10 +772,10 @@ contract DopexV2OptionPools is
                 ? FullMath.mulDiv(
                     priceX192,
                     10 ** ERC20(callAsset).decimals(),
-                    1 << 192
+                    1 << 128
                 )
                 : FullMath.mulDiv(
-                    1 << 192,
+                    1 << 128,
                     10 ** ERC20(callAsset).decimals(),
                     priceX192
                 );
