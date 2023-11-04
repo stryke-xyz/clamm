@@ -227,12 +227,13 @@ contract DopexV2OptionPools is
                 opTick.liquidityToUse
             );
 
-            (, uint256[] memory amounts, ) = positionManager.usePosition(
-                opTick._handler,
-                usePositionData
-            );
+            (
+                address[] memory tokens,
+                uint256[] memory amounts,
 
-            if (opTick.pool.token0() == assetToUse) {
+            ) = positionManager.usePosition(opTick._handler, usePositionData);
+
+            if (tokens[0] == assetToUse) {
                 require(amounts[0] > 0 && amounts[1] == 0);
                 amountsPerOptionTicks[i] = (amounts[0]);
                 totalAssetWithdrawn += amounts[0];
