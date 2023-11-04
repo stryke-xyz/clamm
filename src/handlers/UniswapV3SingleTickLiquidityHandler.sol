@@ -128,8 +128,7 @@ contract UniswapV3SingleTickLiquidityHandler is
 
     ISwapRouter swapRouter;
 
-    uint64 public constant DEFAULT_LOCKED_BLOCK_DURATION = 100;
-    uint64 public lockedBlockDuration = DEFAULT_LOCKED_BLOCK_DURATION;
+    uint64 public lockedBlockDuration = 100;
     uint64 public newLockedBlockDuration;
 
     bytes32 constant PAUSER_ROLE = keccak256("P");
