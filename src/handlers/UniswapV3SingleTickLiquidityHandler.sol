@@ -246,7 +246,7 @@ contract UniswapV3SingleTickLiquidityHandler is
                             tokenOut: isAmount0 ? tki.token0 : tki.token1,
                             fee: tki.fee,
                             recipient: address(this),
-                            deadline: block.timestamp + 5 days,
+                            deadline: block.timestamp,
                             amountIn: isAmount0 ? a1 : a0,
                             amountOutMinimum: 0,
                             sqrtPriceLimitX96: 0
