@@ -378,12 +378,9 @@ contract DopexV2OptionPools is
 
             totalAssetRelocked += amountToSwap;
 
-            uint256 prevBalance = ERC20(ac.assetToGet).balanceOf(address(this));
+            uint256 prevBalance = ac.assetToGet.balanceOf(address(this));
 
-            ERC20(ac.assetToUse).transfer(
-                address(_params.swapper),
-                amountToSwap
-            );
+            ac.assetToUse.transfer(address(_params.swapper), amountToSwap);
 
             _params.swapper.onSwapReceived(
                 address(ac.assetToUse),
@@ -404,14 +401,12 @@ contract DopexV2OptionPools is
                     uint128(_params.liquidityToExercise[i])
                 );
 
-            uint256 currentBalance = ERC20(ac.assetToGet).balanceOf(
-                address(this)
-            );
+            uint256 currentBalance = ac.assetToGet.balanceOf(address(this));
 
             if (currentBalance < prevBalance + amountReq)
                 revert DopexV2OptionPools__NotEnoughAfterSwap();
 
-            ERC20(ac.assetToGet).approve(address(positionManager), amountReq);
+            ac.assetToGet.approve(address(positionManager), amountReq);
 
             bytes memory unusePositionData = abi.encode(
                 opTick.pool,
@@ -427,7 +422,7 @@ contract DopexV2OptionPools is
             totalProfit += currentBalance - (prevBalance + amountReq);
         }
 
-        ERC20(ac.assetToGet).transfer(msg.sender, totalProfit);
+        ac.assetToGet.transfer(msg.sender, totalProfit);
 
         emit LogExerciseOption(
             ownerOf(_params.optionId),
