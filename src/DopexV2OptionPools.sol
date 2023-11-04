@@ -197,39 +197,42 @@ contract DopexV2OptionPools is
 
         if (ttlToVEID[_params.ttl] == 0) revert DopexV2OptionPools__IVNotSet();
 
+        OptionTicks memory opTick;
+
         for (uint256 i; i < _params.optionTicks.length; i++) {
+            opTick = _params.optionTicks[i];
             if (
                 _params.isCall
-                    ? _params.tickUpper != _params.optionTicks[i].tickUpper
-                    : _params.tickLower != _params.optionTicks[i].tickLower
+                    ? _params.tickUpper != opTick.tickUpper
+                    : _params.tickLower != opTick.tickLower
             ) revert DopexV2OptionPools__NotValidStrikeTick();
 
             opTickMap[optionIds].push(
                 OptionTicks({
-                    _handler: _params.optionTicks[i]._handler,
-                    pool: _params.optionTicks[i].pool,
-                    tickLower: _params.optionTicks[i].tickLower,
-                    tickUpper: _params.optionTicks[i].tickUpper,
-                    liquidityToUse: _params.optionTicks[i].liquidityToUse
+                    _handler: opTick._handler,
+                    pool: opTick.pool,
+                    tickLower: opTick.tickLower,
+                    tickUpper: opTick.tickUpper,
+                    liquidityToUse: opTick.liquidityToUse
                 })
             );
 
-            if (!approvedPools[address(_params.optionTicks[i].pool)])
+            if (!approvedPools[address(opTick.pool)])
                 revert DopexV2OptionPools__PoolNotApproved();
 
             bytes memory usePositionData = abi.encode(
-                _params.optionTicks[i].pool,
-                _params.optionTicks[i].tickLower,
-                _params.optionTicks[i].tickUpper,
-                _params.optionTicks[i].liquidityToUse
+                opTick.pool,
+                opTick.tickLower,
+                opTick.tickUpper,
+                opTick.liquidityToUse
             );
 
             (, uint256[] memory amounts, ) = positionManager.usePosition(
-                _params.optionTicks[i]._handler,
+                opTick._handler,
                 usePositionData
             );
 
-            if (_params.optionTicks[i].pool.token0() == assetToUse) {
+            if (opTick.pool.token0() == assetToUse) {
                 require(amounts[0] > 0 && amounts[1] == 0);
                 amountsPerOptionTicks[i] = (amounts[0]);
                 totalAssetWithdrawn += amounts[0];
@@ -275,25 +278,26 @@ contract DopexV2OptionPools is
         ERC20(assetToUse).approve(address(positionManager), premiumAmount);
 
         for (uint i; i < _params.optionTicks.length; i++) {
+            opTick = _params.optionTicks[i];
             uint256 premiumAmountEarned = (amountsPerOptionTicks[i] *
                 premiumAmount) / totalAssetWithdrawn;
 
             uint128 liquidityToDonate = LiquidityAmounts.getLiquidityForAmounts(
-                _getCurrentSqrtPriceX96(_params.optionTicks[i].pool),
-                _params.optionTicks[i].tickLower.getSqrtRatioAtTick(),
-                _params.optionTicks[i].tickUpper.getSqrtRatioAtTick(),
+                _getCurrentSqrtPriceX96(opTick.pool),
+                opTick.tickLower.getSqrtRatioAtTick(),
+                opTick.tickUpper.getSqrtRatioAtTick(),
                 isAmount0 ? premiumAmountEarned : 0,
                 isAmount0 ? 0 : premiumAmountEarned
             );
 
             bytes memory donatePositionData = abi.encode(
-                _params.optionTicks[i].pool,
-                _params.optionTicks[i].tickLower,
-                _params.optionTicks[i].tickUpper,
+                opTick.pool,
+                opTick.tickLower,
+                opTick.tickUpper,
                 liquidityToDonate
             );
             positionManager.donateToPosition(
-                _params.optionTicks[i]._handler,
+                opTick._handler,
                 donatePositionData
             );
         }
