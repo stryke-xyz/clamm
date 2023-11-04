@@ -209,14 +209,15 @@ contract UniswapV3SingleTickLiquidityHandler is
                 amount1Min: amount1
             })
         );
-        if (tki.totalSupply > 0) {
-            _feeCalculation(
-                tki,
-                _params.pool,
-                _params.tickLower,
-                _params.tickUpper
-            );
 
+        _feeCalculation(
+            tki,
+            _params.pool,
+            _params.tickLower,
+            _params.tickUpper
+        );
+
+        if (tki.totalSupply > 0) {
             // compound fees
             if (tki.tokensOwed0 > 0 || tki.tokensOwed1 > 0) {
                 (uint256 a0, uint256 a1) = _params.pool.collect(
@@ -294,13 +295,6 @@ contract UniswapV3SingleTickLiquidityHandler is
 
             sharesMinted = shares;
         } else {
-            _feeCalculation(
-                tki,
-                _params.pool,
-                _params.tickLower,
-                _params.tickUpper
-            );
-
             tki.totalLiquidity += liquidity;
             tki.totalSupply += liquidity;
 
