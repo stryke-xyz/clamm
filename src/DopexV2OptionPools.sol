@@ -195,7 +195,9 @@ contract DopexV2OptionPools is
 
         address assetToUse = _params.isCall ? callAsset : putAsset;
 
-        if (ttlToVEID[_params.ttl] == 0) revert DopexV2OptionPools__IVNotSet();
+        uint256 _ttlToVEID = ttlToVEID[_params.ttl];
+
+        if (_ttlToVEID == 0) revert DopexV2OptionPools__IVNotSet();
 
         OptionTicks memory opTick;
 
@@ -256,7 +258,7 @@ contract DopexV2OptionPools is
             block.timestamp + _params.ttl, // expiry
             strike, // Strike
             getCurrentPricePerCallAsset(primePool), // Current price
-            ttlToVEID[_params.ttl], // IV, strike and expiry param is 0 since we are using flat volatility
+            _ttlToVEID, // IV, strike and expiry param is 0 since we are using flat volatility
             _params.isCall
                 ? totalAssetWithdrawn
                 : (totalAssetWithdrawn * (10 ** ERC20(putAsset).decimals())) /
