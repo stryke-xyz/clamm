@@ -324,6 +324,11 @@ contract DopexV2OptionPools is
         );
     }
 
+    struct AssetsCache {
+        ERC20 assetToUse;
+        ERC20 assetToGet;
+    }
+
     /**
      * @notice Exercises the given option .
      * @param _params The exercise option  parameters.
@@ -346,12 +351,18 @@ contract DopexV2OptionPools is
 
         uint256 totalProfit;
         uint256 totalAssetRelocked;
+
+        bool isAmount0 = oData.isCall
+            ? primePool.token0() == callAsset
+            : primePool.token0() == putAsset;
+
+        AssetsCache memory ac;
+
+        ac.assetToUse = ERC20(oData.isCall ? callAsset : putAsset);
+        ac.assetToGet = ERC20(oData.isCall ? putAsset : callAsset);
+
         for (uint256 i; i < oData.opTickArrayLen; i++) {
             OptionTicks storage opTick = opTickMap[_params.optionId][i];
-
-            bool isAmount0 = oData.isCall
-                ? primePool.token0() == callAsset
-                : primePool.token0() == putAsset;
 
             uint256 amountToSwap = isAmount0
                 ? LiquidityAmounts.getAmount0ForLiquidity(
@@ -367,17 +378,16 @@ contract DopexV2OptionPools is
 
             totalAssetRelocked += amountToSwap;
 
-            uint256 prevBalance = ERC20(oData.isCall ? putAsset : callAsset)
-                .balanceOf(address(this));
+            uint256 prevBalance = ERC20(ac.assetToGet).balanceOf(address(this));
 
-            ERC20(oData.isCall ? callAsset : putAsset).transfer(
+            ERC20(ac.assetToUse).transfer(
                 address(_params.swapper),
                 amountToSwap
             );
 
             _params.swapper.onSwapReceived(
-                oData.isCall ? callAsset : putAsset,
-                oData.isCall ? putAsset : callAsset,
+                address(ac.assetToUse),
+                address(ac.assetToGet),
                 amountToSwap,
                 _params.swapData
             );
@@ -394,16 +404,14 @@ contract DopexV2OptionPools is
                     uint128(_params.liquidityToExercise[i])
                 );
 
-            uint256 currentBalance = ERC20(oData.isCall ? putAsset : callAsset)
-                .balanceOf(address(this));
+            uint256 currentBalance = ERC20(ac.assetToGet).balanceOf(
+                address(this)
+            );
 
             if (currentBalance < prevBalance + amountReq)
                 revert DopexV2OptionPools__NotEnoughAfterSwap();
 
-            ERC20(oData.isCall ? putAsset : callAsset).approve(
-                address(positionManager),
-                amountReq
-            );
+            ERC20(ac.assetToGet).approve(address(positionManager), amountReq);
 
             bytes memory unusePositionData = abi.encode(
                 opTick.pool,
@@ -419,10 +427,7 @@ contract DopexV2OptionPools is
             totalProfit += currentBalance - (prevBalance + amountReq);
         }
 
-        ERC20(oData.isCall ? putAsset : callAsset).transfer(
-            msg.sender,
-            totalProfit
-        );
+        ERC20(ac.assetToGet).transfer(msg.sender, totalProfit);
 
         emit LogExerciseOption(
             ownerOf(_params.optionId),
@@ -449,6 +454,15 @@ contract DopexV2OptionPools is
         if (block.timestamp <= oData.expiry)
             revert DopexV2OptionPools__OptionNotExpired();
 
+        bool isAmount0 = oData.isCall
+            ? primePool.token0() == callAsset
+            : primePool.token0() == putAsset;
+
+        AssetsCache memory ac;
+
+        ac.assetToUse = ERC20(oData.isCall ? callAsset : putAsset);
+        ac.assetToGet = ERC20(oData.isCall ? putAsset : callAsset);
+
         for (uint256 i; i < oData.opTickArrayLen; i++) {
             OptionTicks storage opTick = opTickMap[_params.optionId][i];
             uint256 liquidityToSettle = _params.liquidityToSettle[i] != 0
@@ -463,18 +477,11 @@ contract DopexV2OptionPools is
                     uint128(liquidityToSettle)
                 );
 
-            bool isAmount0 = oData.isCall
-                ? primePool.token0() == callAsset
-                : primePool.token0() == putAsset;
-
             if (
                 (amount0 > 0 && amount1 == 0) || (amount1 > 0 && amount0 == 0)
             ) {
                 if (isAmount0 && amount0 > 0) {
-                    ERC20(oData.isCall ? callAsset : putAsset).approve(
-                        address(positionManager),
-                        amount0
-                    );
+                    ac.assetToUse.approve(address(positionManager), amount0);
 
                     bytes memory unusePositionData = abi.encode(
                         opTick.pool,
@@ -490,10 +497,7 @@ contract DopexV2OptionPools is
 
                     opTick.liquidityToUse -= liquidityToSettle;
                 } else if (!isAmount0 && amount1 > 0) {
-                    ERC20(oData.isCall ? callAsset : putAsset).approve(
-                        address(positionManager),
-                        amount1
-                    );
+                    ac.assetToUse.approve(address(positionManager), amount1);
 
                     bytes memory unusePositionData = abi.encode(
                         opTick.pool,
@@ -520,18 +524,18 @@ contract DopexV2OptionPools is
                             uint128(liquidityToSettle)
                         );
 
-                    uint256 prevBalance = ERC20(
-                        oData.isCall ? putAsset : callAsset
-                    ).balanceOf(address(this));
+                    uint256 prevBalance = ac.assetToGet.balanceOf(
+                        address(this)
+                    );
 
-                    ERC20(oData.isCall ? callAsset : putAsset).transfer(
+                    ac.assetToUse.transfer(
                         address(_params.swapper),
                         amountToSwap
                     );
 
                     _params.swapper.onSwapReceived(
-                        oData.isCall ? callAsset : putAsset,
-                        oData.isCall ? putAsset : callAsset,
+                        address(ac.assetToUse),
+                        address(ac.assetToGet),
                         amountToSwap,
                         _params.swapData
                     );
@@ -548,17 +552,14 @@ contract DopexV2OptionPools is
                             uint128(liquidityToSettle)
                         );
 
-                    uint256 currentBalance = ERC20(
-                        oData.isCall ? putAsset : callAsset
-                    ).balanceOf(address(this));
+                    uint256 currentBalance = ac.assetToGet.balanceOf(
+                        address(this)
+                    );
 
                     if (currentBalance < prevBalance + amountReq)
                         revert DopexV2OptionPools__NotEnoughAfterSwap();
 
-                    ERC20(oData.isCall ? putAsset : callAsset).approve(
-                        address(positionManager),
-                        amountReq
-                    );
+                    ac.assetToGet.approve(address(positionManager), amountReq);
 
                     bytes memory unusePositionData = abi.encode(
                         opTick.pool,
@@ -574,7 +575,7 @@ contract DopexV2OptionPools is
 
                     opTick.liquidityToUse -= liquidityToSettle;
 
-                    ERC20(oData.isCall ? putAsset : callAsset).transfer(
+                    ac.assetToGet.transfer(
                         msg.sender,
                         currentBalance - (prevBalance + amountReq)
                     );
