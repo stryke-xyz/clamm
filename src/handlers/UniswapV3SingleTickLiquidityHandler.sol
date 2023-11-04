@@ -296,11 +296,7 @@ contract UniswapV3SingleTickLiquidityHandler is
                 );
             }
 
-            uint128 shares = _convertToShares(
-                liquidity,
-                tokenId,
-                Math.Rounding.Down
-            );
+            uint128 shares = _convertToShares(liquidity, tokenId);
 
             tki.totalLiquidity += liquidity;
             tki.totalSupply += shares;
@@ -362,11 +358,7 @@ contract UniswapV3SingleTickLiquidityHandler is
 
         TokenIdInfo storage tki = tokenIds[tokenId];
 
-        uint128 liquidityToBurn = _convertToAssets(
-            _params.shares,
-            tokenId,
-            Math.Rounding.Up
-        );
+        uint128 liquidityToBurn = _convertToAssets(_params.shares, tokenId);
 
         (uint256 amount0, uint256 amount1) = _params.pool.burn(
             _params.tickLower,
@@ -853,13 +845,11 @@ contract UniswapV3SingleTickLiquidityHandler is
      * @notice Converts an amount of assets to shares.
      * @param assets The amount of assets.
      * @param tokenId The tokenId of the position.
-     * @param rounding The rounding mode to use.
      * @return shares The number of shares.
      */
     function _convertToShares(
         uint128 assets,
-        uint256 tokenId,
-        Math.Rounding rounding
+        uint256 tokenId
     ) internal view returns (uint128) {
         return
             uint128(
@@ -867,7 +857,7 @@ contract UniswapV3SingleTickLiquidityHandler is
                     tokenIds[tokenId].totalSupply,
                     (tokenIds[tokenId].totalLiquidity + 1) -
                         _donationLocked(tokenId),
-                    rounding
+                    Math.Rounding.Down
                 )
             );
     }
@@ -876,13 +866,11 @@ contract UniswapV3SingleTickLiquidityHandler is
      * @notice Converts an amount of shares to assets.
      * @param shares The number of shares.
      * @param tokenId The tokenId of the position.
-     * @param rounding The rounding mode to use.
      * @return assets The amount of assets.
      */
     function _convertToAssets(
         uint128 shares,
-        uint256 tokenId,
-        Math.Rounding rounding
+        uint256 tokenId
     ) internal view returns (uint128) {
         return
             uint128(
@@ -890,7 +878,7 @@ contract UniswapV3SingleTickLiquidityHandler is
                     (tokenIds[tokenId].totalLiquidity + 1) -
                         _donationLocked(tokenId),
                     tokenIds[tokenId].totalSupply,
-                    rounding
+                    Math.Rounding.Up
                 )
             );
     }
