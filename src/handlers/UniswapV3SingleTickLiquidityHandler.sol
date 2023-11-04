@@ -368,32 +368,36 @@ contract UniswapV3SingleTickLiquidityHandler is
         uint128 feesOwedToken1;
 
         {
-            uint256 a00 = LiquidityAmounts.getAmount0ForLiquidity(
+            uint256 userLiquidity0 = LiquidityAmounts.getAmount0ForLiquidity(
                 _params.tickLower.getSqrtRatioAtTick(),
                 _params.tickUpper.getSqrtRatioAtTick(),
                 uint128(liquidityToBurn)
             );
 
-            uint256 a11 = LiquidityAmounts.getAmount1ForLiquidity(
+            uint256 userLiquidity1 = LiquidityAmounts.getAmount1ForLiquidity(
                 _params.tickLower.getSqrtRatioAtTick(),
                 _params.tickUpper.getSqrtRatioAtTick(),
                 uint128(liquidityToBurn)
             );
 
-            uint256 a0 = LiquidityAmounts.getAmount0ForLiquidity(
+            uint256 totalLiquidity0 = LiquidityAmounts.getAmount0ForLiquidity(
                 _params.tickLower.getSqrtRatioAtTick(),
                 _params.tickUpper.getSqrtRatioAtTick(),
                 uint128(tki.totalLiquidity)
             );
 
-            uint256 a1 = LiquidityAmounts.getAmount1ForLiquidity(
+            uint256 totalLiquidity1 = LiquidityAmounts.getAmount1ForLiquidity(
                 _params.tickLower.getSqrtRatioAtTick(),
                 _params.tickUpper.getSqrtRatioAtTick(),
                 uint128(tki.totalLiquidity)
             );
 
-            feesOwedToken0 = uint128((tki.tokensOwed0 * a00) / a0);
-            feesOwedToken1 = uint128((tki.tokensOwed1 * a11) / a1);
+            feesOwedToken0 = uint128(
+                (tki.tokensOwed0 * userLiquidity0) / totalLiquidity0
+            );
+            feesOwedToken1 = uint128(
+                (tki.tokensOwed1 * userLiquidity1) / totalLiquidity1
+            );
         }
 
         tki.tokensOwed0 -= feesOwedToken0;
