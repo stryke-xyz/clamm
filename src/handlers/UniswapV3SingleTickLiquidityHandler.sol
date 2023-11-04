@@ -242,10 +242,11 @@ contract UniswapV3SingleTickLiquidityHandler is
 
                 uint256 amountOut;
                 if (isAmount0 ? a1 > 0 : a0 > 0) {
-                    IERC20(isAmount0 ? tki.token1 : tki.token0).safeApprove(
-                        address(swapRouter),
-                        isAmount0 ? a1 : a0
-                    );
+                    IERC20(isAmount0 ? tki.token1 : tki.token0)
+                        .safeIncreaseAllowance(
+                            address(swapRouter),
+                            isAmount0 ? a1 : a0
+                        );
 
                     amountOut = swapRouter.exactInputSingle(
                         ISwapRouter.ExactInputSingleParams({

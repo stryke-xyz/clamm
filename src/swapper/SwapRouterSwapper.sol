@@ -27,7 +27,7 @@ contract SwapRouterSwapper is ISwapper {
             (uint24, uint256)
         );
 
-        IERC20(_tokenIn).safeApprove(address(sr), _amountIn);
+        IERC20(_tokenIn).safeIncreaseAllowance(address(sr), _amountIn);
 
         amountOut = sr.exactInputSingle(
             ISwapRouter.ExactInputSingleParams({
