@@ -151,6 +151,7 @@ contract DopexV2PositionManager is Ownable, ReentrancyGuard, Multicall {
     )
         external
         onlyWhitelistedHandlersWithApps(_handler)
+        nonReentrant
         returns (
             address[] memory tokens,
             uint256[] memory amounts,
@@ -181,6 +182,7 @@ contract DopexV2PositionManager is Ownable, ReentrancyGuard, Multicall {
     )
         external
         onlyWhitelistedHandlersWithApps(_handler)
+        nonReentrant
         returns (uint256[] memory amounts, uint256 liquidity)
     {
         (address[] memory tokens, uint256[] memory a) = _handler
@@ -201,7 +203,7 @@ contract DopexV2PositionManager is Ownable, ReentrancyGuard, Multicall {
      * @notice Donate to an existing position using the specified handler.
      * @param _handler The address of the handler to use.
      * @param _donatePosition The data required to donate to the position.
-     * @return amounts The tokens and amounts donated. T
+     * @return amounts The tokens and amounts donated.
      * @return liquidity The total liquidity donated.
      */
     function donateToPosition(
@@ -210,6 +212,7 @@ contract DopexV2PositionManager is Ownable, ReentrancyGuard, Multicall {
     )
         external
         onlyWhitelistedHandlersWithApps(_handler)
+        nonReentrant
         returns (uint256[] memory amounts, uint256 liquidity)
     {
         (address[] memory tokens, uint256[] memory a) = _handler

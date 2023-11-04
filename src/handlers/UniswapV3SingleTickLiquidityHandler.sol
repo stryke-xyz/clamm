@@ -8,7 +8,6 @@ import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/Safe
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {ERC1155} from "openzeppelin-contracts/contracts/token/ERC1155/ERC1155.sol";
 import {Pausable} from "openzeppelin-contracts/contracts/security/Pausable.sol";
-import {ReentrancyGuard} from "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
 
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
@@ -30,7 +29,6 @@ contract UniswapV3SingleTickLiquidityHandler is
     IHandler,
     Pausable,
     AccessControl,
-    ReentrancyGuard,
     LiquidityManager
 {
     using Math for uint128;
@@ -161,13 +159,7 @@ contract UniswapV3SingleTickLiquidityHandler is
     function mintPositionHandler(
         address context,
         bytes calldata _mintPositionData
-    )
-        external
-        onlyWhitelisted
-        whenNotPaused
-        nonReentrant
-        returns (uint256 sharesMinted)
-    {
+    ) external onlyWhitelisted whenNotPaused returns (uint256 sharesMinted) {
         MintPositionParams memory _params = abi.decode(
             _mintPositionData,
             (MintPositionParams)
@@ -338,7 +330,7 @@ contract UniswapV3SingleTickLiquidityHandler is
     function burnPositionHandler(
         address context,
         bytes calldata _burnPositionData
-    ) external onlyWhitelisted whenNotPaused nonReentrant returns (uint256) {
+    ) external onlyWhitelisted whenNotPaused returns (uint256) {
         BurnPositionParams memory _params = abi.decode(
             _burnPositionData,
             (BurnPositionParams)
@@ -445,7 +437,6 @@ contract UniswapV3SingleTickLiquidityHandler is
         external
         onlyWhitelisted
         whenNotPaused
-        nonReentrant
         returns (address[] memory, uint256[] memory, uint256)
     {
         UsePositionParams memory _params = abi.decode(
@@ -513,7 +504,6 @@ contract UniswapV3SingleTickLiquidityHandler is
         external
         onlyWhitelisted
         whenNotPaused
-        nonReentrant
         returns (uint256[] memory, uint256)
     {
         UnusePositionParams memory _params = abi.decode(
@@ -592,7 +582,6 @@ contract UniswapV3SingleTickLiquidityHandler is
         external
         onlyWhitelisted
         whenNotPaused
-        nonReentrant
         returns (uint256[] memory, uint256)
     {
         DonateParams memory _params = abi.decode(_donateData, (DonateParams));
