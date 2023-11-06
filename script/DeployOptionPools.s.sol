@@ -7,7 +7,7 @@ import {DopexV2OptionPools} from "../src/DopexV2OptionPools.sol";
 contract DeployOptionPools is Script {
     function run() public {
         address optionPricing = 0x2b99e3D67dAD973c1B9747Da742B7E26c8Bdd67B;
-        address pm = 0x672436dB2468D9B736f4Ec8300CAc3532303f88b;
+        address pm = 0x1e3d4725dB1062b88962bFAb8B2D31eAa8f63e45;
         address dpFee = address(0);
         address callAsset = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
         address putAsset = 0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8;
