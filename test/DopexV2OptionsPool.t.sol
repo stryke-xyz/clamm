@@ -17,12 +17,10 @@ import {UniswapV3SingleTickLiquidityHandler} from "../src/handlers/UniswapV3Sing
 import {DopexV2OptionPools} from "../src/DopexV2OptionPools.sol";
 
 import {OptionPricing} from "../src/pricing/OptionPricing.sol";
-import {VolatilityEngine} from "../src/volatility-engine/VolatilityEngine.sol";
 import {DopexFee} from "../src/pricing/DopexFee.sol";
 import {SwapRouterSwapper} from "../src/swapper/SwapRouterSwapper.sol";
 
 import {IOptionPricing} from "../src/pricing/IOptionPricing.sol";
-import {IVolatilityEngine} from "../src/volatility-engine/IVolatilityEngine.sol";
 import {IHandler} from "../src/interfaces/IHandler.sol";
 
 contract OptionPoolsTest is Test {
@@ -38,7 +36,6 @@ contract OptionPoolsTest is Test {
     IUniswapV3Pool pool;
 
     OptionPricing op;
-    VolatilityEngine ve;
     DopexFee dpFee;
     SwapRouterSwapper srs;
 
