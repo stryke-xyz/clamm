@@ -35,7 +35,7 @@ contract SwapRouterSwapper is ISwapper {
                 tokenOut: _tokenOut,
                 fee: fee,
                 recipient: msg.sender,
-                deadline: block.timestamp + 5 days,
+                deadline: block.timestamp,
                 amountIn: _amountIn,
                 amountOutMinimum: amountOutMinimum,
                 sqrtPriceLimitX96: 0
