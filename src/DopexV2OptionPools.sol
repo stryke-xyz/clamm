@@ -138,7 +138,7 @@ contract DopexV2OptionPools is
     address public feeTo;
     address public tokenURIFetcher;
 
-    mapping(uint256 => uint256) public ttlToVEID;
+    mapping(uint256 => uint256) public ttlToVol;
     mapping(uint256 => OptionData) public opData;
     mapping(uint256 => OptionTicks[]) public opTickMap;
     mapping(address => mapping(address => bool)) public exerciseDelegator;
@@ -201,9 +201,9 @@ contract DopexV2OptionPools is
 
         address assetToUse = _params.isCall ? callAsset : putAsset;
 
-        uint256 _ttlToVEID = ttlToVEID[_params.ttl];
+        uint256 _ttlToVol = ttlToVol[_params.ttl];
 
-        if (_ttlToVEID == 0) revert DopexV2OptionPools__IVNotSet();
+        if (_ttlToVol == 0) revert DopexV2OptionPools__IVNotSet();
 
         OptionTicks memory opTick;
 
@@ -264,7 +264,7 @@ contract DopexV2OptionPools is
             block.timestamp + _params.ttl, // expiry
             strike, // Strike
             getCurrentPricePerCallAsset(primePool), // Current price
-            _ttlToVEID, // IV, strike and expiry param is 0 since we are using flat volatility
+            _ttlToVol, // IV, strike and expiry param is 0 since we are using flat volatility
             _params.isCall
                 ? totalAssetWithdrawn
                 : (totalAssetWithdrawn * (10 ** putAssetDecimals)) / strike
@@ -780,7 +780,7 @@ contract DopexV2OptionPools is
         uint256[] calldata _ttlIV
     ) external onlyOwner {
         for (uint256 i; i < _ttls.length; i++) {
-            ttlToVEID[_ttls[i]] = _ttlIV[i];
+            ttlToVol[_ttls[i]] = _ttlIV[i];
         }
         emit LogIVUpdate(_ttls, _ttlIV);
     }

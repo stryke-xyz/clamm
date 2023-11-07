@@ -212,7 +212,7 @@ contract OptionPoolsTest is Test {
             block.timestamp + 20 minutes,
             optionPools.getPricePerCallAssetViaTick(pool, tickUpperCalls),
             optionPools.getCurrentPricePerCallAsset(pool),
-            optionPools.ttlToVEID(20 minutes),
+            optionPools.ttlToVol(20 minutes),
             5e18
         );
 
@@ -271,7 +271,7 @@ contract OptionPoolsTest is Test {
             block.timestamp + 20 minutes,
             optionPools.getPricePerCallAssetViaTick(pool, tickLowerPuts),
             optionPools.getCurrentPricePerCallAsset(pool),
-            optionPools.ttlToVEID(20 minutes),
+            optionPools.ttlToVol(20 minutes),
             10_000e18
         );
 
