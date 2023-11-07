@@ -15,30 +15,23 @@ contract DopexV2ClammFeeStrategy is IDopexV2ClammFeeStrategy, Ownable {
     /// @dev Option Pool address => bool (is registered or not)
     mapping(address => bool) public registeredOptionPools;
 
-    /// @dev Option Pool address => Fee Struct
-    mapping(address => FeeStruct) public feeStructs;
+    /// @dev Option Pool address => Fee Percentage
+    mapping(address => uint256) public feePercentages;
 
     /// @dev The precision in which fee percent is set (fee percent should always be divided by 1e6 to get the correct vaue)
     uint256 public constant FEE_PERCENT_PRECISION = 1e4;
 
-    struct FeeStruct {
-        /// @dev Fee percentage on the notional value
-        uint256 feePercentage;
-        /// @dev Max fee percentage of the premium
-        uint256 maxFeePercentageOnPremium;
-    }
-
     /// @notice Registers an option pool with the fee strategy
     /// @dev Can only be called by owner.
     /// @param _optionPool Address of the option pool
-    /// @param _feeStruct FeeStruct
+    /// @param _feePercentage Fee percentage
     function registerOptionPool(
         address _optionPool,
-        FeeStruct memory _feeStruct
+        uint256 _feePercentage
     ) external onlyOwner {
         registeredOptionPools[_optionPool] = true;
 
-        updateFees(_optionPool, _feeStruct);
+        updateFees(_optionPool, _feePercentage);
 
         emit OptionPoolRegistered(_optionPool);
     }
@@ -46,32 +39,28 @@ contract DopexV2ClammFeeStrategy is IDopexV2ClammFeeStrategy, Ownable {
     /// @notice Updates the fee struct of an option pool
     /// @dev Can only be called by owner.
     /// @param _optionPool Address of the option pool
-    /// @param _feeStruct FeeStruct
+    /// @param _feePercentage Fee percentage
     function updateFees(
         address _optionPool,
-        FeeStruct memory _feeStruct
+        uint256 _feePercentage
     ) public onlyOwner {
         require(
-            _feeStruct.feePercentage < FEE_PERCENT_PRECISION,
+            _feePercentage < FEE_PERCENT_PRECISION,
             "Fee percentage cannot be 100 or more"
         );
-        require(
-            _feeStruct.maxFeePercentageOnPremium < FEE_PERCENT_PRECISION,
-            "Max Fee percentage cannot be 100 or more"
-        );
 
-        feeStructs[_optionPool] = _feeStruct;
+        feePercentages[_optionPool] = _feePercentage;
 
-        emit FeeUpdate(_optionPool, _feeStruct);
+        emit FeeUpdate(_optionPool, _feePercentage);
     }
 
     /// @inheritdoc	IDopexV2ClammFeeStrategy
     function onFeeReqReceive(
         address _optionPool,
         uint256 _amount,
-        uint256 _premium
+        uint256
     ) external view returns (uint256 fee) {
-        uint256 feePercentage = feeStructs[_optionPool].feePercentage;
+        uint256 feePercentage = feePercentages[_optionPool];
 
         // If decimals is 0 it means that the option pool was not registered
         if (registeredOptionPools[_optionPool]) {
@@ -79,17 +68,11 @@ contract DopexV2ClammFeeStrategy is IDopexV2ClammFeeStrategy, Ownable {
         }
 
         fee = (feePercentage * _amount) / (FEE_PERCENT_PRECISION * 100);
-
-        uint256 maxFee = (_premium *
-            feeStructs[_optionPool].maxFeePercentageOnPremium) /
-            (FEE_PERCENT_PRECISION * 100);
-
-        if (fee > maxFee) fee = maxFee;
     }
 
     error OptionPoolNotRegistered(address optionPool);
 
     event OptionPoolRegistered(address optionPool);
 
-    event FeeUpdate(address optionPool, FeeStruct feeStruct);
+    event FeeUpdate(address optionPool, uint256 feePercentages);
 }
