@@ -45,7 +45,7 @@ contract BuyOptionScript is Script {
                 tickUpper: -200810,
                 ttl: 24 hours,
                 isCall: true,
-                maxFeeAllowed: 23108495619576
+                maxCostAllowance: 23108495619576
             })
         );
 

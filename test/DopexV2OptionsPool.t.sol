@@ -237,7 +237,7 @@ contract OptionPoolsTest is Test {
                 tickUpper: tickUpperCalls,
                 ttl: 20 minutes,
                 isCall: true,
-                maxFeeAllowed: _premiumAmountCalls
+                maxCostAllowance: _premiumAmountCalls
             })
         );
 
@@ -296,7 +296,7 @@ contract OptionPoolsTest is Test {
                 tickUpper: tickUpperPuts,
                 ttl: 20 minutes,
                 isCall: false,
-                maxFeeAllowed: _premiumAmountPuts
+                maxCostAllowance: _premiumAmountPuts
             })
         );
 

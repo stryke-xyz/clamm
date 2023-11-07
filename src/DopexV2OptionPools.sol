@@ -56,7 +56,7 @@ contract DopexV2OptionPools is
         int24 tickUpper;
         uint256 ttl;
         bool isCall;
-        uint256 maxFeeAllowed;
+        uint256 maxCostAllowance;
     }
 
     struct ExerciseOptionParams {
@@ -117,7 +117,7 @@ contract DopexV2OptionPools is
     error DopexV2OptionPools__IVNotSet();
     error DopexV2OptionPools__NotValidStrikeTick();
     error DopexV2OptionPools__PoolNotApproved();
-    error DopexV2OptionPools__MaxFeeAllowanceExceeded();
+    error DopexV2OptionPools__MaxCostAllowanceExceeded();
     error DopexV2OptionPools__NotOwnerOrDelegator();
     error DopexV2OptionPools__ArrayLenMismatch();
     error DopexV2OptionPools__OptionExpired();
@@ -270,8 +270,8 @@ contract DopexV2OptionPools is
             ERC20(assetToUse).transferFrom(msg.sender, feeTo, protocolFees);
         }
 
-        if (premiumAmount + protocolFees > _params.maxFeeAllowed)
-            revert DopexV2OptionPools__MaxFeeAllowanceExceeded();
+        if (premiumAmount + protocolFees > _params.maxCostAllowance)
+            revert DopexV2OptionPools__MaxCostAllowanceExceeded();
 
         ERC20(assetToUse).transferFrom(
             msg.sender,
