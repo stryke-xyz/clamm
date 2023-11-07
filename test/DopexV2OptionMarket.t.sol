@@ -17,7 +17,7 @@ import {UniswapV3SingleTickLiquidityHandler} from "../src/handlers/UniswapV3Sing
 import {DopexV2OptionMarket} from "../src/DopexV2OptionMarket.sol";
 
 import {OptionPricing} from "../src/pricing/OptionPricing.sol";
-import {DopexFee} from "../src/mocks/DopexFee.sol";
+import {DopexV2ClammFeeStrategy} from "../src/pricing/fees/DopexV2ClammFeeStrategy.sol";
 import {SwapRouterSwapper} from "../src/swapper/SwapRouterSwapper.sol";
 
 import {IOptionPricing} from "../src/pricing/IOptionPricing.sol";
@@ -36,7 +36,6 @@ contract optionMarketTest is Test {
     IUniswapV3Pool pool;
 
     OptionPricing op;
-    DopexFee dpFee;
     SwapRouterSwapper srs;
 
     uint24 fee = 500;
@@ -65,6 +64,7 @@ contract optionMarketTest is Test {
     PositionManagerHandler positionManagerHandler;
     DopexV2OptionMarket optionMarket;
     UniswapV3SingleTickLiquidityHandler uniV3Handler;
+    DopexV2ClammFeeStrategy feeStrategy;
 
     function setUp() public {
         vm.warp(1693352493);
@@ -100,17 +100,21 @@ contract optionMarketTest is Test {
         );
 
         op = new OptionPricing(500, 1e8);
-        dpFee = new DopexFee();
         srs = new SwapRouterSwapper(address(uniswapV3TestLib.swapRouter()));
+
+        feeStrategy = new DopexV2ClammFeeStrategy();
 
         optionMarket = new DopexV2OptionMarket(
             address(positionManager),
             address(op),
-            address(dpFee),
+            address(feeStrategy),
             ETH,
             LUSD,
             address(pool)
         );
+
+        // Add 0.15% fee to the market
+        feeStrategy.registerOptionMarket(address(optionMarket), 1500);
 
         uint256[] memory ttls = new uint256[](1);
         ttls[0] = 20 minutes;
@@ -118,13 +122,15 @@ contract optionMarketTest is Test {
         uint256[] memory IVs = new uint256[](1);
         IVs[0] = 100;
 
+        address feeCollector = makeAddr("feeCollector");
+
         bytes32 IV_SETTER = keccak256("I");
         optionMarket.grantRole(IV_SETTER, address(this));
         optionMarket.updateIVs(ttls, IVs);
         optionMarket.updateAddress(
+            feeCollector,
             address(0),
-            address(0),
-            address(dpFee),
+            address(feeStrategy),
             address(op),
             address(this),
             true,
@@ -217,8 +223,10 @@ contract optionMarketTest is Test {
             5e18
         );
 
-        token1.mint(trader, _premiumAmountCalls);
-        token1.approve(address(optionMarket), _premiumAmountCalls);
+        uint256 _fee = optionMarket.getFee(5e18, 0);
+        uint256 cost = _premiumAmountCalls + _fee;
+        token1.mint(trader, cost);
+        token1.approve(address(optionMarket), cost);
 
         DopexV2OptionMarket.OptionTicks[]
             memory opTicks = new DopexV2OptionMarket.OptionTicks[](1);
@@ -238,7 +246,7 @@ contract optionMarketTest is Test {
                 tickUpper: tickUpperCalls,
                 ttl: 20 minutes,
                 isCall: true,
-                maxCostAllowance: _premiumAmountCalls
+                maxCostAllowance: cost
             })
         );
 
@@ -249,11 +257,6 @@ contract optionMarketTest is Test {
             int24 tickUpper,
             uint256 liquidityToUse
         ) = optionMarket.opTickMap(2, 0);
-
-        // console.log(address(_handler), address(_pool));
-        // console.logInt(tickLower);
-        // console.logInt(tickUpper);
-        // console.log(liquidityToUse);
 
         vm.stopPrank();
     }
@@ -273,11 +276,15 @@ contract optionMarketTest is Test {
             optionMarket.getPricePerCallAssetViaTick(pool, tickLowerPuts),
             optionMarket.getCurrentPricePerCallAsset(pool),
             optionMarket.ttlToVol(20 minutes),
-            10_000e18
+            (10_000e18 * 1e18) /
+                optionMarket.getPricePerCallAssetViaTick(pool, tickLowerPuts)
         );
 
-        token0.mint(trader, _premiumAmountPuts);
-        token0.approve(address(optionMarket), _premiumAmountPuts);
+        uint256 _fee = optionMarket.getFee(10_000e18, 0);
+
+        uint256 cost = _premiumAmountPuts + _fee;
+        token0.mint(trader, cost);
+        token0.approve(address(optionMarket), cost);
 
         DopexV2OptionMarket.OptionTicks[]
             memory opTicks = new DopexV2OptionMarket.OptionTicks[](1);
@@ -297,7 +304,7 @@ contract optionMarketTest is Test {
                 tickUpper: tickUpperPuts,
                 ttl: 20 minutes,
                 isCall: false,
-                maxCostAllowance: _premiumAmountPuts
+                maxCostAllowance: cost
             })
         );
 
@@ -308,11 +315,6 @@ contract optionMarketTest is Test {
             int24 tickUpper,
             uint256 liquidityToUse
         ) = optionMarket.opTickMap(2, 0);
-
-        // console.log(address(_handler), address(_pool));
-        // console.logInt(tickLower);
-        // console.logInt(tickUpper);
-        // console.log(liquidityToUse);
 
         vm.stopPrank();
     }
@@ -509,7 +511,10 @@ contract optionMarketTest is Test {
             })
         );
 
-        console.log(token0.balanceOf(address(this)));
+        console.log(
+            "Balance after settlement",
+            token0.balanceOf(address(this))
+        );
     }
 
     function testSettleOptionPutITM() public {
@@ -552,7 +557,10 @@ contract optionMarketTest is Test {
             })
         );
 
-        console.log(token1.balanceOf(address(this)));
+        console.log(
+            "Balance after settlement",
+            token1.balanceOf(address(this))
+        );
     }
 
     function testSplitPosition() public {
@@ -589,7 +597,7 @@ contract optionMarketTest is Test {
             int24 ptickUpper,
             uint256 pliquidityToUse
         ) = optionMarket.opTickMap(2, 0);
-        console.log(pliquidityToUse);
+        console.log("Previous liquidity", pliquidityToUse);
 
         (
             IHandler n_handler,
@@ -598,6 +606,6 @@ contract optionMarketTest is Test {
             int24 ntickUpper,
             uint256 nliquidityToUse
         ) = optionMarket.opTickMap(3, 0);
-        console.log(nliquidityToUse);
+        console.log("New liquidity", nliquidityToUse);
     }
 }

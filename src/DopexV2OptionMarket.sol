@@ -278,11 +278,7 @@ contract DopexV2OptionMarket is
         );
         uint256 protocolFees;
         if (feeTo != address(0)) {
-            protocolFees = dpFee.onFeeReqReceive(
-                address(this),
-                totalAssetWithdrawn,
-                premiumAmount
-            );
+            protocolFees = getFee(totalAssetWithdrawn, premiumAmount);
             ERC20(assetToUse).transferFrom(msg.sender, feeTo, protocolFees);
         }
 
@@ -777,6 +773,13 @@ contract DopexV2OptionMarket is
                 ? FullMath.mulDiv(priceX192, 10 ** callAssetDecimals, 1 << 128)
                 : FullMath.mulDiv(1 << 128, 10 ** callAssetDecimals, priceX192);
         }
+    }
+
+    function getFee(
+        uint256 amount,
+        uint256 premium
+    ) public view returns (uint256) {
+        return dpFee.onFeeReqReceive(address(this), amount, premium);
     }
 
     // admin
