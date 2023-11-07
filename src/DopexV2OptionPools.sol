@@ -132,6 +132,9 @@ contract DopexV2OptionPools is
 
     address public callAsset;
     address public putAsset;
+    uint8 public callAssetDecimals;
+    uint8 public putAssetDecimals;
+
     address public feeTo;
     address public tokenURIFetcher;
 
@@ -161,6 +164,9 @@ contract DopexV2OptionPools is
         optionPricing = IOptionPricing(_optionPricing);
 
         primePool = IUniswapV3Pool(_primePool);
+
+        callAssetDecimals = ERC20(_callAsset).decimals();
+        putAssetDecimals = ERC20(_putAsset).decimals();
 
         emit LogOptionsPoolInitialized(
             _optionPricing,
@@ -261,8 +267,7 @@ contract DopexV2OptionPools is
             _ttlToVEID, // IV, strike and expiry param is 0 since we are using flat volatility
             _params.isCall
                 ? totalAssetWithdrawn
-                : (totalAssetWithdrawn * (10 ** ERC20(putAsset).decimals())) /
-                    strike
+                : (totalAssetWithdrawn * (10 ** putAssetDecimals)) / strike
         );
         uint256 protocolFees;
         if (feeTo != address(0)) {
@@ -727,18 +732,12 @@ contract DopexV2OptionPools is
                 strike,
                 lastPrice,
                 baseIv
-            )) /
-            (
-                isPut
-                    ? 10 ** ERC20(putAsset).decimals()
-                    : 10 ** ERC20(callAsset).decimals()
-            );
+            )) / (isPut ? 10 ** putAssetDecimals : 10 ** callAssetDecimals);
 
         if (isPut) {
             return premiumInQuote;
         }
-        return
-            (premiumInQuote * (10 ** ERC20(callAsset).decimals())) / lastPrice;
+        return (premiumInQuote * (10 ** callAssetDecimals)) / lastPrice;
     }
 
     /**
@@ -754,16 +753,8 @@ contract DopexV2OptionPools is
         if (sqrtPriceX96 <= type(uint128).max) {
             uint256 priceX192 = uint256(sqrtPriceX96) * sqrtPriceX96;
             price = callAsset == _pool.token0()
-                ? FullMath.mulDiv(
-                    priceX192,
-                    10 ** ERC20(callAsset).decimals(),
-                    1 << 192
-                )
-                : FullMath.mulDiv(
-                    1 << 192,
-                    10 ** ERC20(callAsset).decimals(),
-                    priceX192
-                );
+                ? FullMath.mulDiv(priceX192, 10 ** callAssetDecimals, 1 << 192)
+                : FullMath.mulDiv(1 << 192, 10 ** callAssetDecimals, priceX192);
         } else {
             uint256 priceX192 = FullMath.mulDiv(
                 sqrtPriceX96,
@@ -772,16 +763,8 @@ contract DopexV2OptionPools is
             );
 
             price = callAsset == _pool.token0()
-                ? FullMath.mulDiv(
-                    priceX192,
-                    10 ** ERC20(callAsset).decimals(),
-                    1 << 128
-                )
-                : FullMath.mulDiv(
-                    1 << 128,
-                    10 ** ERC20(callAsset).decimals(),
-                    priceX192
-                );
+                ? FullMath.mulDiv(priceX192, 10 ** callAssetDecimals, 1 << 128)
+                : FullMath.mulDiv(1 << 128, 10 ** callAssetDecimals, priceX192);
         }
     }
 
