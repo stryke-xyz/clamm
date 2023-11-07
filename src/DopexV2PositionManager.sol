@@ -98,7 +98,10 @@ contract DopexV2PositionManager is Ownable, ReentrancyGuard, Multicall {
                 address(this),
                 amounts[i]
             );
-            IERC20(tokens[i]).safeApprove(address(_handler), amounts[i]);
+            IERC20(tokens[i]).safeIncreaseAllowance(
+                address(_handler),
+                amounts[i]
+            );
         }
 
         sharesMinted = _handler.mintPositionHandler(
@@ -148,6 +151,7 @@ contract DopexV2PositionManager is Ownable, ReentrancyGuard, Multicall {
     )
         external
         onlyWhitelistedHandlersWithApps(_handler)
+        nonReentrant
         returns (
             address[] memory tokens,
             uint256[] memory amounts,
@@ -178,6 +182,7 @@ contract DopexV2PositionManager is Ownable, ReentrancyGuard, Multicall {
     )
         external
         onlyWhitelistedHandlersWithApps(_handler)
+        nonReentrant
         returns (uint256[] memory amounts, uint256 liquidity)
     {
         (address[] memory tokens, uint256[] memory a) = _handler
@@ -185,7 +190,7 @@ contract DopexV2PositionManager is Ownable, ReentrancyGuard, Multicall {
 
         for (uint256 i; i < tokens.length; i++) {
             IERC20(tokens[i]).safeTransferFrom(msg.sender, address(this), a[i]);
-            IERC20(tokens[i]).safeApprove(address(_handler), a[i]);
+            IERC20(tokens[i]).safeIncreaseAllowance(address(_handler), a[i]);
         }
         (amounts, liquidity) = _handler.unusePositionHandler(
             _unusePositionData
@@ -198,7 +203,7 @@ contract DopexV2PositionManager is Ownable, ReentrancyGuard, Multicall {
      * @notice Donate to an existing position using the specified handler.
      * @param _handler The address of the handler to use.
      * @param _donatePosition The data required to donate to the position.
-     * @return amounts The tokens and amounts donated. T
+     * @return amounts The tokens and amounts donated.
      * @return liquidity The total liquidity donated.
      */
     function donateToPosition(
@@ -207,6 +212,7 @@ contract DopexV2PositionManager is Ownable, ReentrancyGuard, Multicall {
     )
         external
         onlyWhitelistedHandlersWithApps(_handler)
+        nonReentrant
         returns (uint256[] memory amounts, uint256 liquidity)
     {
         (address[] memory tokens, uint256[] memory a) = _handler
@@ -214,7 +220,7 @@ contract DopexV2PositionManager is Ownable, ReentrancyGuard, Multicall {
 
         for (uint256 i; i < tokens.length; i++) {
             IERC20(tokens[i]).safeTransferFrom(msg.sender, address(this), a[i]);
-            IERC20(tokens[i]).safeApprove(address(_handler), a[i]);
+            IERC20(tokens[i]).safeIncreaseAllowance(address(_handler), a[i]);
         }
         (amounts, liquidity) = _handler.donateToPosition(_donatePosition);
 

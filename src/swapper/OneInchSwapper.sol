@@ -21,7 +21,7 @@ contract OneInchSwapper is ISwapper {
         uint256 _amountIn,
         bytes memory _swapData
     ) external returns (uint256 amountOut) {
-        IERC20(_tokenIn).safeApprove(oneInchRouter, _amountIn);
+        IERC20(_tokenIn).safeIncreaseAllowance(oneInchRouter, _amountIn);
 
         // inch should directly send to the option pool contract
         (bool success, ) = oneInchRouter.call(_swapData);

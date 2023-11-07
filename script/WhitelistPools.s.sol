@@ -7,9 +7,9 @@ import {UniswapV3SingleTickLiquidityHandler} from "../src/handlers/UniswapV3Sing
 
 contract DeployPositionManager is Script {
     function run() public {
-        address pm = 0x672436dB2468D9B736f4Ec8300CAc3532303f88b;
-        address op = 0x58c4d160b33aC1fE89c136c598CEdc9C299D8a0f;
-        address uniV3Handler = 0xfe30F2e6cDcEA6815EF396d81Db5bE2B5C43166c;
+        address pm = 0x1e3d4725dB1062b88962bFAb8B2D31eAa8f63e45;
+        address op = 0x7d6BA9528A1449Fa944D81Ea16089D0db01F2A20;
+        address uniV3Handler = 0xBdAd87fFcB972E55A94C0aDca42E2c21441070A1;
         vm.startBroadcast();
 
         DopexV2PositionManager(pm).updateWhitelistHandlerWithApp(

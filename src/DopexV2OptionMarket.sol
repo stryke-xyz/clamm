@@ -14,6 +14,7 @@ import {ERC20} from "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
+import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
 
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
@@ -21,15 +22,15 @@ import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {FullMath} from "@uniswap/v3-core/contracts/libraries/FullMath.sol";
 
 /**
- * @title DopexV2OptionPools
+ * @title DopexV2OptionMarket
  * @author 0xcarrot
  * @dev Allow traders to buy CALL and PUT options using CLAMM liquidity, which can be
  * exercised at any time ITM.
  */
-contract DopexV2OptionPools is
-    Ownable,
+contract DopexV2OptionMarket is
     ReentrancyGuard,
     Multicall,
+    AccessControl,
     ERC721("Dopex V2 Options Pools", "DV2OP")
 {
     using TickMath for int24;
@@ -56,7 +57,7 @@ contract DopexV2OptionPools is
         int24 tickUpper;
         uint256 ttl;
         bool isCall;
-        uint256 maxFeeAllowed;
+        uint256 maxCostAllowance;
     }
 
     struct ExerciseOptionParams {
@@ -101,7 +102,8 @@ contract DopexV2OptionPools is
         address to
     );
     event LogIVUpdate(uint256[] ttl, uint256[] iv);
-    event LogOptionsPoolInitialized(
+    event LogOptionsMarketInitialized(
+        address primePool,
         address optionPricing,
         address dpFee,
         address callAsset,
@@ -114,28 +116,31 @@ contract DopexV2OptionPools is
     );
 
     // errors
-    error DopexV2OptionPools__IVNotSet();
-    error DopexV2OptionPools__NotValidStrikeTick();
-    error DopexV2OptionPools__PoolNotApproved();
-    error DopexV2OptionPools__MaxFeeAllowanceExceeded();
-    error DopexV2OptionPools__NotOwnerOrDelegator();
-    error DopexV2OptionPools__ArrayLenMismatch();
-    error DopexV2OptionPools__OptionExpired();
-    error DopexV2OptionPools__OptionNotExpired();
-    error DopexV2OptionPools__NotEnoughAfterSwap();
-    error DopexV2OptionPools__NotApprovedSettler();
+    error DopexV2OptionMarket__IVNotSet();
+    error DopexV2OptionMarket__NotValidStrikeTick();
+    error DopexV2OptionMarket__PoolNotApproved();
+    error DopexV2OptionMarket__MaxCostAllowanceExceeded();
+    error DopexV2OptionMarket__NotOwnerOrDelegator();
+    error DopexV2OptionMarket__ArrayLenMismatch();
+    error DopexV2OptionMarket__OptionExpired();
+    error DopexV2OptionMarket__OptionNotExpired();
+    error DopexV2OptionMarket__NotEnoughAfterSwap();
+    error DopexV2OptionMarket__NotApprovedSettler();
 
     IDopexV2ClammFeeStrategy public dpFee;
     IOptionPricing public optionPricing;
-    IDopexV2PositionManager public positionManager;
-    IUniswapV3Pool public primePool;
 
-    address public callAsset;
-    address public putAsset;
+    IDopexV2PositionManager public immutable positionManager;
+    IUniswapV3Pool public immutable primePool;
+    address public immutable callAsset;
+    address public immutable putAsset;
+    uint8 public immutable callAssetDecimals;
+    uint8 public immutable putAssetDecimals;
+
     address public feeTo;
     address public tokenURIFetcher;
 
-    mapping(uint256 => uint256) public ttlToVEID;
+    mapping(uint256 => uint256) public ttlToVol;
     mapping(uint256 => OptionData) public opData;
     mapping(uint256 => OptionTicks[]) public opTickMap;
     mapping(address => mapping(address => bool)) public exerciseDelegator;
@@ -143,6 +148,8 @@ contract DopexV2OptionPools is
     mapping(address => bool) public settlers;
 
     uint256 public optionIds = 1;
+
+    bytes32 constant IV_SETTER = keccak256("I");
 
     constructor(
         address _pm,
@@ -162,7 +169,13 @@ contract DopexV2OptionPools is
 
         primePool = IUniswapV3Pool(_primePool);
 
-        emit LogOptionsPoolInitialized(
+        callAssetDecimals = ERC20(_callAsset).decimals();
+        putAssetDecimals = ERC20(_putAsset).decimals();
+
+        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+
+        emit LogOptionsMarketInitialized(
+            _primePool,
             _optionPricing,
             _dpFee,
             _callAsset,
@@ -195,41 +208,47 @@ contract DopexV2OptionPools is
 
         address assetToUse = _params.isCall ? callAsset : putAsset;
 
-        if (ttlToVEID[_params.ttl] == 0) revert DopexV2OptionPools__IVNotSet();
+        uint256 _ttlToVol = ttlToVol[_params.ttl];
+
+        if (_ttlToVol == 0) revert DopexV2OptionMarket__IVNotSet();
+
+        OptionTicks memory opTick;
 
         for (uint256 i; i < _params.optionTicks.length; i++) {
+            opTick = _params.optionTicks[i];
             if (
                 _params.isCall
-                    ? _params.tickUpper != _params.optionTicks[i].tickUpper
-                    : _params.tickLower != _params.optionTicks[i].tickLower
-            ) revert DopexV2OptionPools__NotValidStrikeTick();
+                    ? _params.tickUpper != opTick.tickUpper
+                    : _params.tickLower != opTick.tickLower
+            ) revert DopexV2OptionMarket__NotValidStrikeTick();
 
             opTickMap[optionIds].push(
                 OptionTicks({
-                    _handler: _params.optionTicks[i]._handler,
-                    pool: _params.optionTicks[i].pool,
-                    tickLower: _params.optionTicks[i].tickLower,
-                    tickUpper: _params.optionTicks[i].tickUpper,
-                    liquidityToUse: _params.optionTicks[i].liquidityToUse
+                    _handler: opTick._handler,
+                    pool: opTick.pool,
+                    tickLower: opTick.tickLower,
+                    tickUpper: opTick.tickUpper,
+                    liquidityToUse: opTick.liquidityToUse
                 })
             );
 
-            if (!approvedPools[address(_params.optionTicks[i].pool)])
-                revert DopexV2OptionPools__PoolNotApproved();
+            if (!approvedPools[address(opTick.pool)])
+                revert DopexV2OptionMarket__PoolNotApproved();
 
             bytes memory usePositionData = abi.encode(
-                _params.optionTicks[i].pool,
-                _params.optionTicks[i].tickLower,
-                _params.optionTicks[i].tickUpper,
-                _params.optionTicks[i].liquidityToUse
+                opTick.pool,
+                opTick.tickLower,
+                opTick.tickUpper,
+                opTick.liquidityToUse
             );
 
-            (, uint256[] memory amounts, ) = positionManager.usePosition(
-                _params.optionTicks[i]._handler,
-                usePositionData
-            );
+            (
+                address[] memory tokens,
+                uint256[] memory amounts,
 
-            if (_params.optionTicks[i].pool.token0() == assetToUse) {
+            ) = positionManager.usePosition(opTick._handler, usePositionData);
+
+            if (tokens[0] == assetToUse) {
                 require(amounts[0] > 0 && amounts[1] == 0);
                 amountsPerOptionTicks[i] = (amounts[0]);
                 totalAssetWithdrawn += amounts[0];
@@ -252,11 +271,10 @@ contract DopexV2OptionPools is
             block.timestamp + _params.ttl, // expiry
             strike, // Strike
             getCurrentPricePerCallAsset(primePool), // Current price
-            ttlToVEID[_params.ttl], // IV, strike and expiry param is 0 since we are using flat volatility
+            _ttlToVol, // IV, strike and expiry param is 0 since we are using flat volatility
             _params.isCall
                 ? totalAssetWithdrawn
-                : (totalAssetWithdrawn * (10 ** ERC20(putAsset).decimals())) /
-                    strike
+                : (totalAssetWithdrawn * (10 ** putAssetDecimals)) / strike
         );
         uint256 protocolFees;
         if (feeTo != address(0)) {
@@ -268,8 +286,8 @@ contract DopexV2OptionPools is
             ERC20(assetToUse).transferFrom(msg.sender, feeTo, protocolFees);
         }
 
-        if (premiumAmount + protocolFees > _params.maxFeeAllowed)
-            revert DopexV2OptionPools__MaxFeeAllowanceExceeded();
+        if (premiumAmount + protocolFees > _params.maxCostAllowance)
+            revert DopexV2OptionMarket__MaxCostAllowanceExceeded();
 
         ERC20(assetToUse).transferFrom(
             msg.sender,
@@ -279,25 +297,26 @@ contract DopexV2OptionPools is
         ERC20(assetToUse).approve(address(positionManager), premiumAmount);
 
         for (uint i; i < _params.optionTicks.length; i++) {
+            opTick = _params.optionTicks[i];
             uint256 premiumAmountEarned = (amountsPerOptionTicks[i] *
                 premiumAmount) / totalAssetWithdrawn;
 
             uint128 liquidityToDonate = LiquidityAmounts.getLiquidityForAmounts(
-                _getCurrentSqrtPriceX96(_params.optionTicks[i].pool),
-                _params.optionTicks[i].tickLower.getSqrtRatioAtTick(),
-                _params.optionTicks[i].tickUpper.getSqrtRatioAtTick(),
+                _getCurrentSqrtPriceX96(opTick.pool),
+                opTick.tickLower.getSqrtRatioAtTick(),
+                opTick.tickUpper.getSqrtRatioAtTick(),
                 isAmount0 ? premiumAmountEarned : 0,
                 isAmount0 ? 0 : premiumAmountEarned
             );
 
             bytes memory donatePositionData = abi.encode(
-                _params.optionTicks[i].pool,
-                _params.optionTicks[i].tickLower,
-                _params.optionTicks[i].tickUpper,
+                opTick.pool,
+                opTick.tickLower,
+                opTick.tickUpper,
                 liquidityToDonate
             );
             positionManager.donateToPosition(
-                _params.optionTicks[i]._handler,
+                opTick._handler,
                 donatePositionData
             );
         }
@@ -321,6 +340,11 @@ contract DopexV2OptionPools is
         );
     }
 
+    struct AssetsCache {
+        ERC20 assetToUse;
+        ERC20 assetToGet;
+    }
+
     /**
      * @notice Exercises the given option .
      * @param _params The exercise option  parameters.
@@ -331,24 +355,30 @@ contract DopexV2OptionPools is
         if (
             ownerOf(_params.optionId) != msg.sender &&
             exerciseDelegator[ownerOf(_params.optionId)][msg.sender] == false
-        ) revert DopexV2OptionPools__NotOwnerOrDelegator();
+        ) revert DopexV2OptionMarket__NotOwnerOrDelegator();
 
         OptionData memory oData = opData[_params.optionId];
 
         if (oData.opTickArrayLen != _params.liquidityToExercise.length)
-            revert DopexV2OptionPools__ArrayLenMismatch();
+            revert DopexV2OptionMarket__ArrayLenMismatch();
 
         if (oData.expiry < block.timestamp)
-            revert DopexV2OptionPools__OptionExpired();
+            revert DopexV2OptionMarket__OptionExpired();
 
         uint256 totalProfit;
         uint256 totalAssetRelocked;
+
+        bool isAmount0 = oData.isCall
+            ? primePool.token0() == callAsset
+            : primePool.token0() == putAsset;
+
+        AssetsCache memory ac;
+
+        ac.assetToUse = ERC20(oData.isCall ? callAsset : putAsset);
+        ac.assetToGet = ERC20(oData.isCall ? putAsset : callAsset);
+
         for (uint256 i; i < oData.opTickArrayLen; i++) {
             OptionTicks storage opTick = opTickMap[_params.optionId][i];
-
-            bool isAmount0 = oData.isCall
-                ? primePool.token0() == callAsset
-                : primePool.token0() == putAsset;
 
             uint256 amountToSwap = isAmount0
                 ? LiquidityAmounts.getAmount0ForLiquidity(
@@ -364,17 +394,13 @@ contract DopexV2OptionPools is
 
             totalAssetRelocked += amountToSwap;
 
-            uint256 prevBalance = ERC20(oData.isCall ? putAsset : callAsset)
-                .balanceOf(address(this));
+            uint256 prevBalance = ac.assetToGet.balanceOf(address(this));
 
-            ERC20(oData.isCall ? callAsset : putAsset).transfer(
-                address(_params.swapper),
-                amountToSwap
-            );
+            ac.assetToUse.transfer(address(_params.swapper), amountToSwap);
 
             _params.swapper.onSwapReceived(
-                oData.isCall ? callAsset : putAsset,
-                oData.isCall ? putAsset : callAsset,
+                address(ac.assetToUse),
+                address(ac.assetToGet),
                 amountToSwap,
                 _params.swapData
             );
@@ -391,16 +417,12 @@ contract DopexV2OptionPools is
                     uint128(_params.liquidityToExercise[i])
                 );
 
-            uint256 currentBalance = ERC20(oData.isCall ? putAsset : callAsset)
-                .balanceOf(address(this));
+            uint256 currentBalance = ac.assetToGet.balanceOf(address(this));
 
             if (currentBalance < prevBalance + amountReq)
-                revert DopexV2OptionPools__NotEnoughAfterSwap();
+                revert DopexV2OptionMarket__NotEnoughAfterSwap();
 
-            ERC20(oData.isCall ? putAsset : callAsset).approve(
-                address(positionManager),
-                amountReq
-            );
+            ac.assetToGet.approve(address(positionManager), amountReq);
 
             bytes memory unusePositionData = abi.encode(
                 opTick.pool,
@@ -416,10 +438,7 @@ contract DopexV2OptionPools is
             totalProfit += currentBalance - (prevBalance + amountReq);
         }
 
-        ERC20(oData.isCall ? putAsset : callAsset).transfer(
-            msg.sender,
-            totalProfit
-        );
+        ac.assetToGet.transfer(msg.sender, totalProfit);
 
         emit LogExerciseOption(
             ownerOf(_params.optionId),
@@ -437,14 +456,23 @@ contract DopexV2OptionPools is
         SettleOptionParams calldata _params
     ) external nonReentrant {
         if (!settlers[msg.sender])
-            revert DopexV2OptionPools__NotApprovedSettler();
+            revert DopexV2OptionMarket__NotApprovedSettler();
         OptionData memory oData = opData[_params.optionId];
 
         if (oData.opTickArrayLen != _params.liquidityToSettle.length)
-            revert DopexV2OptionPools__ArrayLenMismatch();
+            revert DopexV2OptionMarket__ArrayLenMismatch();
 
         if (block.timestamp <= oData.expiry)
-            revert DopexV2OptionPools__OptionNotExpired();
+            revert DopexV2OptionMarket__OptionNotExpired();
+
+        bool isAmount0 = oData.isCall
+            ? primePool.token0() == callAsset
+            : primePool.token0() == putAsset;
+
+        AssetsCache memory ac;
+
+        ac.assetToUse = ERC20(oData.isCall ? callAsset : putAsset);
+        ac.assetToGet = ERC20(oData.isCall ? putAsset : callAsset);
 
         for (uint256 i; i < oData.opTickArrayLen; i++) {
             OptionTicks storage opTick = opTickMap[_params.optionId][i];
@@ -460,18 +488,11 @@ contract DopexV2OptionPools is
                     uint128(liquidityToSettle)
                 );
 
-            bool isAmount0 = oData.isCall
-                ? primePool.token0() == callAsset
-                : primePool.token0() == putAsset;
-
             if (
                 (amount0 > 0 && amount1 == 0) || (amount1 > 0 && amount0 == 0)
             ) {
                 if (isAmount0 && amount0 > 0) {
-                    ERC20(oData.isCall ? callAsset : putAsset).approve(
-                        address(positionManager),
-                        amount0
-                    );
+                    ac.assetToUse.approve(address(positionManager), amount0);
 
                     bytes memory unusePositionData = abi.encode(
                         opTick.pool,
@@ -487,10 +508,7 @@ contract DopexV2OptionPools is
 
                     opTick.liquidityToUse -= liquidityToSettle;
                 } else if (!isAmount0 && amount1 > 0) {
-                    ERC20(oData.isCall ? callAsset : putAsset).approve(
-                        address(positionManager),
-                        amount1
-                    );
+                    ac.assetToUse.approve(address(positionManager), amount1);
 
                     bytes memory unusePositionData = abi.encode(
                         opTick.pool,
@@ -517,18 +535,18 @@ contract DopexV2OptionPools is
                             uint128(liquidityToSettle)
                         );
 
-                    uint256 prevBalance = ERC20(
-                        oData.isCall ? putAsset : callAsset
-                    ).balanceOf(address(this));
+                    uint256 prevBalance = ac.assetToGet.balanceOf(
+                        address(this)
+                    );
 
-                    ERC20(oData.isCall ? callAsset : putAsset).transfer(
+                    ac.assetToUse.transfer(
                         address(_params.swapper),
                         amountToSwap
                     );
 
                     _params.swapper.onSwapReceived(
-                        oData.isCall ? callAsset : putAsset,
-                        oData.isCall ? putAsset : callAsset,
+                        address(ac.assetToUse),
+                        address(ac.assetToGet),
                         amountToSwap,
                         _params.swapData
                     );
@@ -545,17 +563,14 @@ contract DopexV2OptionPools is
                             uint128(liquidityToSettle)
                         );
 
-                    uint256 currentBalance = ERC20(
-                        oData.isCall ? putAsset : callAsset
-                    ).balanceOf(address(this));
+                    uint256 currentBalance = ac.assetToGet.balanceOf(
+                        address(this)
+                    );
 
                     if (currentBalance < prevBalance + amountReq)
-                        revert DopexV2OptionPools__NotEnoughAfterSwap();
+                        revert DopexV2OptionMarket__NotEnoughAfterSwap();
 
-                    ERC20(oData.isCall ? putAsset : callAsset).approve(
-                        address(positionManager),
-                        amountReq
-                    );
+                    ac.assetToGet.approve(address(positionManager), amountReq);
 
                     bytes memory unusePositionData = abi.encode(
                         opTick.pool,
@@ -571,7 +586,7 @@ contract DopexV2OptionPools is
 
                     opTick.liquidityToUse -= liquidityToSettle;
 
-                    ERC20(oData.isCall ? putAsset : callAsset).transfer(
+                    ac.assetToGet.transfer(
                         msg.sender,
                         currentBalance - (prevBalance + amountReq)
                     );
@@ -583,7 +598,7 @@ contract DopexV2OptionPools is
     }
 
     /**
-     * @notice Splits the given option  into two new option.
+     * @notice Splits the given option into a new option.
      * @param _params The position splitter parameters.
      */
     function positionSplitter(
@@ -592,11 +607,11 @@ contract DopexV2OptionPools is
         optionIds += 1;
 
         if (ownerOf(_params.optionId) != msg.sender)
-            revert DopexV2OptionPools__NotOwnerOrDelegator();
+            revert DopexV2OptionMarket__NotOwnerOrDelegator();
         OptionData memory oData = opData[_params.optionId];
 
         if (oData.opTickArrayLen != _params.liquidityToSplit.length)
-            revert DopexV2OptionPools__ArrayLenMismatch();
+            revert DopexV2OptionMarket__ArrayLenMismatch();
 
         for (uint256 i; i < _params.liquidityToSplit.length; i++) {
             OptionTicks storage opTick = opTickMap[_params.optionId][i];
@@ -728,18 +743,12 @@ contract DopexV2OptionPools is
                 strike,
                 lastPrice,
                 baseIv
-            )) /
-            (
-                isPut
-                    ? 10 ** ERC20(putAsset).decimals()
-                    : 10 ** ERC20(callAsset).decimals()
-            );
+            )) / (isPut ? 10 ** putAssetDecimals : 10 ** callAssetDecimals);
 
         if (isPut) {
             return premiumInQuote;
         }
-        return
-            (premiumInQuote * (10 ** ERC20(callAsset).decimals())) / lastPrice;
+        return (premiumInQuote * (10 ** callAssetDecimals)) / lastPrice;
     }
 
     /**
@@ -755,16 +764,8 @@ contract DopexV2OptionPools is
         if (sqrtPriceX96 <= type(uint128).max) {
             uint256 priceX192 = uint256(sqrtPriceX96) * sqrtPriceX96;
             price = callAsset == _pool.token0()
-                ? FullMath.mulDiv(
-                    priceX192,
-                    10 ** ERC20(callAsset).decimals(),
-                    1 << 192
-                )
-                : FullMath.mulDiv(
-                    1 << 192,
-                    10 ** ERC20(callAsset).decimals(),
-                    priceX192
-                );
+                ? FullMath.mulDiv(priceX192, 10 ** callAssetDecimals, 1 << 192)
+                : FullMath.mulDiv(1 << 192, 10 ** callAssetDecimals, priceX192);
         } else {
             uint256 priceX192 = FullMath.mulDiv(
                 sqrtPriceX96,
@@ -773,16 +774,8 @@ contract DopexV2OptionPools is
             );
 
             price = callAsset == _pool.token0()
-                ? FullMath.mulDiv(
-                    priceX192,
-                    10 ** ERC20(callAsset).decimals(),
-                    1 << 192
-                )
-                : FullMath.mulDiv(
-                    1 << 192,
-                    10 ** ERC20(callAsset).decimals(),
-                    priceX192
-                );
+                ? FullMath.mulDiv(priceX192, 10 ** callAssetDecimals, 1 << 128)
+                : FullMath.mulDiv(1 << 128, 10 ** callAssetDecimals, priceX192);
         }
     }
 
@@ -791,14 +784,14 @@ contract DopexV2OptionPools is
      * @notice Updates the implied volatility (IV) for the given time to expirations (TTLs).
      * @param _ttls The TTLs to update the IV for.
      * @param _ttlIV The new IVs for the given TTLs.
-     * @dev Only the owner can call this function.
+     * @dev Only the IV SETTER can call this function.
      */
     function updateIVs(
         uint256[] calldata _ttls,
         uint256[] calldata _ttlIV
-    ) external onlyOwner {
+    ) external onlyRole(IV_SETTER) {
         for (uint256 i; i < _ttls.length; i++) {
-            ttlToVEID[_ttls[i]] = _ttlIV[i];
+            ttlToVol[_ttls[i]] = _ttlIV[i];
         }
         emit LogIVUpdate(_ttls, _ttlIV);
     }
@@ -824,7 +817,7 @@ contract DopexV2OptionPools is
         bool _statusSettler,
         address _pool,
         bool _statusPools
-    ) external onlyOwner {
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         feeTo = _feeTo;
         tokenURIFetcher = _tokeURIFetcher;
         dpFee = IDopexV2ClammFeeStrategy(_dpFee);
@@ -841,10 +834,22 @@ contract DopexV2OptionPools is
      * @param token The address of the token to withdraw.
      * @dev Only the owner can call this function.
      */
-    function emergencyWithdraw(address token) external onlyOwner {
+    function emergencyWithdraw(
+        address token
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         ERC20(token).transfer(
             msg.sender,
             ERC20(token).balanceOf(address(this))
         );
+    }
+
+    /**
+     * @notice Emergency unpauses the contract.
+     * @param interfaceId The Id of the interface
+     */
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public view override(ERC721, AccessControl) returns (bool) {
+        return super.supportsInterface(interfaceId);
     }
 }
