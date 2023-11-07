@@ -14,6 +14,7 @@ import {ERC20} from "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
+import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
 
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
@@ -27,9 +28,9 @@ import {FullMath} from "@uniswap/v3-core/contracts/libraries/FullMath.sol";
  * exercised at any time ITM.
  */
 contract DopexV2OptionPools is
-    Ownable,
     ReentrancyGuard,
     Multicall,
+    AccessControl,
     ERC721("Dopex V2 Options Pools", "DV2OP")
 {
     using TickMath for int24;
@@ -128,9 +129,9 @@ contract DopexV2OptionPools is
 
     IDopexFee public dpFee;
     IOptionPricing public optionPricing;
+
     IDopexV2PositionManager public positionManager;
     IUniswapV3Pool public primePool;
-
     address public callAsset;
     address public putAsset;
     uint8 public callAssetDecimals;
@@ -147,6 +148,8 @@ contract DopexV2OptionPools is
     mapping(address => bool) public settlers;
 
     uint256 public optionIds = 1;
+
+    bytes32 constant IV_SETTER = keccak256("I");
 
     constructor(
         address _pm,
@@ -168,6 +171,8 @@ contract DopexV2OptionPools is
 
         callAssetDecimals = ERC20(_callAsset).decimals();
         putAssetDecimals = ERC20(_putAsset).decimals();
+
+        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
 
         emit LogOptionsPoolInitialized(
             _primePool,
@@ -775,12 +780,12 @@ contract DopexV2OptionPools is
      * @notice Updates the implied volatility (IV) for the given time to expirations (TTLs).
      * @param _ttls The TTLs to update the IV for.
      * @param _ttlIV The new IVs for the given TTLs.
-     * @dev Only the owner can call this function.
+     * @dev Only the IV SETTER can call this function.
      */
     function updateIVs(
         uint256[] calldata _ttls,
         uint256[] calldata _ttlIV
-    ) external onlyOwner {
+    ) external onlyRole(IV_SETTER) {
         for (uint256 i; i < _ttls.length; i++) {
             ttlToVol[_ttls[i]] = _ttlIV[i];
         }
@@ -808,7 +813,7 @@ contract DopexV2OptionPools is
         bool _statusSettler,
         address _pool,
         bool _statusPools
-    ) external onlyOwner {
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         feeTo = _feeTo;
         tokenURIFetcher = _tokeURIFetcher;
         dpFee = IDopexFee(_dpFee);
@@ -825,10 +830,22 @@ contract DopexV2OptionPools is
      * @param token The address of the token to withdraw.
      * @dev Only the owner can call this function.
      */
-    function emergencyWithdraw(address token) external onlyOwner {
+    function emergencyWithdraw(
+        address token
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         ERC20(token).transfer(
             msg.sender,
             ERC20(token).balanceOf(address(this))
         );
+    }
+
+    /**
+     * @notice Emergency unpauses the contract.
+     * @param interfaceId The Id of the interface
+     */
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public view override(ERC721, AccessControl) returns (bool) {
+        return super.supportsInterface(interfaceId);
     }
 }

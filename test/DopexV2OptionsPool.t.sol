@@ -112,13 +112,14 @@ contract OptionPoolsTest is Test {
             address(pool)
         );
 
-        // positionManager.updateWhitelist(address(optionPools), true);
         uint256[] memory ttls = new uint256[](1);
         ttls[0] = 20 minutes;
 
         uint256[] memory IVs = new uint256[](1);
         IVs[0] = 100;
 
+        bytes32 IV_SETTER = keccak256("I");
+        optionPools.grantRole(IV_SETTER, address(this));
         optionPools.updateIVs(ttls, IVs);
         optionPools.updateAddress(
             address(0),
