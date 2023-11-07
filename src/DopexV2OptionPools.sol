@@ -587,7 +587,7 @@ contract DopexV2OptionPools is
     }
 
     /**
-     * @notice Splits the given option  into two new option.
+     * @notice Splits the given option into a new option.
      * @param _params The position splitter parameters.
      */
     function positionSplitter(
