@@ -22,12 +22,12 @@ import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {FullMath} from "@uniswap/v3-core/contracts/libraries/FullMath.sol";
 
 /**
- * @title DopexV2OptionPools
+ * @title DopexV2OptionMarket
  * @author 0xcarrot
  * @dev Allow traders to buy CALL and PUT options using CLAMM liquidity, which can be
  * exercised at any time ITM.
  */
-contract DopexV2OptionPools is
+contract DopexV2OptionMarket is
     ReentrancyGuard,
     Multicall,
     AccessControl,
@@ -102,7 +102,7 @@ contract DopexV2OptionPools is
         address to
     );
     event LogIVUpdate(uint256[] ttl, uint256[] iv);
-    event LogOptionsPoolInitialized(
+    event LogOptionsMarketInitialized(
         address primePool,
         address optionPricing,
         address dpFee,
@@ -116,16 +116,16 @@ contract DopexV2OptionPools is
     );
 
     // errors
-    error DopexV2OptionPools__IVNotSet();
-    error DopexV2OptionPools__NotValidStrikeTick();
-    error DopexV2OptionPools__PoolNotApproved();
-    error DopexV2OptionPools__MaxCostAllowanceExceeded();
-    error DopexV2OptionPools__NotOwnerOrDelegator();
-    error DopexV2OptionPools__ArrayLenMismatch();
-    error DopexV2OptionPools__OptionExpired();
-    error DopexV2OptionPools__OptionNotExpired();
-    error DopexV2OptionPools__NotEnoughAfterSwap();
-    error DopexV2OptionPools__NotApprovedSettler();
+    error DopexV2OptionMarket__IVNotSet();
+    error DopexV2OptionMarket__NotValidStrikeTick();
+    error DopexV2OptionMarket__PoolNotApproved();
+    error DopexV2OptionMarket__MaxCostAllowanceExceeded();
+    error DopexV2OptionMarket__NotOwnerOrDelegator();
+    error DopexV2OptionMarket__ArrayLenMismatch();
+    error DopexV2OptionMarket__OptionExpired();
+    error DopexV2OptionMarket__OptionNotExpired();
+    error DopexV2OptionMarket__NotEnoughAfterSwap();
+    error DopexV2OptionMarket__NotApprovedSettler();
 
     IDopexFee public dpFee;
     IOptionPricing public optionPricing;
@@ -174,7 +174,7 @@ contract DopexV2OptionPools is
 
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
 
-        emit LogOptionsPoolInitialized(
+        emit LogOptionsMarketInitialized(
             _primePool,
             _optionPricing,
             _dpFee,
@@ -210,7 +210,7 @@ contract DopexV2OptionPools is
 
         uint256 _ttlToVol = ttlToVol[_params.ttl];
 
-        if (_ttlToVol == 0) revert DopexV2OptionPools__IVNotSet();
+        if (_ttlToVol == 0) revert DopexV2OptionMarket__IVNotSet();
 
         OptionTicks memory opTick;
 
@@ -220,7 +220,7 @@ contract DopexV2OptionPools is
                 _params.isCall
                     ? _params.tickUpper != opTick.tickUpper
                     : _params.tickLower != opTick.tickLower
-            ) revert DopexV2OptionPools__NotValidStrikeTick();
+            ) revert DopexV2OptionMarket__NotValidStrikeTick();
 
             opTickMap[optionIds].push(
                 OptionTicks({
@@ -233,7 +233,7 @@ contract DopexV2OptionPools is
             );
 
             if (!approvedPools[address(opTick.pool)])
-                revert DopexV2OptionPools__PoolNotApproved();
+                revert DopexV2OptionMarket__PoolNotApproved();
 
             bytes memory usePositionData = abi.encode(
                 opTick.pool,
@@ -283,7 +283,7 @@ contract DopexV2OptionPools is
         }
 
         if (premiumAmount + protocolFees > _params.maxCostAllowance)
-            revert DopexV2OptionPools__MaxCostAllowanceExceeded();
+            revert DopexV2OptionMarket__MaxCostAllowanceExceeded();
 
         ERC20(assetToUse).transferFrom(
             msg.sender,
@@ -351,15 +351,15 @@ contract DopexV2OptionPools is
         if (
             ownerOf(_params.optionId) != msg.sender &&
             exerciseDelegator[ownerOf(_params.optionId)][msg.sender] == false
-        ) revert DopexV2OptionPools__NotOwnerOrDelegator();
+        ) revert DopexV2OptionMarket__NotOwnerOrDelegator();
 
         OptionData memory oData = opData[_params.optionId];
 
         if (oData.opTickArrayLen != _params.liquidityToExercise.length)
-            revert DopexV2OptionPools__ArrayLenMismatch();
+            revert DopexV2OptionMarket__ArrayLenMismatch();
 
         if (oData.expiry < block.timestamp)
-            revert DopexV2OptionPools__OptionExpired();
+            revert DopexV2OptionMarket__OptionExpired();
 
         uint256 totalProfit;
         uint256 totalAssetRelocked;
@@ -416,7 +416,7 @@ contract DopexV2OptionPools is
             uint256 currentBalance = ac.assetToGet.balanceOf(address(this));
 
             if (currentBalance < prevBalance + amountReq)
-                revert DopexV2OptionPools__NotEnoughAfterSwap();
+                revert DopexV2OptionMarket__NotEnoughAfterSwap();
 
             ac.assetToGet.approve(address(positionManager), amountReq);
 
@@ -452,14 +452,14 @@ contract DopexV2OptionPools is
         SettleOptionParams calldata _params
     ) external nonReentrant {
         if (!settlers[msg.sender])
-            revert DopexV2OptionPools__NotApprovedSettler();
+            revert DopexV2OptionMarket__NotApprovedSettler();
         OptionData memory oData = opData[_params.optionId];
 
         if (oData.opTickArrayLen != _params.liquidityToSettle.length)
-            revert DopexV2OptionPools__ArrayLenMismatch();
+            revert DopexV2OptionMarket__ArrayLenMismatch();
 
         if (block.timestamp <= oData.expiry)
-            revert DopexV2OptionPools__OptionNotExpired();
+            revert DopexV2OptionMarket__OptionNotExpired();
 
         bool isAmount0 = oData.isCall
             ? primePool.token0() == callAsset
@@ -564,7 +564,7 @@ contract DopexV2OptionPools is
                     );
 
                     if (currentBalance < prevBalance + amountReq)
-                        revert DopexV2OptionPools__NotEnoughAfterSwap();
+                        revert DopexV2OptionMarket__NotEnoughAfterSwap();
 
                     ac.assetToGet.approve(address(positionManager), amountReq);
 
@@ -603,11 +603,11 @@ contract DopexV2OptionPools is
         optionIds += 1;
 
         if (ownerOf(_params.optionId) != msg.sender)
-            revert DopexV2OptionPools__NotOwnerOrDelegator();
+            revert DopexV2OptionMarket__NotOwnerOrDelegator();
         OptionData memory oData = opData[_params.optionId];
 
         if (oData.opTickArrayLen != _params.liquidityToSplit.length)
-            revert DopexV2OptionPools__ArrayLenMismatch();
+            revert DopexV2OptionMarket__ArrayLenMismatch();
 
         for (uint256 i; i < _params.liquidityToSplit.length; i++) {
             OptionTicks storage opTick = opTickMap[_params.optionId][i];

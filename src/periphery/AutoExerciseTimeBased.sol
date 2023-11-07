@@ -7,7 +7,7 @@ import {ISwapper} from "../interfaces/ISwapper.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 
-interface IOptionPools {
+interface IOptionMarket {
     struct ExerciseOptionParams {
         uint256 optionId;
         ISwapper swapper;
@@ -58,12 +58,12 @@ contract AutoExerciseTimeBased is AccessControl {
     error AutoExerciseOneMin__GreedyExecutor();
 
     function autoExercise(
-        IOptionPools pool,
+        IOptionMarket pool,
         uint256 tokenId,
         uint256 executorFee,
-        IOptionPools.ExerciseOptionParams calldata _params
+        IOptionMarket.ExerciseOptionParams calldata _params
     ) external onlyRole(EXECUTOR_ROLE) {
-        IOptionPools.OptionData memory opData = pool.opData(tokenId);
+        IOptionMarket.OptionData memory opData = pool.opData(tokenId);
 
         if (opData.expiry < block.timestamp)
             revert AutoExerciseOneMin__AlreadyExpired();

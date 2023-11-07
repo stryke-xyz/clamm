@@ -2,9 +2,9 @@
 pragma solidity ^0.8.13;
 
 import "forge-std/Script.sol";
-import {DopexV2OptionPools} from "../src/DopexV2OptionPools.sol";
+import {DopexV2OptionMarket} from "../src/DopexV2OptionMarket.sol";
 
-contract DeployOptionPools is Script {
+contract DeployOptionMarket is Script {
     function run() public {
         address optionPricing = 0x2b99e3D67dAD973c1B9747Da742B7E26c8Bdd67B;
         address pm = 0x1e3d4725dB1062b88962bFAb8B2D31eAa8f63e45;
@@ -14,7 +14,7 @@ contract DeployOptionPools is Script {
         address primePool = 0xC31E54c7a869B9FcBEcc14363CF510d1c41fa443;
 
         vm.startBroadcast();
-        DopexV2OptionPools op = new DopexV2OptionPools(
+        DopexV2OptionMarket op = new DopexV2OptionMarket(
             pm,
             optionPricing,
             dpFee,

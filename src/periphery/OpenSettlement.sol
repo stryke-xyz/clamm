@@ -6,7 +6,7 @@ import {ISwapper} from "../interfaces/ISwapper.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 
-interface IOptionPools {
+interface IOptionMarket {
     struct SettleOptionParams {
         uint256 optionId;
         ISwapper swapper;
@@ -46,11 +46,11 @@ contract OpenSettlement is AccessControl {
     error OpenSettlement__TooSoonOpenSettle();
 
     function openSettle(
-        IOptionPools pool,
+        IOptionMarket pool,
         uint256 tokenId,
-        IOptionPools.SettleOptionParams calldata _params
+        IOptionMarket.SettleOptionParams calldata _params
     ) public {
-        IOptionPools.OptionData memory opData = pool.opData(tokenId);
+        IOptionMarket.OptionData memory opData = pool.opData(tokenId);
 
         if (opData.expiry >= block.timestamp)
             revert OpenSettlement__NotExpired();
