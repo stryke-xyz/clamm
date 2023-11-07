@@ -5,7 +5,7 @@ import {IDopexV2PositionManager} from "./interfaces/IDopexV2PositionManager.sol"
 
 import {IOptionPricing} from "./pricing/IOptionPricing.sol";
 import {IHandler} from "./interfaces/IHandler.sol";
-import {IDopexFee} from "./interfaces/IDopexFee.sol";
+import {IDopexV2ClammFeeStrategy} from "./pricing/fees/IDopexV2ClammFeeStrategy.sol";
 import {ISwapper} from "./interfaces/ISwapper.sol";
 import {ITokenURIFetcher} from "./interfaces/ITokenURIFetcher.sol";
 
@@ -127,7 +127,7 @@ contract DopexV2OptionMarket is
     error DopexV2OptionMarket__NotEnoughAfterSwap();
     error DopexV2OptionMarket__NotApprovedSettler();
 
-    IDopexFee public dpFee;
+    IDopexV2ClammFeeStrategy public dpFee;
     IOptionPricing public optionPricing;
 
     IDopexV2PositionManager public immutable positionManager;
@@ -163,7 +163,7 @@ contract DopexV2OptionMarket is
         callAsset = _callAsset;
         putAsset = _putAsset;
 
-        dpFee = IDopexFee(_dpFee);
+        dpFee = IDopexV2ClammFeeStrategy(_dpFee);
 
         optionPricing = IOptionPricing(_optionPricing);
 
@@ -278,7 +278,7 @@ contract DopexV2OptionMarket is
         );
         uint256 protocolFees;
         if (feeTo != address(0)) {
-            protocolFees = dpFee.onFeeReqReceive();
+            protocolFees = getFee(totalAssetWithdrawn, premiumAmount);
             ERC20(assetToUse).transferFrom(msg.sender, feeTo, protocolFees);
         }
 
@@ -775,6 +775,13 @@ contract DopexV2OptionMarket is
         }
     }
 
+    function getFee(
+        uint256 amount,
+        uint256 premium
+    ) public view returns (uint256) {
+        return dpFee.onFeeReqReceive(address(this), amount, premium);
+    }
+
     // admin
     /**
      * @notice Updates the implied volatility (IV) for the given time to expirations (TTLs).
@@ -816,7 +823,7 @@ contract DopexV2OptionMarket is
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         feeTo = _feeTo;
         tokenURIFetcher = _tokeURIFetcher;
-        dpFee = IDopexFee(_dpFee);
+        dpFee = IDopexV2ClammFeeStrategy(_dpFee);
         optionPricing = IOptionPricing(_optionPricing);
         settlers[_settler] = _statusSettler;
         approvedPools[_pool] = _statusPools;
