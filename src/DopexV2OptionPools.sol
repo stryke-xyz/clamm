@@ -130,12 +130,12 @@ contract DopexV2OptionPools is
     IDopexFee public dpFee;
     IOptionPricing public optionPricing;
 
-    IDopexV2PositionManager public positionManager;
-    IUniswapV3Pool public primePool;
-    address public callAsset;
-    address public putAsset;
-    uint8 public callAssetDecimals;
-    uint8 public putAssetDecimals;
+    IDopexV2PositionManager public immutable positionManager;
+    IUniswapV3Pool public immutable primePool;
+    address public immutable callAsset;
+    address public immutable putAsset;
+    uint8 public immutable callAssetDecimals;
+    uint8 public immutable putAssetDecimals;
 
     address public feeTo;
     address public tokenURIFetcher;
