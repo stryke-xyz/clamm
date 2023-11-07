@@ -38,11 +38,8 @@ contract OpenSettlement is AccessControl {
 
     uint256 public timeToSettle = 2 hours;
 
-    bytes32 constant EXECUTOR_ROLE = keccak256("EXECUTOR");
-
     constructor() {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _setRoleAdmin(EXECUTOR_ROLE, DEFAULT_ADMIN_ROLE);
     }
 
     error OpenSettlement__NotExpired();
@@ -77,5 +74,11 @@ contract OpenSettlement is AccessControl {
         if (putAssetBalance > 0) {
             IERC20(pool.putAsset()).safeTransfer(msg.sender, putAssetBalance);
         }
+    }
+
+    function updateTimeToSettle(
+        uint256 _newTime
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        timeToSettle = _newTime;
     }
 }
