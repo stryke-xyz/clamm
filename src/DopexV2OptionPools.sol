@@ -102,6 +102,7 @@ contract DopexV2OptionPools is
     );
     event LogIVUpdate(uint256[] ttl, uint256[] iv);
     event LogOptionsPoolInitialized(
+        address primePool,
         address optionPricing,
         address dpFee,
         address callAsset,
@@ -169,6 +170,7 @@ contract DopexV2OptionPools is
         putAssetDecimals = ERC20(_putAsset).decimals();
 
         emit LogOptionsPoolInitialized(
+            _primePool,
             _optionPricing,
             _dpFee,
             _callAsset,
