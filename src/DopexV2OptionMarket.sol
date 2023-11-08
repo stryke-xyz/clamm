@@ -30,7 +30,7 @@ contract DopexV2OptionMarket is
     ReentrancyGuard,
     Multicall,
     Ownable,
-    ERC721("Dopex V2 Options Pools", "DV2OP")
+    ERC721("Dopex V2 Option Market", "DPX-V2-OM")
 {
     using TickMath for int24;
 
