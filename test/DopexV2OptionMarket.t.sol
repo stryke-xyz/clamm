@@ -124,8 +124,6 @@ contract optionMarketTest is Test {
 
         address feeCollector = makeAddr("feeCollector");
 
-        bytes32 IV_SETTER = keccak256("I");
-        optionMarket.grantRole(IV_SETTER, address(this));
         optionMarket.updateIVs(ttls, IVs);
         optionMarket.updateAddress(
             feeCollector,

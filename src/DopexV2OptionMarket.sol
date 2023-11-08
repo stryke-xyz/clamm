@@ -14,7 +14,6 @@ import {ERC20} from "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
-import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
 
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
@@ -30,7 +29,7 @@ import {FullMath} from "@uniswap/v3-core/contracts/libraries/FullMath.sol";
 contract DopexV2OptionMarket is
     ReentrancyGuard,
     Multicall,
-    AccessControl,
+    Ownable,
     ERC721("Dopex V2 Options Pools", "DV2OP")
 {
     using TickMath for int24;
@@ -101,6 +100,7 @@ contract DopexV2OptionMarket is
         uint256 newTokenId,
         address to
     );
+    event LogIVSetterUpdate(address _setter, bool _status);
     event LogIVUpdate(uint256[] ttl, uint256[] iv);
     event LogOptionsMarketInitialized(
         address primePool,
@@ -126,6 +126,7 @@ contract DopexV2OptionMarket is
     error DopexV2OptionMarket__OptionNotExpired();
     error DopexV2OptionMarket__NotEnoughAfterSwap();
     error DopexV2OptionMarket__NotApprovedSettler();
+    error DopexV2OptionMarket__NotIVSetter();
 
     IDopexV2ClammFeeStrategy public dpFee;
     IOptionPricing public optionPricing;
@@ -146,10 +147,9 @@ contract DopexV2OptionMarket is
     mapping(address => mapping(address => bool)) public exerciseDelegator;
     mapping(address => bool) public approvedPools;
     mapping(address => bool) public settlers;
+    mapping(address => bool) public ivSetter;
 
     uint256 public optionIds = 1;
-
-    bytes32 constant IV_SETTER = keccak256("I");
 
     constructor(
         address _pm,
@@ -172,7 +172,7 @@ contract DopexV2OptionMarket is
         callAssetDecimals = ERC20(_callAsset).decimals();
         putAssetDecimals = ERC20(_putAsset).decimals();
 
-        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        ivSetter[msg.sender] = true;
 
         emit LogOptionsMarketInitialized(
             _primePool,
@@ -783,6 +783,18 @@ contract DopexV2OptionMarket is
     }
 
     // admin
+
+    /**
+     * @notice Updates the IV setter
+     * @param _setter Address of the setter
+     * @param _status Status  to set
+     * @dev Only the owner of the contract can call this function
+     */
+    function updateIVSetter(address _setter, bool _status) external onlyOwner {
+        ivSetter[_setter] = _status;
+        emit LogIVSetterUpdate(_setter, _status);
+    }
+
     /**
      * @notice Updates the implied volatility (IV) for the given time to expirations (TTLs).
      * @param _ttls The TTLs to update the IV for.
@@ -792,7 +804,9 @@ contract DopexV2OptionMarket is
     function updateIVs(
         uint256[] calldata _ttls,
         uint256[] calldata _ttlIV
-    ) external onlyRole(IV_SETTER) {
+    ) external {
+        if (!ivSetter[msg.sender]) revert DopexV2OptionMarket__NotIVSetter();
+
         for (uint256 i; i < _ttls.length; i++) {
             ttlToVol[_ttls[i]] = _ttlIV[i];
         }
@@ -820,7 +834,7 @@ contract DopexV2OptionMarket is
         bool _statusSettler,
         address _pool,
         bool _statusPools
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    ) external onlyOwner {
         feeTo = _feeTo;
         tokenURIFetcher = _tokeURIFetcher;
         dpFee = IDopexV2ClammFeeStrategy(_dpFee);
@@ -837,22 +851,10 @@ contract DopexV2OptionMarket is
      * @param token The address of the token to withdraw.
      * @dev Only the owner can call this function.
      */
-    function emergencyWithdraw(
-        address token
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function emergencyWithdraw(address token) external onlyOwner {
         ERC20(token).transfer(
             msg.sender,
             ERC20(token).balanceOf(address(this))
         );
-    }
-
-    /**
-     * @notice Emergency unpauses the contract.
-     * @param interfaceId The Id of the interface
-     */
-    function supportsInterface(
-        bytes4 interfaceId
-    ) public view override(ERC721, AccessControl) returns (bool) {
-        return super.supportsInterface(interfaceId);
     }
 }
