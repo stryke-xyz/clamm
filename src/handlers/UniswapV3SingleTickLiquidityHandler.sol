@@ -130,6 +130,7 @@ contract UniswapV3SingleTickLiquidityHandler is
     uint64 public newLockedBlockDuration;
 
     bytes32 constant PAUSER_ROLE = keccak256("P");
+    bytes32 constant SOS_ROLE = keccak256("SOS");
 
     // modifiers
     modifier onlyWhitelisted() {
@@ -934,7 +935,7 @@ contract UniswapV3SingleTickLiquidityHandler is
         int24 tickLower,
         int24 tickUpper,
         uint128 liquidity
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    ) external onlyRole(SOS_ROLE) {
         pool.burn(tickLower, tickUpper, liquidity);
         (, , , uint128 t0, uint128 t1) = pool.positions(
             _computePositionKey(address(this), tickLower, tickUpper)
@@ -946,9 +947,7 @@ contract UniswapV3SingleTickLiquidityHandler is
      * @notice Emergency withdraws the given token from the contract.
      * @param token The token to withdraw.
      */
-    function emergencyWithdraw(
-        address token
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function emergencyWithdraw(address token) external onlyRole(SOS_ROLE) {
         IERC20(token).transfer(
             msg.sender,
             IERC20(token).balanceOf(address(this))
