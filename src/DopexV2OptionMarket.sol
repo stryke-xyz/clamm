@@ -775,6 +775,12 @@ contract DopexV2OptionMarket is
         }
     }
 
+    /**
+     * @notice Gets the fee for the option.
+     * @param amount Amount being withdrawn.
+     * @param premium Premium being paid for the position
+     * @return fee for the option
+     */
     function getFee(
         uint256 amount,
         uint256 premium
