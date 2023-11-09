@@ -7,9 +7,8 @@ import {Math} from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {ERC1155} from "openzeppelin-contracts/contracts/token/ERC1155/ERC1155.sol";
-import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import {Pausable} from "openzeppelin-contracts/contracts/security/Pausable.sol";
-import {ReentrancyGuard} from "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
+import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
 
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {LiquidityManager} from "../uniswap-v3/LiquidityManager.sol";
@@ -28,9 +27,8 @@ import {ISwapRouter} from "v3-periphery/SwapRouter.sol";
 contract UniswapV3SingleTickLiquidityHandler is
     ERC1155(""),
     IHandler,
-    Ownable,
     Pausable,
-    ReentrancyGuard,
+    AccessControl,
     LiquidityManager
 {
     using Math for uint128;
@@ -89,17 +87,26 @@ contract UniswapV3SingleTickLiquidityHandler is
 
     // events
     event LogMintedPosition(
-        address user,
         uint256 tokenId,
-        uint128 sharesMinted
+        uint128 liquidityMinted,
+        address pool,
+        address user,
+        int24 tickLower,
+        int24 tickUpper
     );
     event LogBurnedPosition(
-        address user,
         uint256 tokenId,
-        uint128 sharesBurned
+        uint128 liquidityBurned,
+        address pool,
+        address user,
+        int24 tickLower,
+        int24 tickUpper
     );
+
     event LogFeeCompound(
+        address handler,
         IUniswapV3Pool pool,
+        uint256 tokenId,
         int24 tickLower,
         int24 tickUpper,
         uint128 liquidity
@@ -119,9 +126,11 @@ contract UniswapV3SingleTickLiquidityHandler is
 
     ISwapRouter swapRouter;
 
-    uint64 public constant DEFAULT_LOCKED_BLOCK_DURATION = 100;
-    uint64 public lockedBlockDuration = DEFAULT_LOCKED_BLOCK_DURATION;
+    uint64 public lockedBlockDuration = 100;
     uint64 public newLockedBlockDuration;
+
+    bytes32 constant PAUSER_ROLE = keccak256("P");
+    bytes32 constant SOS_ROLE = keccak256("SOS");
 
     // modifiers
     modifier onlyWhitelisted() {
@@ -136,6 +145,7 @@ contract UniswapV3SingleTickLiquidityHandler is
         address _swapRouter
     ) LiquidityManager(_factory, _pool_init_code_hash) {
         swapRouter = ISwapRouter(_swapRouter);
+        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
     /**
@@ -150,13 +160,7 @@ contract UniswapV3SingleTickLiquidityHandler is
     function mintPositionHandler(
         address context,
         bytes calldata _mintPositionData
-    )
-        external
-        onlyWhitelisted
-        whenNotPaused
-        nonReentrant
-        returns (uint256 sharesMinted)
-    {
+    ) external onlyWhitelisted whenNotPaused returns (uint256 sharesMinted) {
         MintPositionParams memory _params = abi.decode(
             _mintPositionData,
             (MintPositionParams)
@@ -189,6 +193,9 @@ contract UniswapV3SingleTickLiquidityHandler is
                 uint128(_params.liquidity)
             );
 
+        if (amount0 > 0 && amount1 > 0)
+            revert UniswapV3SingleTickLiquidityHandler__InRangeLP();
+
         (uint128 liquidity, , , ) = addLiquidity(
             LiquidityManager.AddLiquidityParams({
                 token0: tki.token0,
@@ -203,41 +210,92 @@ contract UniswapV3SingleTickLiquidityHandler is
                 amount1Min: amount1
             })
         );
+
+        _feeCalculation(
+            tki,
+            _params.pool,
+            _params.tickLower,
+            _params.tickUpper
+        );
+
         if (tki.totalSupply > 0) {
-            _feeCalculation(
-                tki,
-                _params.pool,
-                _params.tickLower,
-                _params.tickUpper
-            );
+            // compound fees
+            if (tki.tokensOwed0 > 0 || tki.tokensOwed1 > 0) {
+                (uint256 a0, uint256 a1) = _params.pool.collect(
+                    address(this),
+                    _params.tickLower,
+                    _params.tickUpper,
+                    uint128(tki.tokensOwed0),
+                    uint128(tki.tokensOwed1)
+                );
 
-            _compoundFees(
-                tki,
-                _params.pool,
-                _params.tickLower,
-                _params.tickUpper,
-                amount0,
-                amount1
-            );
+                (tki.tokensOwed0, tki.tokensOwed1) = (0, 0);
 
-            uint128 shares = _convertToShares(
-                liquidity,
-                tokenId,
-                Math.Rounding.Down
-            );
+                bool isAmount0 = amount0 > 0;
+
+                uint256 amountOut;
+                if (isAmount0 ? a1 > 0 : a0 > 0) {
+                    IERC20(isAmount0 ? tki.token1 : tki.token0)
+                        .safeIncreaseAllowance(
+                            address(swapRouter),
+                            isAmount0 ? a1 : a0
+                        );
+
+                    amountOut = swapRouter.exactInputSingle(
+                        ISwapRouter.ExactInputSingleParams({
+                            tokenIn: isAmount0 ? tki.token1 : tki.token0,
+                            tokenOut: isAmount0 ? tki.token0 : tki.token1,
+                            fee: tki.fee,
+                            recipient: address(this),
+                            deadline: block.timestamp,
+                            amountIn: isAmount0 ? a1 : a0,
+                            amountOutMinimum: 0,
+                            sqrtPriceLimitX96: 0
+                        })
+                    );
+                }
+
+                (
+                    uint128 liquidityFee,
+                    ,
+                    ,
+
+                ) = UniswapV3SingleTickLiquidityHandler(address(this))
+                        .addLiquidity(
+                            LiquidityManager.AddLiquidityParams({
+                                token0: tki.token0,
+                                token1: tki.token1,
+                                fee: tki.fee,
+                                recipient: address(this),
+                                tickLower: _params.tickLower,
+                                tickUpper: _params.tickUpper,
+                                amount0Desired: a0 +
+                                    (isAmount0 ? amountOut : 0),
+                                amount1Desired: a1 +
+                                    (isAmount0 ? 0 : amountOut),
+                                amount0Min: a0 + (isAmount0 ? amountOut : 0),
+                                amount1Min: a1 + (isAmount0 ? 0 : amountOut)
+                            })
+                        );
+                tki.totalLiquidity += liquidityFee;
+
+                emit LogFeeCompound(
+                    address(this),
+                    _params.pool,
+                    tokenId,
+                    _params.tickLower,
+                    _params.tickUpper,
+                    liquidityFee
+                );
+            }
+
+            uint128 shares = _convertToShares(liquidity, tokenId);
 
             tki.totalLiquidity += liquidity;
             tki.totalSupply += shares;
 
             sharesMinted = shares;
         } else {
-            _feeCalculation(
-                tki,
-                _params.pool,
-                _params.tickLower,
-                _params.tickUpper
-            );
-
             tki.totalLiquidity += liquidity;
             tki.totalSupply += liquidity;
 
@@ -246,7 +304,14 @@ contract UniswapV3SingleTickLiquidityHandler is
 
         _mint(context, tokenId, sharesMinted, "");
 
-        emit LogMintedPosition(context, tokenId, uint128(sharesMinted));
+        emit LogMintedPosition(
+            tokenId,
+            liquidity,
+            address(_params.pool),
+            context,
+            _params.tickLower,
+            _params.tickUpper
+        );
     }
 
     /**
@@ -260,7 +325,7 @@ contract UniswapV3SingleTickLiquidityHandler is
     function burnPositionHandler(
         address context,
         bytes calldata _burnPositionData
-    ) external onlyWhitelisted whenNotPaused nonReentrant returns (uint256) {
+    ) external onlyWhitelisted whenNotPaused returns (uint256) {
         BurnPositionParams memory _params = abi.decode(
             _burnPositionData,
             (BurnPositionParams)
@@ -279,11 +344,7 @@ contract UniswapV3SingleTickLiquidityHandler is
 
         TokenIdInfo storage tki = tokenIds[tokenId];
 
-        uint128 liquidityToBurn = _convertToAssets(
-            _params.shares,
-            tokenId,
-            Math.Rounding.Up
-        );
+        uint128 liquidityToBurn = _convertToAssets(_params.shares, tokenId);
 
         (uint256 amount0, uint256 amount1) = _params.pool.burn(
             _params.tickLower,
@@ -302,32 +363,36 @@ contract UniswapV3SingleTickLiquidityHandler is
         uint128 feesOwedToken1;
 
         {
-            uint256 a00 = LiquidityAmounts.getAmount0ForLiquidity(
+            uint256 userLiquidity0 = LiquidityAmounts.getAmount0ForLiquidity(
                 _params.tickLower.getSqrtRatioAtTick(),
                 _params.tickUpper.getSqrtRatioAtTick(),
                 uint128(liquidityToBurn)
             );
 
-            uint256 a11 = LiquidityAmounts.getAmount1ForLiquidity(
+            uint256 userLiquidity1 = LiquidityAmounts.getAmount1ForLiquidity(
                 _params.tickLower.getSqrtRatioAtTick(),
                 _params.tickUpper.getSqrtRatioAtTick(),
                 uint128(liquidityToBurn)
             );
 
-            uint256 a0 = LiquidityAmounts.getAmount0ForLiquidity(
+            uint256 totalLiquidity0 = LiquidityAmounts.getAmount0ForLiquidity(
                 _params.tickLower.getSqrtRatioAtTick(),
                 _params.tickUpper.getSqrtRatioAtTick(),
                 uint128(tki.totalLiquidity)
             );
 
-            uint256 a1 = LiquidityAmounts.getAmount1ForLiquidity(
+            uint256 totalLiquidity1 = LiquidityAmounts.getAmount1ForLiquidity(
                 _params.tickLower.getSqrtRatioAtTick(),
                 _params.tickUpper.getSqrtRatioAtTick(),
                 uint128(tki.totalLiquidity)
             );
 
-            feesOwedToken0 = uint128((tki.tokensOwed0 * a00) / a0);
-            feesOwedToken1 = uint128((tki.tokensOwed1 * a11) / a1);
+            feesOwedToken0 = uint128(
+                (tki.tokensOwed0 * userLiquidity0) / totalLiquidity0
+            );
+            feesOwedToken1 = uint128(
+                (tki.tokensOwed1 * userLiquidity1) / totalLiquidity1
+            );
         }
 
         tki.tokensOwed0 -= feesOwedToken0;
@@ -346,7 +411,14 @@ contract UniswapV3SingleTickLiquidityHandler is
 
         _burn(context, tokenId, _params.shares);
 
-        emit LogBurnedPosition(context, tokenId, _params.shares);
+        emit LogBurnedPosition(
+            tokenId,
+            liquidityToBurn,
+            address(_params.pool),
+            context,
+            _params.tickLower,
+            _params.tickUpper
+        );
         return (_params.shares);
     }
 
@@ -364,7 +436,6 @@ contract UniswapV3SingleTickLiquidityHandler is
         external
         onlyWhitelisted
         whenNotPaused
-        nonReentrant
         returns (address[] memory, uint256[] memory, uint256)
     {
         UsePositionParams memory _params = abi.decode(
@@ -432,7 +503,6 @@ contract UniswapV3SingleTickLiquidityHandler is
         external
         onlyWhitelisted
         whenNotPaused
-        nonReentrant
         returns (uint256[] memory, uint256)
     {
         UnusePositionParams memory _params = abi.decode(
@@ -511,7 +581,6 @@ contract UniswapV3SingleTickLiquidityHandler is
         external
         onlyWhitelisted
         whenNotPaused
-        nonReentrant
         returns (uint256[] memory, uint256)
     {
         DonateParams memory _params = abi.decode(_donateData, (DonateParams));
@@ -622,80 +691,6 @@ contract UniswapV3SingleTickLiquidityHandler is
 
             _tki.feeGrowthInside0LastX128 = feeGrowthInside0LastX128;
             _tki.feeGrowthInside1LastX128 = feeGrowthInside1LastX128;
-        }
-    }
-
-    /**
-     * @notice Compounds the fees owed to the position.
-     * @param tki The TokenIdInfo struct for the position.
-     * @param _pool The UniswapV3Pool contract.
-     * @param _tickLower The lower tick of the position.
-     * @param _tickUpper The upper tick of the position.
-     * @param amount0 The amount of token 0 to add to the position.
-     * @param amount1 The amount of token 1 to add to the position.
-     * @dev Cannot auto-compound in-range positions
-     */
-    function _compoundFees(
-        TokenIdInfo storage tki,
-        IUniswapV3Pool _pool,
-        int24 _tickLower,
-        int24 _tickUpper,
-        uint256 amount0,
-        uint256 amount1
-    ) internal {
-        if (amount0 > 0 && amount1 > 0)
-            revert UniswapV3SingleTickLiquidityHandler__InRangeLP();
-
-        if (tki.tokensOwed0 > 0 || tki.tokensOwed1 > 0) {
-            (uint256 a0, uint256 a1) = _pool.collect(
-                address(this),
-                _tickLower,
-                _tickUpper,
-                uint128(tki.tokensOwed0),
-                uint128(tki.tokensOwed1)
-            );
-
-            (tki.tokensOwed0, tki.tokensOwed1) = (0, 0);
-
-            bool isAmount0 = amount0 > 0;
-
-            IERC20(isAmount0 ? tki.token1 : tki.token0).safeApprove(
-                address(swapRouter),
-                isAmount0 ? a1 : a0
-            );
-
-            uint256 amountOut = swapRouter.exactInputSingle(
-                ISwapRouter.ExactInputSingleParams({
-                    tokenIn: isAmount0 ? tki.token1 : tki.token0,
-                    tokenOut: isAmount0 ? tki.token0 : tki.token1,
-                    fee: tki.fee,
-                    recipient: address(this),
-                    deadline: block.timestamp + 5 days,
-                    amountIn: isAmount0 ? a1 : a0,
-                    amountOutMinimum: 0,
-                    sqrtPriceLimitX96: 0
-                })
-            );
-
-            (uint128 liquidity, , , ) = UniswapV3SingleTickLiquidityHandler(
-                address(this)
-            ).addLiquidity(
-                    LiquidityManager.AddLiquidityParams({
-                        token0: tki.token0,
-                        token1: tki.token1,
-                        fee: tki.fee,
-                        recipient: address(this),
-                        tickLower: _tickLower,
-                        tickUpper: _tickUpper,
-                        amount0Desired: a0 + (isAmount0 ? amountOut : 0),
-                        amount1Desired: a1 + (isAmount0 ? 0 : amountOut),
-                        amount0Min: a0 + (isAmount0 ? amountOut : 0),
-                        amount1Min: a1 + (isAmount0 ? 0 : amountOut)
-                    })
-                );
-            tki.totalLiquidity += liquidity;
-
-            emit LogFeeCompound(_pool, _tickLower, _tickUpper, liquidity);
         }
     }
 
@@ -837,13 +832,11 @@ contract UniswapV3SingleTickLiquidityHandler is
      * @notice Converts an amount of assets to shares.
      * @param assets The amount of assets.
      * @param tokenId The tokenId of the position.
-     * @param rounding The rounding mode to use.
      * @return shares The number of shares.
      */
     function _convertToShares(
         uint128 assets,
-        uint256 tokenId,
-        Math.Rounding rounding
+        uint256 tokenId
     ) internal view returns (uint128) {
         return
             uint128(
@@ -851,7 +844,7 @@ contract UniswapV3SingleTickLiquidityHandler is
                     tokenIds[tokenId].totalSupply,
                     (tokenIds[tokenId].totalLiquidity + 1) -
                         _donationLocked(tokenId),
-                    rounding
+                    Math.Rounding.Down
                 )
             );
     }
@@ -860,13 +853,11 @@ contract UniswapV3SingleTickLiquidityHandler is
      * @notice Converts an amount of shares to assets.
      * @param shares The number of shares.
      * @param tokenId The tokenId of the position.
-     * @param rounding The rounding mode to use.
      * @return assets The amount of assets.
      */
     function _convertToAssets(
         uint128 shares,
-        uint256 tokenId,
-        Math.Rounding rounding
+        uint256 tokenId
     ) internal view returns (uint128) {
         return
             uint128(
@@ -874,7 +865,7 @@ contract UniswapV3SingleTickLiquidityHandler is
                     (tokenIds[tokenId].totalLiquidity + 1) -
                         _donationLocked(tokenId),
                     tokenIds[tokenId].totalSupply,
-                    rounding
+                    Math.Rounding.Up
                 )
             );
     }
@@ -914,7 +905,7 @@ contract UniswapV3SingleTickLiquidityHandler is
     function updateWhitelistedApps(
         address _app,
         bool _status
-    ) external onlyOwner {
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         whitelistedApps[_app] = _status;
         emit LogUpdateWhitelistedApp(_app, _status);
     }
@@ -925,7 +916,7 @@ contract UniswapV3SingleTickLiquidityHandler is
      */
     function updateLockedBlockDuration(
         uint64 _newLockedBlockDuration
-    ) external onlyOwner {
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         newLockedBlockDuration = _newLockedBlockDuration;
         emit LogUpdatedLockedBlockDuration(_newLockedBlockDuration);
     }
@@ -944,7 +935,7 @@ contract UniswapV3SingleTickLiquidityHandler is
         int24 tickLower,
         int24 tickUpper,
         uint128 liquidity
-    ) external onlyOwner {
+    ) external onlyRole(SOS_ROLE) {
         pool.burn(tickLower, tickUpper, liquidity);
         (, , , uint128 t0, uint128 t1) = pool.positions(
             _computePositionKey(address(this), tickLower, tickUpper)
@@ -956,7 +947,7 @@ contract UniswapV3SingleTickLiquidityHandler is
      * @notice Emergency withdraws the given token from the contract.
      * @param token The token to withdraw.
      */
-    function emergencyWithdraw(address token) external onlyOwner {
+    function emergencyWithdraw(address token) external onlyRole(SOS_ROLE) {
         IERC20(token).transfer(
             msg.sender,
             IERC20(token).balanceOf(address(this))
@@ -966,15 +957,24 @@ contract UniswapV3SingleTickLiquidityHandler is
     /**
      * @notice Emergency pauses the contract.
      */
-    function emergencyPause() external onlyOwner {
+    function emergencyPause() external onlyRole(PAUSER_ROLE) {
         _pause();
     }
 
     /**
      * @notice Emergency unpauses the contract.
      */
-
-    function emergencyUnpause() external onlyOwner {
+    function emergencyUnpause() external onlyRole(PAUSER_ROLE) {
         _unpause();
+    }
+
+    /**
+     * @notice Emergency unpauses the contract.
+     * @param interfaceId The Id of the interface
+     */
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public view override(ERC1155, AccessControl) returns (bool) {
+        return super.supportsInterface(interfaceId);
     }
 }
