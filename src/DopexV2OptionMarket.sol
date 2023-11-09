@@ -102,6 +102,11 @@ contract DopexV2OptionMarket is
     );
     event LogIVSetterUpdate(address _setter, bool _status);
     event LogIVUpdate(uint256[] ttl, uint256[] iv);
+    event LogUpdateExerciseDelegate(
+        address owner,
+        address delegate,
+        bool status
+    );
     event LogOptionsMarketInitialized(
         address primePool,
         address optionPricing,
@@ -659,6 +664,7 @@ contract DopexV2OptionMarket is
         bool _status
     ) external {
         exerciseDelegator[msg.sender][_delegateTo] = _status;
+        emit LogUpdateExerciseDelegate(msg.sender, _delegateTo, _status);
     }
 
     // internal
