@@ -834,6 +834,32 @@ contract UniswapV3SingleTickLiquidityHandler is
      * @param tokenId The tokenId of the position.
      * @return shares The number of shares.
      */
+    function convertToShares(
+        uint128 assets,
+        uint256 tokenId
+    ) external view returns (uint128) {
+        _convertToShares(assets, tokenId);
+    }
+
+    /**
+     * @notice Converts an amount of shares to assets.
+     * @param shares The number of shares.
+     * @param tokenId The tokenId of the position.
+     * @return assets The amount of assets.
+     */
+    function convertToAssets(
+        uint128 shares,
+        uint256 tokenId
+    ) external view returns (uint128) {
+        _convertToAssets(shares, tokenId);
+    }
+
+    /**
+     * @notice Converts an amount of assets to shares.
+     * @param assets The amount of assets.
+     * @param tokenId The tokenId of the position.
+     * @return shares The number of shares.
+     */
     function _convertToShares(
         uint128 assets,
         uint256 tokenId
