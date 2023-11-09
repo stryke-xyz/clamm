@@ -763,15 +763,15 @@ contract DopexV2OptionMarket is
                 ? FullMath.mulDiv(priceX192, 10 ** callAssetDecimals, 1 << 192)
                 : FullMath.mulDiv(1 << 192, 10 ** callAssetDecimals, priceX192);
         } else {
-            uint256 priceX192 = FullMath.mulDiv(
+            uint256 priceX128 = FullMath.mulDiv(
                 sqrtPriceX96,
                 sqrtPriceX96,
                 1 << 64
             );
 
             price = callAsset == _pool.token0()
-                ? FullMath.mulDiv(priceX192, 10 ** callAssetDecimals, 1 << 128)
-                : FullMath.mulDiv(1 << 128, 10 ** callAssetDecimals, priceX192);
+                ? FullMath.mulDiv(priceX128, 10 ** callAssetDecimals, 1 << 128)
+                : FullMath.mulDiv(1 << 128, 10 ** callAssetDecimals, priceX128);
         }
     }
 
