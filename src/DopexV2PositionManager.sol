@@ -99,11 +99,11 @@ contract DopexV2PositionManager is Ownable, ReentrancyGuard, Multicall {
                 IERC20(tokens[i]).safeTransferFrom(
                     msg.sender,
                     address(this),
-                    amounts[i]
+                    amount
                 );
                 IERC20(tokens[i]).safeIncreaseAllowance(
                     address(_handler),
-                    amounts[i]
+                    amount
                 );
             }
         }
@@ -170,7 +170,7 @@ contract DopexV2PositionManager is Ownable, ReentrancyGuard, Multicall {
         for (uint256 i; i < tokens.length; i++) {
             amount = amounts[i];
             if (amount != 0) {
-                IERC20(tokens[i]).safeTransfer(msg.sender, amounts[i]);
+                IERC20(tokens[i]).safeTransfer(msg.sender, amount);
             }
         }
 
@@ -203,11 +203,11 @@ contract DopexV2PositionManager is Ownable, ReentrancyGuard, Multicall {
                 IERC20(tokens[i]).safeTransferFrom(
                     msg.sender,
                     address(this),
-                    a[i]
+                    amount
                 );
                 IERC20(tokens[i]).safeIncreaseAllowance(
                     address(_handler),
-                    a[i]
+                    amount
                 );
             }
         }
@@ -244,11 +244,11 @@ contract DopexV2PositionManager is Ownable, ReentrancyGuard, Multicall {
                 IERC20(tokens[i]).safeTransferFrom(
                     msg.sender,
                     address(this),
-                    a[i]
+                    amount
                 );
                 IERC20(tokens[i]).safeIncreaseAllowance(
                     address(_handler),
-                    a[i]
+                    amount
                 );
             }
         }
