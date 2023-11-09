@@ -127,6 +127,7 @@ contract DopexV2OptionMarket is
     error DopexV2OptionMarket__NotEnoughAfterSwap();
     error DopexV2OptionMarket__NotApprovedSettler();
     error DopexV2OptionMarket__NotIVSetter();
+    error DopexV2OptionMarket__InvalidPool();
 
     IDopexV2ClammFeeStrategy public dpFee;
     IOptionPricing public optionPricing;
@@ -168,6 +169,12 @@ contract DopexV2OptionMarket is
         optionPricing = IOptionPricing(_optionPricing);
 
         primePool = IUniswapV3Pool(_primePool);
+
+        if (
+            primePool.token0() != _callAsset && primePool.token1() != _callAsset
+        ) revert DopexV2OptionMarket__InvalidPool();
+        if (primePool.token0() != _putAsset && primePool.token1() != _putAsset)
+            revert DopexV2OptionMarket__InvalidPool();
 
         callAssetDecimals = ERC20(_callAsset).decimals();
         putAssetDecimals = ERC20(_putAsset).decimals();
@@ -847,6 +854,12 @@ contract DopexV2OptionMarket is
         optionPricing = IOptionPricing(_optionPricing);
         settlers[_settler] = _statusSettler;
         approvedPools[_pool] = _statusPools;
+
+        IUniswapV3Pool pool = IUniswapV3Pool(_pool);
+        if (pool.token0() != callAsset && pool.token1() != callAsset)
+            revert DopexV2OptionMarket__InvalidPool();
+        if (pool.token0() != putAsset && pool.token1() != putAsset)
+            revert DopexV2OptionMarket__InvalidPool();
 
         emit LogUpdateAddress(_tokeURIFetcher, _dpFee, _optionPricing);
     }
