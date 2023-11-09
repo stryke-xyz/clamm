@@ -92,16 +92,20 @@ contract DopexV2PositionManager is Ownable, ReentrancyGuard, Multicall {
         (address[] memory tokens, uint256[] memory amounts) = _handler
             .tokensToPullForMint(_mintPositionData);
 
+        uint256 amount;
         for (uint256 i; i < tokens.length; i++) {
-            IERC20(tokens[i]).safeTransferFrom(
-                msg.sender,
-                address(this),
-                amounts[i]
-            );
-            IERC20(tokens[i]).safeIncreaseAllowance(
-                address(_handler),
-                amounts[i]
-            );
+            amount = amounts[i];
+            if (amount != 0) {
+                IERC20(tokens[i]).safeTransferFrom(
+                    msg.sender,
+                    address(this),
+                    amounts[i]
+                );
+                IERC20(tokens[i]).safeIncreaseAllowance(
+                    address(_handler),
+                    amounts[i]
+                );
+            }
         }
 
         sharesMinted = _handler.mintPositionHandler(
@@ -162,8 +166,12 @@ contract DopexV2PositionManager is Ownable, ReentrancyGuard, Multicall {
             _usePositionData
         );
 
+        uint256 amount;
         for (uint256 i; i < tokens.length; i++) {
-            IERC20(tokens[i]).safeTransfer(msg.sender, amounts[i]);
+            amount = amounts[i];
+            if (amount != 0) {
+                IERC20(tokens[i]).safeTransfer(msg.sender, amounts[i]);
+            }
         }
 
         emit LogUsePosition(_handler, liquidityUsed);
@@ -188,9 +196,20 @@ contract DopexV2PositionManager is Ownable, ReentrancyGuard, Multicall {
         (address[] memory tokens, uint256[] memory a) = _handler
             .tokensToPullForUnUse(_unusePositionData);
 
+        uint256 amount;
         for (uint256 i; i < tokens.length; i++) {
-            IERC20(tokens[i]).safeTransferFrom(msg.sender, address(this), a[i]);
-            IERC20(tokens[i]).safeIncreaseAllowance(address(_handler), a[i]);
+            amount = a[i];
+            if (amount != 0) {
+                IERC20(tokens[i]).safeTransferFrom(
+                    msg.sender,
+                    address(this),
+                    a[i]
+                );
+                IERC20(tokens[i]).safeIncreaseAllowance(
+                    address(_handler),
+                    a[i]
+                );
+            }
         }
         (amounts, liquidity) = _handler.unusePositionHandler(
             _unusePositionData
@@ -218,9 +237,20 @@ contract DopexV2PositionManager is Ownable, ReentrancyGuard, Multicall {
         (address[] memory tokens, uint256[] memory a) = _handler
             .tokensToPullForDonate(_donatePosition);
 
+        uint256 amount;
         for (uint256 i; i < tokens.length; i++) {
-            IERC20(tokens[i]).safeTransferFrom(msg.sender, address(this), a[i]);
-            IERC20(tokens[i]).safeIncreaseAllowance(address(_handler), a[i]);
+            amount = a[i];
+            if (amount != 0) {
+                IERC20(tokens[i]).safeTransferFrom(
+                    msg.sender,
+                    address(this),
+                    a[i]
+                );
+                IERC20(tokens[i]).safeIncreaseAllowance(
+                    address(_handler),
+                    a[i]
+                );
+            }
         }
         (amounts, liquidity) = _handler.donateToPosition(_donatePosition);
 
