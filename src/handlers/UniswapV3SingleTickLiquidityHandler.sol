@@ -838,7 +838,7 @@ contract UniswapV3SingleTickLiquidityHandler is
         uint128 assets,
         uint256 tokenId
     ) external view returns (uint128) {
-        _convertToShares(assets, tokenId);
+        return _convertToShares(assets, tokenId);
     }
 
     /**
@@ -851,7 +851,7 @@ contract UniswapV3SingleTickLiquidityHandler is
         uint128 shares,
         uint256 tokenId
     ) external view returns (uint128) {
-        _convertToAssets(shares, tokenId);
+        return _convertToAssets(shares, tokenId);
     }
 
     /**
