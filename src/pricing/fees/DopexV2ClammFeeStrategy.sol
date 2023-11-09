@@ -15,7 +15,7 @@ contract DopexV2ClammFeeStrategy is IDopexV2ClammFeeStrategy, Ownable {
     /// @dev Option Market address => bool (is registered or not)
     mapping(address => bool) public registeredOptionMarkets;
 
-    /// @dev Option Market address => Fee Percentage
+    /// @dev Option Market address => Fee Percentage (fee percentage on premium)
     mapping(address => uint256) public feePercentages;
 
     /// @dev The precision in which fee percent is set (fee percent should always be divided by 1e6 to get the correct vaue)
@@ -45,7 +45,7 @@ contract DopexV2ClammFeeStrategy is IDopexV2ClammFeeStrategy, Ownable {
         uint256 _feePercentage
     ) public onlyOwner {
         require(
-            _feePercentage < FEE_PERCENT_PRECISION,
+            _feePercentage < FEE_PERCENT_PRECISION * 100,
             "Fee percentage cannot be 100 or more"
         );
 
@@ -57,8 +57,9 @@ contract DopexV2ClammFeeStrategy is IDopexV2ClammFeeStrategy, Ownable {
     /// @inheritdoc	IDopexV2ClammFeeStrategy
     function onFeeReqReceive(
         address _optionMarket,
-        uint256 _amount,
-        uint256
+        uint256,
+        uint256,
+        uint256 _premium
     ) external view returns (uint256 fee) {
         uint256 feePercentage = feePercentages[_optionMarket];
 
@@ -67,7 +68,7 @@ contract DopexV2ClammFeeStrategy is IDopexV2ClammFeeStrategy, Ownable {
             revert OptionMarketNotRegistered(_optionMarket);
         }
 
-        fee = (feePercentage * _amount) / (FEE_PERCENT_PRECISION * 100);
+        fee = (feePercentage * _premium) / (FEE_PERCENT_PRECISION * 100);
     }
 
     error OptionMarketNotRegistered(address optionMarket);
