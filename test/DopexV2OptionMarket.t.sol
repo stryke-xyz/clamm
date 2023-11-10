@@ -114,7 +114,7 @@ contract optionMarketTest is Test {
         );
 
         // Add 0.15% fee to the market
-        feeStrategy.registerOptionMarket(address(optionMarket), 1500);
+        feeStrategy.registerOptionMarket(address(optionMarket), 350000);
 
         uint256[] memory ttls = new uint256[](1);
         ttls[0] = 20 minutes;
@@ -221,7 +221,7 @@ contract optionMarketTest is Test {
             5e18
         );
 
-        uint256 _fee = optionMarket.getFee(5e18, 0);
+        uint256 _fee = optionMarket.getFee(0, 0, _premiumAmountCalls);
         uint256 cost = _premiumAmountCalls + _fee;
         token1.mint(trader, cost);
         token1.approve(address(optionMarket), cost);
@@ -278,8 +278,7 @@ contract optionMarketTest is Test {
                 optionMarket.getPricePerCallAssetViaTick(pool, tickLowerPuts)
         );
 
-        uint256 _fee = optionMarket.getFee(10_000e18, 0);
-
+        uint256 _fee = optionMarket.getFee(0, 0, _premiumAmountPuts);
         uint256 cost = _premiumAmountPuts + _fee;
         token0.mint(trader, cost);
         token0.approve(address(optionMarket), cost);
