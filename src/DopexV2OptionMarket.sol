@@ -61,15 +61,15 @@ contract DopexV2OptionMarket is
 
     struct ExerciseOptionParams {
         uint256 optionId;
-        ISwapper swapper;
-        bytes swapData;
+        ISwapper[] swapper;
+        bytes[] swapData;
         uint256[] liquidityToExercise;
     }
 
     struct SettleOptionParams {
         uint256 optionId;
-        ISwapper swapper;
-        bytes swapData;
+        ISwapper[] swapper;
+        bytes[] swapData;
         uint256[] liquidityToSettle;
     }
 
@@ -408,13 +408,13 @@ contract DopexV2OptionMarket is
 
             uint256 prevBalance = ac.assetToGet.balanceOf(address(this));
 
-            ac.assetToUse.transfer(address(_params.swapper), amountToSwap);
+            ac.assetToUse.transfer(address(_params.swapper[i]), amountToSwap);
 
-            _params.swapper.onSwapReceived(
+            _params.swapper[i].onSwapReceived(
                 address(ac.assetToUse),
                 address(ac.assetToGet),
                 amountToSwap,
-                _params.swapData
+                _params.swapData[i]
             );
 
             uint256 amountReq = isAmount0
@@ -552,15 +552,15 @@ contract DopexV2OptionMarket is
                     );
 
                     ac.assetToUse.transfer(
-                        address(_params.swapper),
+                        address(_params.swapper[i]),
                         amountToSwap
                     );
 
-                    _params.swapper.onSwapReceived(
+                    _params.swapper[i].onSwapReceived(
                         address(ac.assetToUse),
                         address(ac.assetToGet),
                         amountToSwap,
-                        _params.swapData
+                        _params.swapData[i]
                     );
 
                     uint256 amountReq = isAmount0

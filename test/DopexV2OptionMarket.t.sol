@@ -22,6 +22,7 @@ import {SwapRouterSwapper} from "../src/swapper/SwapRouterSwapper.sol";
 
 import {IOptionPricing} from "../src/pricing/IOptionPricing.sol";
 import {IHandler} from "../src/interfaces/IHandler.sol";
+import {ISwapper} from "../src/interfaces/ISwapper.sol";
 
 contract optionMarketTest is Test {
     using TickMath for int24;
@@ -346,13 +347,17 @@ contract optionMarketTest is Test {
 
         liquidityToExercise[0] = liquidityToUse;
 
-        bytes memory swapData = abi.encode(pool.fee(), 0);
+        bytes[] memory swapDatas = new bytes[](len);
+        swapDatas[0] = abi.encode(pool.fee(), 0);
+
+        ISwapper[] memory swappers = new ISwapper[](len);
+        swappers[0] = srs;
 
         optionMarket.exerciseOption(
             DopexV2OptionMarket.ExerciseOptionParams({
                 optionId: optionId,
-                swapper: srs,
-                swapData: swapData,
+                swapper: swappers,
+                swapData: swapDatas,
                 liquidityToExercise: liquidityToExercise
             })
         );
@@ -390,13 +395,18 @@ contract optionMarketTest is Test {
         uint256[] memory liquidityToExercise = new uint256[](len);
 
         liquidityToExercise[0] = liquidityToUse;
-        bytes memory swapData = abi.encode(pool.fee(), 0);
+
+        bytes[] memory swapDatas = new bytes[](len);
+        swapDatas[0] = abi.encode(pool.fee(), 0);
+
+        ISwapper[] memory swappers = new ISwapper[](len);
+        swappers[0] = srs;
 
         optionMarket.exerciseOption(
             DopexV2OptionMarket.ExerciseOptionParams({
                 optionId: optionId,
-                swapper: srs,
-                swapData: swapData,
+                swapper: swappers,
+                swapData: swapDatas,
                 liquidityToExercise: liquidityToExercise
             })
         );
@@ -424,13 +434,18 @@ contract optionMarketTest is Test {
         uint256[] memory liquidityToSettle = new uint256[](len);
 
         liquidityToSettle[0] = liquidityToUse;
-        bytes memory swapData = abi.encode(pool.fee(), 0);
+
+        bytes[] memory swapDatas = new bytes[](len);
+        swapDatas[0] = abi.encode(pool.fee(), 0);
+
+        ISwapper[] memory swappers = new ISwapper[](len);
+        swappers[0] = srs;
 
         optionMarket.settleOption(
             DopexV2OptionMarket.SettleOptionParams({
                 optionId: optionId,
-                swapper: srs,
-                swapData: swapData,
+                swapper: swappers,
+                swapData: swapDatas,
                 liquidityToSettle: liquidityToSettle
             })
         );
@@ -456,13 +471,18 @@ contract optionMarketTest is Test {
         uint256[] memory liquidityToSettle = new uint256[](len);
 
         liquidityToSettle[0] = liquidityToUse;
-        bytes memory swapData = abi.encode(pool.fee(), 0);
+
+        bytes[] memory swapDatas = new bytes[](len);
+        swapDatas[0] = abi.encode(pool.fee(), 0);
+
+        ISwapper[] memory swappers = new ISwapper[](len);
+        swappers[0] = srs;
 
         optionMarket.settleOption(
             DopexV2OptionMarket.SettleOptionParams({
                 optionId: optionId,
-                swapper: srs,
-                swapData: swapData,
+                swapper: swappers,
+                swapData: swapDatas,
                 liquidityToSettle: liquidityToSettle
             })
         );
@@ -497,13 +517,18 @@ contract optionMarketTest is Test {
         uint256[] memory liquidityToSettle = new uint256[](len);
 
         liquidityToSettle[0] = liquidityToUse;
-        bytes memory swapData = abi.encode(pool.fee(), 0);
+
+        bytes[] memory swapDatas = new bytes[](len);
+        swapDatas[0] = abi.encode(pool.fee(), 0);
+
+        ISwapper[] memory swappers = new ISwapper[](len);
+        swappers[0] = srs;
 
         optionMarket.settleOption(
             DopexV2OptionMarket.SettleOptionParams({
                 optionId: optionId,
-                swapper: srs,
-                swapData: swapData,
+                swapper: swappers,
+                swapData: swapDatas,
                 liquidityToSettle: liquidityToSettle
             })
         );
@@ -543,13 +568,18 @@ contract optionMarketTest is Test {
         uint256[] memory liquidityToSettle = new uint256[](len);
 
         liquidityToSettle[0] = liquidityToUse;
-        bytes memory swapData = abi.encode(pool.fee(), 0);
+
+        bytes[] memory swapDatas = new bytes[](len);
+        swapDatas[0] = abi.encode(pool.fee(), 0);
+
+        ISwapper[] memory swappers = new ISwapper[](len);
+        swappers[0] = srs;
 
         optionMarket.settleOption(
             DopexV2OptionMarket.SettleOptionParams({
                 optionId: optionId,
-                swapper: srs,
-                swapData: swapData,
+                swapper: swappers,
+                swapData: swapDatas,
                 liquidityToSettle: liquidityToSettle
             })
         );
