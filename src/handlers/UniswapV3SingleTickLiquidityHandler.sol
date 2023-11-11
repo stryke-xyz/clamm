@@ -129,8 +129,8 @@ contract UniswapV3SingleTickLiquidityHandler is
     uint64 public lockedBlockDuration = 100;
     uint64 public newLockedBlockDuration;
 
-    bytes32 constant PAUSER_ROLE = keccak256("P");
-    bytes32 constant SOS_ROLE = keccak256("SOS");
+    bytes32 public constant PAUSER_ROLE = keccak256("P");
+    bytes32 public constant SOS_ROLE = keccak256("SOS");
 
     // modifiers
     modifier onlyWhitelisted() {
@@ -995,7 +995,7 @@ contract UniswapV3SingleTickLiquidityHandler is
     }
 
     /**
-     * @notice Emergency unpauses the contract.
+     * @notice Interface Support
      * @param interfaceId The Id of the interface
      */
     function supportsInterface(
