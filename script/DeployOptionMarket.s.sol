@@ -14,7 +14,7 @@ contract DeployOptionMarket is Script {
         address primePool = 0xC6F780497A95e246EB9449f5e4770916DCd6396A;
 
         vm.startBroadcast();
-        DopexV2OptionMarket op = new DopexV2OptionMarket(
+        DopexV2OptionMarket om = new DopexV2OptionMarket(
             pm,
             optionPricing,
             dpFee,
@@ -22,7 +22,7 @@ contract DeployOptionMarket is Script {
             putAsset,
             primePool
         );
-        console.log(address(op));
+        console.log(address(om));
 
         uint256[] memory ttls = new uint256[](6);
         ttls[0] = 20 minutes;
@@ -40,9 +40,9 @@ contract DeployOptionMarket is Script {
         IVs[4] = 40;
         IVs[5] = 30;
 
-        op.updateIVs(ttls, IVs);
+        om.updateIVs(ttls, IVs);
 
-        op.updateAddress(
+        om.updateAddress(
             address(0),
             address(0),
             dpFee,
