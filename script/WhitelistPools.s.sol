@@ -7,9 +7,9 @@ import {UniswapV3SingleTickLiquidityHandler} from "../src/handlers/UniswapV3Sing
 
 contract DeployPositionManager is Script {
     function run() public {
-        address pm = 0x1e3d4725dB1062b88962bFAb8B2D31eAa8f63e45;
-        address op = 0x7d6BA9528A1449Fa944D81Ea16089D0db01F2A20;
-        address uniV3Handler = 0xBdAd87fFcB972E55A94C0aDca42E2c21441070A1;
+        address pm = 0xE4bA6740aF4c666325D49B3112E4758371386aDc;
+        address op = 0xBb1cF6f913DE129900faefb7FBDa2e247A7f22aF;
+        address uniV3Handler = 0x08dD79AEA6046B1E509fB84B57c3f9D024484D09;
         vm.startBroadcast();
 
         DopexV2PositionManager(pm).updateWhitelistHandlerWithApp(
@@ -18,12 +18,12 @@ contract DeployPositionManager is Script {
             true
         );
 
-        DopexV2PositionManager(pm).updateWhitelistHandler(uniV3Handler, true);
+        // DopexV2PositionManager(pm).updateWhitelistHandler(uniV3Handler, true);
 
-        UniswapV3SingleTickLiquidityHandler(uniV3Handler).updateWhitelistedApps(
-            pm,
-            true
-        );
+        // UniswapV3SingleTickLiquidityHandler(uniV3Handler).updateWhitelistedApps(
+        //     pm,
+        //     true
+        // );
 
         vm.stopBroadcast();
     }
