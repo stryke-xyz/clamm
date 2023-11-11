@@ -155,7 +155,7 @@ contract DopexV2OptionMarket is
     mapping(address => bool) public settlers;
     mapping(address => bool) public ivSetter;
 
-    uint256 public optionIds = 1;
+    uint256 public optionIds;
 
     constructor(
         address _pm,

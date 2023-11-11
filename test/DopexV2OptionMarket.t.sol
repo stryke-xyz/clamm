@@ -255,7 +255,7 @@ contract optionMarketTest is Test {
             int24 tickLower,
             int24 tickUpper,
             uint256 liquidityToUse
-        ) = optionMarket.opTickMap(2, 0);
+        ) = optionMarket.opTickMap(1, 0);
 
         vm.stopPrank();
     }
@@ -312,7 +312,7 @@ contract optionMarketTest is Test {
             int24 tickLower,
             int24 tickUpper,
             uint256 liquidityToUse
-        ) = optionMarket.opTickMap(2, 0);
+        ) = optionMarket.opTickMap(1, 0);
 
         vm.stopPrank();
     }
@@ -320,7 +320,7 @@ contract optionMarketTest is Test {
     function testExerciseCallOption() public {
         testBuyCallOption();
 
-        uint256 optionId = 2;
+        uint256 optionId = 1;
 
         uniswapV3TestLib.performSwap(
             UniswapV3TestLib.SwapParamsStruct({
@@ -341,7 +341,7 @@ contract optionMarketTest is Test {
             int24 tickLower,
             int24 tickUpper,
             uint256 liquidityToUse
-        ) = optionMarket.opTickMap(2, 0);
+        ) = optionMarket.opTickMap(1, 0);
 
         uint256[] memory liquidityToExercise = new uint256[](len);
 
@@ -370,7 +370,7 @@ contract optionMarketTest is Test {
     function testExercisePutOption() public {
         testBuyPutOption();
 
-        uint256 optionId = 2;
+        uint256 optionId = 1;
 
         uniswapV3TestLib.performSwap(
             UniswapV3TestLib.SwapParamsStruct({
@@ -390,7 +390,7 @@ contract optionMarketTest is Test {
             int24 tickLower,
             int24 tickUpper,
             uint256 liquidityToUse
-        ) = optionMarket.opTickMap(2, 0);
+        ) = optionMarket.opTickMap(1, 0);
 
         uint256[] memory liquidityToExercise = new uint256[](len);
 
@@ -420,7 +420,7 @@ contract optionMarketTest is Test {
         testBuyCallOption();
         uint256 prevTime = block.timestamp + 20 minutes;
         vm.warp(block.timestamp + 1201 seconds);
-        uint256 optionId = 2;
+        uint256 optionId = 1;
         (uint256 len, , , , ) = optionMarket.opData(optionId);
 
         (
@@ -429,7 +429,7 @@ contract optionMarketTest is Test {
             int24 tickLower,
             int24 tickUpper,
             uint256 liquidityToUse
-        ) = optionMarket.opTickMap(2, 0);
+        ) = optionMarket.opTickMap(1, 0);
 
         uint256[] memory liquidityToSettle = new uint256[](len);
 
@@ -457,7 +457,7 @@ contract optionMarketTest is Test {
 
         vm.warp(block.timestamp + 1201 seconds);
 
-        uint256 optionId = 2;
+        uint256 optionId = 1;
         (uint256 len, , , , ) = optionMarket.opData(optionId);
 
         (
@@ -466,7 +466,7 @@ contract optionMarketTest is Test {
             int24 tickLower,
             int24 tickUpper,
             uint256 liquidityToUse
-        ) = optionMarket.opTickMap(2, 0);
+        ) = optionMarket.opTickMap(1, 0);
 
         uint256[] memory liquidityToSettle = new uint256[](len);
 
@@ -503,7 +503,7 @@ contract optionMarketTest is Test {
             })
         );
 
-        uint256 optionId = 2;
+        uint256 optionId = 1;
         (uint256 len, , , , ) = optionMarket.opData(optionId);
 
         (
@@ -512,7 +512,7 @@ contract optionMarketTest is Test {
             int24 tickLower,
             int24 tickUpper,
             uint256 liquidityToUse
-        ) = optionMarket.opTickMap(2, 0);
+        ) = optionMarket.opTickMap(1, 0);
 
         uint256[] memory liquidityToSettle = new uint256[](len);
 
@@ -554,7 +554,7 @@ contract optionMarketTest is Test {
                 requireMint: true
             })
         );
-        uint256 optionId = 2;
+        uint256 optionId = 1;
         (uint256 len, , , , ) = optionMarket.opData(optionId);
 
         (
@@ -563,7 +563,7 @@ contract optionMarketTest is Test {
             int24 tickLower,
             int24 tickUpper,
             uint256 liquidityToUse
-        ) = optionMarket.opTickMap(2, 0);
+        ) = optionMarket.opTickMap(1, 0);
 
         uint256[] memory liquidityToSettle = new uint256[](len);
 
@@ -593,7 +593,7 @@ contract optionMarketTest is Test {
     function testSplitPosition() public {
         testBuyCallOption();
 
-        uint256 optionId = 2;
+        uint256 optionId = 1;
         (uint256 len, , , , ) = optionMarket.opData(optionId);
 
         (
@@ -602,13 +602,13 @@ contract optionMarketTest is Test {
             int24 tickLower,
             int24 tickUpper,
             uint256 liquidityToUse
-        ) = optionMarket.opTickMap(2, 0);
+        ) = optionMarket.opTickMap(1, 0);
 
         uint256[] memory l = new uint256[](len);
 
         l[0] = liquidityToUse / 4;
 
-        vm.prank(optionMarket.ownerOf(2));
+        vm.prank(optionMarket.ownerOf(1));
         optionMarket.positionSplitter(
             DopexV2OptionMarket.PositionSplitterParams({
                 optionId: optionId,
@@ -623,7 +623,7 @@ contract optionMarketTest is Test {
             int24 ptickLower,
             int24 ptickUpper,
             uint256 pliquidityToUse
-        ) = optionMarket.opTickMap(2, 0);
+        ) = optionMarket.opTickMap(1, 0);
         console.log("Previous liquidity", pliquidityToUse);
 
         (
@@ -632,7 +632,7 @@ contract optionMarketTest is Test {
             int24 ntickLower,
             int24 ntickUpper,
             uint256 nliquidityToUse
-        ) = optionMarket.opTickMap(3, 0);
+        ) = optionMarket.opTickMap(2, 0);
         console.log("New liquidity", nliquidityToUse);
     }
 }
