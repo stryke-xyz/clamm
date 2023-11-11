@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import "forge-std/Test.sol";
-
 // Libraries
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {BlackScholes} from "./BlackScholes.sol";
@@ -11,10 +9,7 @@ import {ABDKMathQuad} from "./ABDKMathQuad.sol";
 // Contracts
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-// Interfaces
-import {IOptionPricing} from "./IOptionPricing.sol";
-
-contract OptionPricing is Ownable, IOptionPricing {
+contract OptionPricing is Ownable {
     using SafeMath for uint256;
 
     // The max volatility possible
@@ -68,7 +63,7 @@ contract OptionPricing is Ownable, IOptionPricing {
         uint256 strike,
         uint256 lastPrice,
         uint256 volatility
-    ) external view override returns (uint256) {
+    ) external view returns (uint256) {
         uint256 timeToExpiry = expiry.sub(block.timestamp).div(864);
 
         uint256 optionPrice = BlackScholes

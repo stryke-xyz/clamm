@@ -16,7 +16,7 @@ import {PositionManagerHandler} from "./handlers/PositionManager.handler.sol";
 import {UniswapV3SingleTickLiquidityHandler} from "../src/handlers/UniswapV3SingleTickLiquidityHandler.sol";
 import {DopexV2OptionMarket} from "../src/DopexV2OptionMarket.sol";
 
-import {OptionPricing} from "../src/pricing/OptionPricing.sol";
+import {OptionPricing} from "./pricing/OptionPricing.sol";
 import {DopexV2ClammFeeStrategy} from "../src/pricing/fees/DopexV2ClammFeeStrategy.sol";
 import {SwapRouterSwapper} from "../src/swapper/SwapRouterSwapper.sol";
 
