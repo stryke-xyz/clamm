@@ -58,12 +58,12 @@ contract AutoExerciseTimeBased is AccessControl {
     error AutoExerciseOneMin__GreedyExecutor();
 
     function autoExercise(
-        IOptionMarket pool,
+        IOptionMarket market,
         uint256 tokenId,
         uint256 executorFee,
         IOptionMarket.ExerciseOptionParams calldata _params
     ) external onlyRole(EXECUTOR_ROLE) {
-        IOptionMarket.OptionData memory opData = pool.opData(tokenId);
+        IOptionMarket.OptionData memory opData = market.opData(tokenId);
 
         if (opData.expiry < block.timestamp)
             revert AutoExerciseOneMin__AlreadyExpired();
@@ -74,10 +74,10 @@ contract AutoExerciseTimeBased is AccessControl {
         if (executorFee > MAX_EXECUTOR_FEE)
             revert AutoExerciseOneMin__GreedyExecutor();
 
-        pool.exerciseOption(_params);
+        market.exerciseOption(_params);
 
         if (opData.isCall) {
-            address putAsset = pool.putAsset();
+            address putAsset = market.putAsset();
             uint256 amountAfterExercise = IERC20(putAsset).balanceOf(
                 address(this)
             );
@@ -87,11 +87,11 @@ contract AutoExerciseTimeBased is AccessControl {
             IERC20(putAsset).safeTransfer(feeTo, fees);
 
             IERC20(putAsset).safeTransfer(
-                pool.ownerOf(tokenId),
+                market.ownerOf(tokenId),
                 amountAfterExercise - fees
             );
         } else {
-            address callAsset = pool.callAsset();
+            address callAsset = market.callAsset();
             uint256 amountAfterExercise = IERC20(callAsset).balanceOf(
                 address(this)
             );
@@ -101,7 +101,7 @@ contract AutoExerciseTimeBased is AccessControl {
             IERC20(callAsset).safeTransfer(feeTo, fees);
 
             IERC20(callAsset).safeTransfer(
-                pool.ownerOf(tokenId),
+                market.ownerOf(tokenId),
                 amountAfterExercise - fees
             );
         }

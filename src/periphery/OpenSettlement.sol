@@ -46,11 +46,11 @@ contract OpenSettlement is AccessControl {
     error OpenSettlement__TooSoonOpenSettle();
 
     function openSettle(
-        IOptionMarket pool,
+        IOptionMarket market,
         uint256 tokenId,
         IOptionMarket.SettleOptionParams calldata _params
     ) public {
-        IOptionMarket.OptionData memory opData = pool.opData(tokenId);
+        IOptionMarket.OptionData memory opData = market.opData(tokenId);
 
         if (opData.expiry >= block.timestamp)
             revert OpenSettlement__NotExpired();
@@ -58,21 +58,24 @@ contract OpenSettlement is AccessControl {
         if (block.timestamp - opData.expiry <= timeToSettle)
             revert OpenSettlement__TooSoonOpenSettle();
 
-        pool.settleOption(_params);
+        market.settleOption(_params);
 
-        uint256 callAssetBalance = IERC20(pool.callAsset()).balanceOf(
+        uint256 callAssetBalance = IERC20(market.callAsset()).balanceOf(
             address(this)
         );
-        uint256 putAssetBalance = IERC20(pool.putAsset()).balanceOf(
+        uint256 putAssetBalance = IERC20(market.putAsset()).balanceOf(
             address(this)
         );
 
         if (callAssetBalance > 0) {
-            IERC20(pool.callAsset()).safeTransfer(msg.sender, callAssetBalance);
+            IERC20(market.callAsset()).safeTransfer(
+                msg.sender,
+                callAssetBalance
+            );
         }
 
         if (putAssetBalance > 0) {
-            IERC20(pool.putAsset()).safeTransfer(msg.sender, putAssetBalance);
+            IERC20(market.putAsset()).safeTransfer(msg.sender, putAssetBalance);
         }
     }
 
