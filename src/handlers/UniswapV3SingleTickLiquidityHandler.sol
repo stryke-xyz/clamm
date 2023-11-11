@@ -1,22 +1,25 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.8.0 <0.9.0;
 
+// Interfaces
+import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {ISwapRouter} from "v3-periphery/SwapRouter.sol";
 import {IHandler} from "../interfaces/IHandler.sol";
 
+// Libraries
 import {Math} from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import {ERC1155} from "openzeppelin-contracts/contracts/token/ERC1155/ERC1155.sol";
-import {Pausable} from "openzeppelin-contracts/contracts/security/Pausable.sol";
-import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
-
-import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
-import {LiquidityManager} from "../uniswap-v3/LiquidityManager.sol";
 import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {FullMath} from "@uniswap/v3-core/contracts/libraries/FullMath.sol";
 import {FixedPoint128} from "@uniswap/v3-core/contracts/libraries/FixedPoint128.sol";
-import {ISwapRouter} from "v3-periphery/SwapRouter.sol";
+
+// Contracts
+import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
+import {Pausable} from "openzeppelin-contracts/contracts/security/Pausable.sol";
+import {ERC1155} from "openzeppelin-contracts/contracts/token/ERC1155/ERC1155.sol";
+import {LiquidityManager} from "../uniswap-v3/LiquidityManager.sol";
 
 /**
  * @title UniswapV3SingleTickLiquidityHandler

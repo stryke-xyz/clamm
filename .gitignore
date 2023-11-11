@@ -13,3 +13,8 @@ docs/
 # Dotenv file
 .env
 
+# Flattened solidity files
+flatten
+
+# Playground foundry script
+script/Playground.s.sol
