@@ -46,7 +46,7 @@ contract DopexV2ClammFeeStrategy is IDopexV2ClammFeeStrategy, Ownable {
     ) public onlyOwner {
         require(
             _feePercentage < FEE_PERCENT_PRECISION * 100,
-            "Fee percentage cannot be 100 or more"
+            "Fee percentage cannot be 100% or more"
         );
 
         feePercentages[_optionMarket] = _feePercentage;
@@ -63,7 +63,6 @@ contract DopexV2ClammFeeStrategy is IDopexV2ClammFeeStrategy, Ownable {
     ) external view returns (uint256 fee) {
         uint256 feePercentage = feePercentages[_optionMarket];
 
-        // If decimals is 0 it means that the option market was not registered
         if (!registeredOptionMarkets[_optionMarket]) {
             revert OptionMarketNotRegistered(_optionMarket);
         }
