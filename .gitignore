@@ -19,3 +19,6 @@ flatten
 
 # Playground foundry script
 script/Playground.s.sol
+
+# MacOS
+.DS_Store
