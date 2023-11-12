@@ -23,7 +23,7 @@ contract OneInchSwapper is ISwapper {
     ) external returns (uint256 amountOut) {
         IERC20(_tokenIn).safeIncreaseAllowance(oneInchRouter, _amountIn);
 
-        // inch should directly send to the option pool contract
+        // inch should directly send to the option market contract
         (bool success, ) = oneInchRouter.call(_swapData);
         require(success);
     }
