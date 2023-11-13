@@ -81,10 +81,14 @@ contract AutoExerciseTimeBased is AccessControl {
             uint256 amountAfterExercise = IERC20(putAsset).balanceOf(
                 address(this)
             );
-            uint256 fees = (amountAfterExercise * executorFee) /
-                EXECUTOR_FEE_PRECISION;
+            uint256 fees;
+            if (feeTo != address(0)) {
+                fees =
+                    (amountAfterExercise * executorFee) /
+                    EXECUTOR_FEE_PRECISION;
 
-            IERC20(putAsset).safeTransfer(feeTo, fees);
+                IERC20(putAsset).safeTransfer(feeTo, fees);
+            }
 
             IERC20(putAsset).safeTransfer(
                 market.ownerOf(tokenId),
@@ -95,10 +99,14 @@ contract AutoExerciseTimeBased is AccessControl {
             uint256 amountAfterExercise = IERC20(callAsset).balanceOf(
                 address(this)
             );
-            uint256 fees = (amountAfterExercise * executorFee) /
-                EXECUTOR_FEE_PRECISION;
+            uint256 fees;
+            if (feeTo != address(0)) {
+                fees =
+                    (amountAfterExercise * executorFee) /
+                    EXECUTOR_FEE_PRECISION;
 
-            IERC20(callAsset).safeTransfer(feeTo, fees);
+                IERC20(callAsset).safeTransfer(feeTo, fees);
+            }
 
             IERC20(callAsset).safeTransfer(
                 market.ownerOf(tokenId),
