@@ -10,8 +10,8 @@ import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/Safe
 interface IOptionMarket {
     struct ExerciseOptionParams {
         uint256 optionId;
-        ISwapper swapper;
-        bytes swapData;
+        ISwapper[] swapper;
+        bytes[] swapData;
         uint256[] liquidityToExercise;
     }
 
