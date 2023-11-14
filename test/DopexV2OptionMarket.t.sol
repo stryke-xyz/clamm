@@ -19,10 +19,12 @@ import {DopexV2OptionMarket} from "../src/DopexV2OptionMarket.sol";
 import {OptionPricing} from "./pricing/OptionPricing.sol";
 import {DopexV2ClammFeeStrategy} from "../src/pricing/fees/DopexV2ClammFeeStrategy.sol";
 import {SwapRouterSwapper} from "../src/swapper/SwapRouterSwapper.sol";
+import {AutoExerciseTimeBased} from "../src/periphery/AutoExerciseTimeBased.sol";
 
 import {IOptionPricing} from "../src/pricing/IOptionPricing.sol";
 import {IHandler} from "../src/interfaces/IHandler.sol";
 import {ISwapper} from "../src/interfaces/ISwapper.sol";
+import {IOptionMarket} from "../src/interfaces/IOptionMarket.sol";
 
 contract optionMarketTest is Test {
     using TickMath for int24;
@@ -60,12 +62,15 @@ contract optionMarketTest is Test {
     address jason = makeAddr("jason"); // protocol LP
     address trader = makeAddr("trader"); // option buyer
     address garbage = makeAddr("garbage"); // garbage address
+    address feeToAutoExercise = makeAddr("feeToAutoExercise"); // auto exercise fee to
+    address autoExercisoor = makeAddr("autoExercisoor"); // auto exciseroor role
 
     DopexV2PositionManager positionManager;
     PositionManagerHandler positionManagerHandler;
     DopexV2OptionMarket optionMarket;
     UniswapV3SingleTickLiquidityHandler uniV3Handler;
     DopexV2ClammFeeStrategy feeStrategy;
+    AutoExerciseTimeBased autoExercise;
 
     function setUp() public {
         vm.warp(1693352493);
@@ -157,6 +162,12 @@ contract optionMarketTest is Test {
         positionManager.updateWhitelistHandler(address(uniV3Handler), true);
 
         uniV3Handler.updateWhitelistedApps(address(positionManager), true);
+
+        autoExercise = new AutoExerciseTimeBased();
+
+        autoExercise.updateFeeTo(feeToAutoExercise);
+
+        autoExercise.grantRole(keccak256("EXECUTOR"), autoExercisoor);
 
         // for calls
         positionManagerHandler.mintPosition(
@@ -634,5 +645,63 @@ contract optionMarketTest is Test {
             uint256 nliquidityToUse
         ) = optionMarket.opTickMap(2, 0);
         console.log("New liquidity", nliquidityToUse);
+    }
+
+    function testAutoExercise() public {
+        testBuyCallOption();
+
+        uint256 optionId = 1;
+
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
+                user: garbage,
+                pool: pool,
+                amountIn: 400000e18, // pushes to 2078
+                zeroForOne: true,
+                requireMint: true
+            })
+        );
+        vm.startPrank(trader);
+        vm.warp(block.timestamp + 901);
+
+        optionMarket.updateExerciseDelegate(address(autoExercise), true);
+
+        vm.stopPrank();
+
+        vm.startPrank(autoExercisoor);
+
+        (uint256 len, , , , ) = optionMarket.opData(optionId);
+
+        (, , , , uint256 liquidityToUse) = optionMarket.opTickMap(1, 0);
+
+        uint256[] memory liquidityToExercise = new uint256[](len);
+
+        liquidityToExercise[0] = liquidityToUse;
+
+        bytes[] memory swapDatas = new bytes[](len);
+        swapDatas[0] = abi.encode(pool.fee(), 0);
+
+        ISwapper[] memory swappers = new ISwapper[](len);
+        swappers[0] = srs;
+
+        autoExercise.autoExercise(
+            IOptionMarket(address(optionMarket)),
+            optionId,
+            1e4, // 1%
+            IOptionMarket.ExerciseOptionParams({
+                optionId: optionId,
+                swapper: swappers,
+                swapData: swapDatas,
+                liquidityToExercise: liquidityToExercise
+            })
+        );
+
+        console.log("Profit", token0.balanceOf(trader));
+        console.log(
+            "AutoExerciser Profit",
+            token0.balanceOf(feeToAutoExercise)
+        );
+
+        vm.stopPrank();
     }
 }
