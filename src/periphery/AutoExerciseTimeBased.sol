@@ -3,36 +3,10 @@ pragma solidity ^0.8.13;
 
 import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
 import {ISwapper} from "../interfaces/ISwapper.sol";
+import {IOptionMarket} from "../interfaces/IOptionMarket.sol";
 
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-
-interface IOptionMarket {
-    struct ExerciseOptionParams {
-        uint256 optionId;
-        ISwapper[] swapper;
-        bytes[] swapData;
-        uint256[] liquidityToExercise;
-    }
-
-    struct OptionData {
-        uint256 opTickArrayLen;
-        int24 tickLower;
-        int24 tickUpper;
-        uint256 expiry;
-        bool isCall;
-    }
-
-    function opData(uint256 tokenId) external view returns (OptionData memory);
-
-    function exerciseOption(ExerciseOptionParams calldata _params) external;
-
-    function callAsset() external view returns (address);
-
-    function putAsset() external view returns (address);
-
-    function ownerOf(uint256 tokenId) external view returns (address);
-}
 
 contract AutoExerciseTimeBased is AccessControl {
     using SafeERC20 for IERC20;
@@ -86,8 +60,11 @@ contract AutoExerciseTimeBased is AccessControl {
                 fees =
                     (amountAfterExercise * executorFee) /
                     EXECUTOR_FEE_PRECISION;
+                    
+                if (fees > 0) {
+                    IERC20(putAsset).safeTransfer(feeTo, fees);
+                }
 
-                IERC20(putAsset).safeTransfer(feeTo, fees);
             }
 
             IERC20(putAsset).safeTransfer(
@@ -105,7 +82,10 @@ contract AutoExerciseTimeBased is AccessControl {
                     (amountAfterExercise * executorFee) /
                     EXECUTOR_FEE_PRECISION;
 
-                IERC20(callAsset).safeTransfer(feeTo, fees);
+                if (fees > 0) {
+                    IERC20(callAsset).safeTransfer(feeTo, fees);
+                }
+
             }
 
             IERC20(callAsset).safeTransfer(
