@@ -86,8 +86,9 @@ contract AutoExerciseTimeBased is AccessControl {
                 fees =
                     (amountAfterExercise * executorFee) /
                     EXECUTOR_FEE_PRECISION;
-
-                IERC20(putAsset).safeTransfer(feeTo, fees);
+                if (fees > 0) {
+                    IERC20(putAsset).safeTransfer(feeTo, fees);
+                }
             }
 
             IERC20(putAsset).safeTransfer(
@@ -104,8 +105,9 @@ contract AutoExerciseTimeBased is AccessControl {
                 fees =
                     (amountAfterExercise * executorFee) /
                     EXECUTOR_FEE_PRECISION;
-
-                IERC20(callAsset).safeTransfer(feeTo, fees);
+                if (fees > 0) {
+                    IERC20(callAsset).safeTransfer(feeTo, fees);
+                }
             }
 
             IERC20(callAsset).safeTransfer(
