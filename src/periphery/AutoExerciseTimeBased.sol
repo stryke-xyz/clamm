@@ -7,8 +7,9 @@ import {IOptionMarket} from "../interfaces/IOptionMarket.sol";
 
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 
-contract AutoExerciseTimeBased is AccessControl {
+contract AutoExerciseTimeBased is AccessControl, Multicall {
     using SafeERC20 for IERC20;
 
     address public feeTo;
@@ -60,11 +61,10 @@ contract AutoExerciseTimeBased is AccessControl {
                 fees =
                     (amountAfterExercise * executorFee) /
                     EXECUTOR_FEE_PRECISION;
-                    
+
                 if (fees > 0) {
                     IERC20(putAsset).safeTransfer(feeTo, fees);
                 }
-
             }
 
             IERC20(putAsset).safeTransfer(
@@ -85,7 +85,6 @@ contract AutoExerciseTimeBased is AccessControl {
                 if (fees > 0) {
                     IERC20(callAsset).safeTransfer(feeTo, fees);
                 }
-
             }
 
             IERC20(callAsset).safeTransfer(
