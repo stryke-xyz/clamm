@@ -1,38 +1,17 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
-import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
-import {ISwapper} from "../interfaces/ISwapper.sol";
+pragma solidity 0.8.15;
 
-import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+// Contracts
+import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
 import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 
-interface IOptionMarket {
-    struct SettleOptionParams {
-        uint256 optionId;
-        ISwapper swapper;
-        bytes swapData;
-        uint256[] liquidityToSettle;
-    }
+// Interfaces
+import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {ISwapper} from "../interfaces/ISwapper.sol";
+import {IOptionMarket} from "../interfaces/IOptionMarket.sol";
 
-    struct OptionData {
-        uint256 opTickArrayLen;
-        int24 tickLower;
-        int24 tickUpper;
-        uint256 expiry;
-        bool isCall;
-    }
-
-    function opData(uint256 tokenId) external view returns (OptionData memory);
-
-    function settleOption(SettleOptionParams calldata _params) external;
-
-    function callAsset() external view returns (address);
-
-    function putAsset() external view returns (address);
-
-    function ownerOf(uint256 tokenId) external view returns (address);
-}
+// Libraries
+import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract OpenSettlement is AccessControl, Multicall {
     using SafeERC20 for IERC20;

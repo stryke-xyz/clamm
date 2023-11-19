@@ -1,13 +1,17 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity 0.8.15;
 
+// Contracts
+import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
+
+// Libraries
+import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+
+// Interfaces
+import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {ISwapper} from "../interfaces/ISwapper.sol";
 import {IOptionMarket} from "../interfaces/IOptionMarket.sol";
-
-import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 
 contract AutoExerciseTimeBased is AccessControl, Multicall {
     using SafeERC20 for IERC20;
