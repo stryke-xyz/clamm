@@ -5,6 +5,7 @@ import {ISwapper} from "../interfaces/ISwapper.sol";
 
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 
 interface IOptionMarket {
     struct SettleOptionParams {
@@ -33,7 +34,7 @@ interface IOptionMarket {
     function ownerOf(uint256 tokenId) external view returns (address);
 }
 
-contract OpenSettlement is AccessControl {
+contract OpenSettlement is AccessControl, Multicall {
     using SafeERC20 for IERC20;
 
     uint256 public timeToSettle = 2 hours;
