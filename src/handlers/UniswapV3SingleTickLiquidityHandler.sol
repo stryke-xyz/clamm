@@ -429,12 +429,16 @@ contract UniswapV3SingleTickLiquidityHandler is
                 uint128(tki.totalLiquidity)
             );
 
-            feesOwedToken0 = uint128(
-                (tki.tokensOwed0 * userLiquidity0) / totalLiquidity0
-            );
-            feesOwedToken1 = uint128(
-                (tki.tokensOwed1 * userLiquidity1) / totalLiquidity1
-            );
+            if (totalLiquidity0 > 0) {
+                feesOwedToken0 = uint128(
+                    (tki.tokensOwed0 * userLiquidity0) / totalLiquidity0
+                );
+            }
+            if (totalLiquidity1 > 0) {
+                feesOwedToken1 = uint128(
+                    (tki.tokensOwed1 * userLiquidity1) / totalLiquidity1
+                );
+            }
         }
 
         tki.tokensOwed0 -= feesOwedToken0;
