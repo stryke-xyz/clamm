@@ -243,7 +243,7 @@ contract UniswapV3SingleTickLiquidityHandler is
 
         if (tki.totalSupply > 0) {
             // compound fees
-            if (tki.tokensOwed0 > 10_000 || tki.tokensOwed1 > 10_000) {
+            if (tki.tokensOwed0 > 0 || tki.tokensOwed1 > 0) {
                 uint256 expectedAmountForLiquidity0 = LiquidityAmounts
                     .getAmount0ForLiquidity(
                         posCache.sqrtRatioTickLower,
