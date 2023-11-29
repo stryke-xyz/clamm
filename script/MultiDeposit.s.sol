@@ -12,7 +12,7 @@ import {ERC20} from "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 
-contract MultiDepositScript is Script {
+contract MultiDeposit is Script {
     using TickMath for int24;
 
     struct LoopCache {
