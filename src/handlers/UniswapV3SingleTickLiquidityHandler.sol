@@ -88,6 +88,16 @@ contract UniswapV3SingleTickLiquidityHandler is
         uint128 liquidityToDonate;
     }
 
+    struct MintPositionCache {
+        int24 tickLower;
+        int24 tickUpper;
+        uint160 sqrtRatioTickLower;
+        uint160 sqrtRatioTickUpper;
+        uint128 liquidity;
+        uint256 amount0;
+        uint256 amount1;
+    }
+
     // events
     event LogMintedPosition(
         uint256 tokenId,
@@ -188,132 +198,161 @@ contract UniswapV3SingleTickLiquidityHandler is
             tki.fee = _params.pool.fee();
         }
 
-        (uint256 amount0, uint256 amount1) = LiquidityAmounts
+        MintPositionCache memory posCache = MintPositionCache({
+            tickLower: _params.tickLower,
+            tickUpper: _params.tickUpper,
+            sqrtRatioTickLower: _params.tickLower.getSqrtRatioAtTick(),
+            sqrtRatioTickUpper: _params.tickUpper.getSqrtRatioAtTick(),
+            liquidity: 0,
+            amount0: 0,
+            amount1: 0
+        });
+
+        (posCache.amount0, posCache.amount1) = LiquidityAmounts
             .getAmountsForLiquidity(
                 _getCurrentSqrtPriceX96(_params.pool),
-                _params.tickLower.getSqrtRatioAtTick(),
-                _params.tickUpper.getSqrtRatioAtTick(),
+                posCache.sqrtRatioTickLower,
+                posCache.sqrtRatioTickUpper,
                 uint128(_params.liquidity)
             );
 
-        if (amount0 > 0 && amount1 > 0)
+        if (posCache.amount0 > 0 && posCache.amount1 > 0)
             revert UniswapV3SingleTickLiquidityHandler__InRangeLP();
 
-        (uint128 liquidity, , , ) = addLiquidity(
+        (posCache.liquidity, , , ) = addLiquidity(
             LiquidityManager.AddLiquidityParams({
                 token0: tki.token0,
                 token1: tki.token1,
                 fee: tki.fee,
                 recipient: address(this),
-                tickLower: _params.tickLower,
-                tickUpper: _params.tickUpper,
-                amount0Desired: amount0,
-                amount1Desired: amount1,
-                amount0Min: amount0,
-                amount1Min: amount1
+                tickLower: posCache.tickLower,
+                tickUpper: posCache.tickUpper,
+                amount0Desired: posCache.amount0,
+                amount1Desired: posCache.amount1,
+                amount0Min: posCache.amount0,
+                amount1Min: posCache.amount1
             })
         );
 
         _feeCalculation(
             tki,
             _params.pool,
-            _params.tickLower,
-            _params.tickUpper
+            posCache.tickLower,
+            posCache.tickUpper
         );
 
         if (tki.totalSupply > 0) {
             // compound fees
             if (tki.tokensOwed0 > 0 || tki.tokensOwed1 > 0) {
-                (uint256 a0, uint256 a1) = _params.pool.collect(
-                    address(this),
-                    _params.tickLower,
-                    _params.tickUpper,
-                    uint128(tki.tokensOwed0),
-                    uint128(tki.tokensOwed1)
-                );
-
-                (tki.tokensOwed0, tki.tokensOwed1) = (0, 0);
-
-                bool isAmount0 = amount0 > 0;
-
-                uint256 amountOut;
-                if (isAmount0 ? a1 > 0 : a0 > 0) {
-                    IERC20(isAmount0 ? tki.token1 : tki.token0)
-                        .safeIncreaseAllowance(
-                            address(swapRouter),
-                            isAmount0 ? a1 : a0
-                        );
-
-                    amountOut = swapRouter.exactInputSingle(
-                        ISwapRouter.ExactInputSingleParams({
-                            tokenIn: isAmount0 ? tki.token1 : tki.token0,
-                            tokenOut: isAmount0 ? tki.token0 : tki.token1,
-                            fee: tki.fee,
-                            recipient: address(this),
-                            deadline: block.timestamp,
-                            amountIn: isAmount0 ? a1 : a0,
-                            amountOutMinimum: 0,
-                            sqrtPriceLimitX96: 0
-                        })
+                uint256 expectedAmountForLiquidity0 = LiquidityAmounts
+                    .getAmount0ForLiquidity(
+                        posCache.sqrtRatioTickLower,
+                        posCache.sqrtRatioTickUpper,
+                        2
                     );
-                }
 
-                (
-                    uint128 liquidityFee,
-                    ,
-                    ,
+                uint256 expectedAmountForLiquidity1 = LiquidityAmounts
+                    .getAmount1ForLiquidity(
+                        posCache.sqrtRatioTickLower,
+                        posCache.sqrtRatioTickUpper,
+                        2
+                    );
 
-                ) = UniswapV3SingleTickLiquidityHandler(address(this))
-                        .addLiquidity(
-                            LiquidityManager.AddLiquidityParams({
-                                token0: tki.token0,
-                                token1: tki.token1,
+                if (
+                    expectedAmountForLiquidity0 > tki.tokensOwed0 ||
+                    expectedAmountForLiquidity1 > tki.tokensOwed1
+                ) {
+                    bool isAmount0 = posCache.amount0 > 0;
+                    (uint256 a0, uint256 a1) = _params.pool.collect(
+                        address(this),
+                        _params.tickLower,
+                        _params.tickUpper,
+                        uint128(tki.tokensOwed0),
+                        uint128(tki.tokensOwed1)
+                    );
+
+                    (tki.tokensOwed0, tki.tokensOwed1) = (0, 0);
+
+                    uint256 amountOut;
+                    if (isAmount0 ? a1 > 0 : a0 > 0) {
+                        IERC20(isAmount0 ? tki.token1 : tki.token0)
+                            .safeIncreaseAllowance(
+                                address(swapRouter),
+                                isAmount0 ? a1 : a0
+                            );
+
+                        amountOut = swapRouter.exactInputSingle(
+                            ISwapRouter.ExactInputSingleParams({
+                                tokenIn: isAmount0 ? tki.token1 : tki.token0,
+                                tokenOut: isAmount0 ? tki.token0 : tki.token1,
                                 fee: tki.fee,
                                 recipient: address(this),
-                                tickLower: _params.tickLower,
-                                tickUpper: _params.tickUpper,
-                                amount0Desired: a0 +
-                                    (isAmount0 ? amountOut : 0),
-                                amount1Desired: a1 +
-                                    (isAmount0 ? 0 : amountOut),
-                                amount0Min: a0 + (isAmount0 ? amountOut : 0),
-                                amount1Min: a1 + (isAmount0 ? 0 : amountOut)
+                                deadline: block.timestamp,
+                                amountIn: isAmount0 ? a1 : a0,
+                                amountOutMinimum: 0,
+                                sqrtPriceLimitX96: 0
                             })
                         );
-                tki.totalLiquidity += liquidityFee;
+                    }
 
-                emit LogFeeCompound(
-                    address(this),
-                    _params.pool,
-                    tokenId,
-                    _params.tickLower,
-                    _params.tickUpper,
-                    liquidityFee
-                );
+                    (
+                        uint128 liquidityFee,
+                        ,
+                        ,
+
+                    ) = UniswapV3SingleTickLiquidityHandler(address(this))
+                            .addLiquidity(
+                                LiquidityManager.AddLiquidityParams({
+                                    token0: tki.token0,
+                                    token1: tki.token1,
+                                    fee: tki.fee,
+                                    recipient: address(this),
+                                    tickLower: _params.tickLower,
+                                    tickUpper: _params.tickUpper,
+                                    amount0Desired: a0 +
+                                        (isAmount0 ? amountOut : 0),
+                                    amount1Desired: a1 +
+                                        (isAmount0 ? 0 : amountOut),
+                                    amount0Min: a0 +
+                                        (isAmount0 ? amountOut : 0),
+                                    amount1Min: a1 + (isAmount0 ? 0 : amountOut)
+                                })
+                            );
+                    tki.totalLiquidity += liquidityFee;
+
+                    emit LogFeeCompound(
+                        address(this),
+                        _params.pool,
+                        tokenId,
+                        posCache.tickLower,
+                        posCache.tickUpper,
+                        liquidityFee
+                    );
+                }
             }
 
-            uint128 shares = _convertToShares(liquidity, tokenId);
+            uint128 shares = _convertToShares(posCache.liquidity, tokenId);
 
-            tki.totalLiquidity += liquidity;
+            tki.totalLiquidity += posCache.liquidity;
             tki.totalSupply += shares;
 
             sharesMinted = shares;
         } else {
-            tki.totalLiquidity += liquidity;
-            tki.totalSupply += liquidity;
+            tki.totalLiquidity += posCache.liquidity;
+            tki.totalSupply += posCache.liquidity;
 
-            sharesMinted = liquidity;
+            sharesMinted = posCache.liquidity;
         }
 
         _mint(context, tokenId, sharesMinted, "");
 
         emit LogMintedPosition(
             tokenId,
-            liquidity,
+            posCache.liquidity,
             address(_params.pool),
             context,
-            _params.tickLower,
-            _params.tickUpper
+            posCache.tickLower,
+            posCache.tickUpper
         );
     }
 
@@ -390,12 +429,16 @@ contract UniswapV3SingleTickLiquidityHandler is
                 uint128(tki.totalLiquidity)
             );
 
-            feesOwedToken0 = uint128(
-                (tki.tokensOwed0 * userLiquidity0) / totalLiquidity0
-            );
-            feesOwedToken1 = uint128(
-                (tki.tokensOwed1 * userLiquidity1) / totalLiquidity1
-            );
+            if (totalLiquidity0 > 0) {
+                feesOwedToken0 = uint128(
+                    (tki.tokensOwed0 * userLiquidity0) / totalLiquidity0
+                );
+            }
+            if (totalLiquidity1 > 0) {
+                feesOwedToken1 = uint128(
+                    (tki.tokensOwed1 * userLiquidity1) / totalLiquidity1
+                );
+            }
         }
 
         tki.tokensOwed0 -= feesOwedToken0;

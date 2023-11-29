@@ -326,6 +326,69 @@ contract PositionManagerHandlerTest is Test {
         );
     }
 
+    function testBurnPositionSmallValue() public {
+        int24 tickLower = -77420;
+        int24 tickUpper = -77410;
+
+        positionManagerHandler.mintPosition(
+            token0,
+            token1,
+            0,
+            2,
+            tickLower,
+            tickUpper,
+            pool,
+            bob
+        );
+
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
+                user: garbage,
+                pool: pool,
+                amountIn: 2_000_000e18,
+                zeroForOne: true,
+                requireMint: true
+            })
+        );
+
+        positionManagerHandler.mintPosition(
+            token0,
+            token1,
+            2,
+            0,
+            tickLower,
+            tickUpper,
+            pool,
+            jason
+        );
+
+        uint256 bobBalance = uniV3Handler.balanceOf(
+            bob,
+            positionManagerHandler.getTokenId(pool, tickLower, tickUpper)
+        );
+
+        uint256 jasonBalance = uniV3Handler.balanceOf(
+            jason,
+            positionManagerHandler.getTokenId(pool, tickLower, tickUpper)
+        );
+
+        positionManagerHandler.burnPosition(
+            bobBalance,
+            tickLower,
+            tickUpper,
+            pool,
+            bob
+        );
+
+        positionManagerHandler.burnPosition(
+            jasonBalance - 1, // since you can't reset the shares
+            tickLower,
+            tickUpper,
+            pool,
+            jason
+        );
+    }
+
     function testUsePosition() public {
         testMintPositionWithSwaps();
         uint256 amount0 = 0;
