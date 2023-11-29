@@ -7,7 +7,7 @@ import {IHandler} from "../src/interfaces/IHandler.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {ERC20} from "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 
-contract BuyOptionScript is Script {
+contract BuyOption is Script {
     function run() public {
         address op = 0x7d6BA9528A1449Fa944D81Ea16089D0db01F2A20;
         vm.startBroadcast();
