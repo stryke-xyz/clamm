@@ -126,6 +126,7 @@ contract DopexV2OptionMarket is
     error DopexV2OptionMarket__PoolNotApproved();
     error DopexV2OptionMarket__MaxCostAllowanceExceeded();
     error DopexV2OptionMarket__NotOwnerOrDelegator();
+    error DopexV2OptionMarket__EmptyOption();
     error DopexV2OptionMarket__ArrayLenMismatch();
     error DopexV2OptionMarket__OptionExpired();
     error DopexV2OptionMarket__OptionNotExpired();
@@ -626,6 +627,8 @@ contract DopexV2OptionMarket is
             revert DopexV2OptionMarket__ArrayLenMismatch();
 
         for (uint256 i; i < _params.liquidityToSplit.length; i++) {
+            if(_params.liquidityToSplit[i] == 0)
+                revert DopexV2OptionMarket__EmptyOption();
             OptionTicks storage opTick = opTickMap[_params.optionId][i];
             opTick.liquidityToUse -= _params.liquidityToSplit[i];
 
