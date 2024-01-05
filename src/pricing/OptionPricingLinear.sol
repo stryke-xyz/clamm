@@ -6,8 +6,6 @@ import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {BlackScholes} from "../../test/pricing/BlackScholes.sol";
 import {ABDKMathQuad} from "../../test/pricing/ABDKMathQuad.sol";
 
-import "forge-std/console.sol";
-
 // Contracts
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -21,7 +19,7 @@ contract OptionPricingLinear is Ownable {
     uint256 public volatilityMultiplier;
 
     // The decimal precision for volatility calculation
-    uint256 public constant volatilityPrecision = 1e4;
+    uint256 public constant VOLATILITY_PRECISION = 1e4;
 
     constructor(uint256 _volatilityOffset, uint256 _volatilityMultiplier) {
         volatilityOffset = _volatilityOffset;
@@ -99,7 +97,7 @@ contract OptionPricingLinear is Ownable {
     ) public view returns (uint256) {
         uint256 percentageDifference = strike
             .mul(1e2)
-            .mul(volatilityPrecision)
+            .mul(VOLATILITY_PRECISION)
             .div(lastPrice); // 1e4 in percentage precision (1e6 is 100%)
 
         if (strike > lastPrice) {
@@ -111,10 +109,10 @@ contract OptionPricingLinear is Ownable {
         uint256 scaleFactor = volatilityOffset +
             (
                 percentageDifference.mul(volatilityMultiplier).div(
-                    volatilityPrecision
+                    VOLATILITY_PRECISION
                 )
             );
 
-        return (volatility.mul(scaleFactor).div(volatilityPrecision));
+        return (volatility.mul(scaleFactor).div(VOLATILITY_PRECISION));
     }
 }
