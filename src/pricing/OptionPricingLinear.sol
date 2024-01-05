@@ -17,9 +17,6 @@ contract OptionPricingLinear is Ownable {
     // The max volatility possible
     uint256 public volatilityCap;
 
-    // The % of the price of asset which is the minimum option price possible in 1e8 precision
-    uint256 public minOptionPricePercentage;
-
     // The offset for volatility calculation in 1e4 precision
     uint256 public volatilityOffset;
 
@@ -31,12 +28,10 @@ contract OptionPricingLinear is Ownable {
 
     constructor(
         uint256 _volatilityCap,
-        uint256 _minOptionPricePercentage,
         uint256 _volatilityOffset,
         uint256 _volatilityMultiplier
     ) {
         volatilityCap = _volatilityCap;
-        minOptionPricePercentage = _minOptionPricePercentage;
         volatilityOffset = _volatilityOffset;
         volatilityMultiplier = _volatilityMultiplier;
     }
@@ -50,17 +45,6 @@ contract OptionPricingLinear is Ownable {
         uint256 _volatilityCap
     ) external onlyOwner returns (bool) {
         volatilityCap = _volatilityCap;
-
-        return true;
-    }
-
-    /// @notice updates % of the price of asset which is the minimum option price possible
-    /// @param _minOptionPricePercentage the new %
-    /// @return whether % was updated
-    function updateMinOptionPricePercentage(
-        uint256 _minOptionPricePercentage
-    ) external onlyOwner returns (bool) {
-        minOptionPricePercentage = _minOptionPricePercentage;
 
         return true;
     }
@@ -117,14 +101,6 @@ contract OptionPricingLinear is Ownable {
                 volatility
             )
             .div(BlackScholes.DIVISOR);
-
-        uint256 minOptionPrice = lastPrice.mul(minOptionPricePercentage).div(
-            1e10
-        );
-
-        if (minOptionPrice > optionPrice) {
-            return minOptionPrice;
-        }
 
         return optionPrice;
     }
