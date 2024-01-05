@@ -14,9 +14,6 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 contract OptionPricingLinear is Ownable {
     using SafeMath for uint256;
 
-    // The max volatility possible
-    uint256 public volatilityCap;
-
     // The offset for volatility calculation in 1e4 precision
     uint256 public volatilityOffset;
 
@@ -26,28 +23,12 @@ contract OptionPricingLinear is Ownable {
     // The decimal precision for volatility calculation
     uint256 public constant volatilityPrecision = 1e4;
 
-    constructor(
-        uint256 _volatilityCap,
-        uint256 _volatilityOffset,
-        uint256 _volatilityMultiplier
-    ) {
-        volatilityCap = _volatilityCap;
+    constructor(uint256 _volatilityOffset, uint256 _volatilityMultiplier) {
         volatilityOffset = _volatilityOffset;
         volatilityMultiplier = _volatilityMultiplier;
     }
 
     /*---- GOVERNANCE FUNCTIONS ----*/
-
-    /// @notice updates volatility cap for an option pool
-    /// @param _volatilityCap the new volatility cap
-    /// @return whether volatility cap was updated
-    function updateVolatilityCap(
-        uint256 _volatilityCap
-    ) external onlyOwner returns (bool) {
-        volatilityCap = _volatilityCap;
-
-        return true;
-    }
 
     /// @notice updates the offset for volatility calculation
     /// @param _volatilityOffset the new offset
