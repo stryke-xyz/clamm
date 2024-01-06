@@ -4,6 +4,7 @@ pragma solidity 0.8.15;
 import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 
 // Libraries
+import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
@@ -15,11 +16,14 @@ import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Po
 
 contract LimitExercise is AccessControl, EIP712 {
     using ECDSA for bytes32;
+    using SafeERC20 for IERC20;
 
     struct Order {
         uint256 optionId;
         uint256 minProfit;
         uint256 deadline;
+        address optionMarket;
+        address signer;
     }
 
     struct SignatureMeta {
@@ -38,7 +42,9 @@ contract LimitExercise is AccessControl, EIP712 {
 
     bytes32 public constant KEEPER_ROLE = keccak256("KEEPER_ROLE");
     bytes32 public constant ORDER_TYPEHASH =
-        keccak256("Order(uint256 optionId,uint256 minProfit,uint256 deadline)");
+        keccak256(
+            "Order(uint256 optionId,uint256 minProfit,uint256 deadline,address optionMarket,address signer)"
+        );
 
     constructor() EIP712("LimitExercise", "1") {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -47,7 +53,6 @@ contract LimitExercise is AccessControl, EIP712 {
 
     function limitExercise(
         address _extraProfitTo,
-        IOptionMarket optionMarket,
         Order calldata _order,
         SignatureMeta calldata _signatureMeta,
         IOptionMarket.ExerciseOptionParams calldata _exerciseParams
@@ -57,7 +62,10 @@ contract LimitExercise is AccessControl, EIP712 {
             "optionIds don't match"
         );
         require(_order.minProfit != 0, "minProfit is zero");
-        require(_order.deadline <= block.timestamp, "Order Expired");
+        require(_order.deadline > block.timestamp, "Order Expired");
+
+        IOptionMarket optionMarket = IOptionMarket(_order.optionMarket);
+
         // Should verify signature in general and should also revert incase the limit order was placed by a signer different than the owner.
         require(
             verify(
@@ -80,6 +88,8 @@ contract LimitExercise is AccessControl, EIP712 {
 
         tokenBalance = tokenInContext.balanceOf(address(this)) - tokenBalance;
 
+        require(_order.minProfit <= tokenBalance, "minProfit exceeds profit");
+
         if (tokenBalance >= 0) {
             uint256 executorProfit = tokenBalance > _order.minProfit
                 ? tokenBalance - _order.minProfit
@@ -91,11 +101,11 @@ contract LimitExercise is AccessControl, EIP712 {
 
             // transfer complete profit if its above min profit or transfer min profit and extra to provided address
             if (executorProfit > 0) {
-                tokenInContext.transfer(_extraProfitTo, executorProfit);
+                tokenInContext.safeTransfer(_extraProfitTo, executorProfit);
             }
 
             if (userProfit > 0) {
-                tokenInContext.transfer(
+                tokenInContext.safeTransfer(
                     optionMarket.ownerOf(_exerciseParams.optionId),
                     userProfit
                 );
@@ -110,8 +120,6 @@ contract LimitExercise is AccessControl, EIP712 {
             );
         }
     }
-
-    // Signature utils
 
     function verify(
         address _signer,
@@ -138,7 +146,9 @@ contract LimitExercise is AccessControl, EIP712 {
                     ORDER_TYPEHASH,
                     _order.optionId,
                     _order.minProfit,
-                    _order.deadline
+                    _order.deadline,
+                    _order.optionMarket,
+                    _order.signer
                 )
             );
     }

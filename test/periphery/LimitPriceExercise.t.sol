@@ -26,7 +26,7 @@ import {IHandler} from "../../src/interfaces/IHandler.sol";
 import {ISwapper} from "../../src/interfaces/ISwapper.sol";
 import {IOptionMarket} from "../../src/interfaces/IOptionMarket.sol";
 
-contract LimitPriceExerciseTest is Test {
+contract LimitExerciseTest is Test {
     using TickMath for int24;
 
     address ETH; // token1
@@ -211,6 +211,240 @@ contract LimitPriceExerciseTest is Test {
         );
     }
 
+    function testFailKeeperAccessControl() public {
+        vm.startPrank(trader);
+
+        LimitExercise.Order memory _order;
+        IOptionMarket.ExerciseOptionParams memory _params;
+        LimitExercise.SignatureMeta memory _sigMeta;
+
+        limitExercise.limitExercise(trader, _order, _sigMeta, _params);
+        vm.stopPrank();
+    }
+
+    function testVerifySignature() public {
+        limitExercise.grantRole(limitExercise.KEEPER_ROLE(), trader);
+
+        vm.startPrank(trader);
+
+        (, uint256 privateKey0) = makeAddrAndKey("alice");
+        (, uint256 privateKey1) = makeAddrAndKey("trader");
+
+        bytes32 digest0 = limitExercise.computeDigest(
+            LimitExercise.Order(1, 2, 3, address(1), address(1))
+        );
+        bytes32 digest1 = limitExercise.computeDigest(
+            LimitExercise.Order(2, 3, 4, address(2), address(1))
+        );
+
+        (uint8 v0, bytes32 r0, bytes32 s0) = vm.sign(privateKey0, digest0);
+        (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(privateKey1, digest1);
+
+        assertEq(
+            limitExercise.verify(
+                alice,
+                LimitExercise.Order(1, 2, 3, address(1), address(1)),
+                LimitExercise.SignatureMeta(v0, r0, s0)
+            ),
+            true
+        );
+
+        assertEq(
+            limitExercise.verify(
+                alice,
+                LimitExercise.Order(1, 2, 3, address(1), address(1)),
+                LimitExercise.SignatureMeta(v0, r1, s0)
+            ),
+            false
+        );
+
+        assertEq(
+            limitExercise.verify(
+                alice,
+                LimitExercise.Order(1, 2, 3, address(1), address(1)),
+                LimitExercise.SignatureMeta(v0, r1, s1)
+            ),
+            false
+        );
+
+        assertEq(
+            limitExercise.verify(
+                alice,
+                LimitExercise.Order(1, 2, 3, address(1), address(1)),
+                LimitExercise.SignatureMeta(v0, r0, s1)
+            ),
+            false
+        );
+
+        assertEq(
+            limitExercise.verify(
+                alice,
+                LimitExercise.Order(1, 2, 3, address(1), address(1)),
+                LimitExercise.SignatureMeta(v0, r0, s1)
+            ),
+            false
+        );
+
+        assertEq(
+            limitExercise.verify(
+                trader,
+                LimitExercise.Order(1, 2, 3, address(1), address(1)),
+                LimitExercise.SignatureMeta(v0, r0, s0)
+            ),
+            false
+        );
+
+        assertEq(
+            limitExercise.verify(
+                trader,
+                LimitExercise.Order(1, 2, 3, address(1), address(1)),
+                LimitExercise.SignatureMeta(v1, r1, s1)
+            ),
+            false
+        );
+
+        assertEq(
+            limitExercise.verify(
+                trader,
+                LimitExercise.Order(2, 3, 4, address(2), address(1)),
+                LimitExercise.SignatureMeta(v1, r1, s1)
+            ),
+            true
+        );
+
+        vm.stopPrank();
+    }
+
+    function testFailOptionIdsMisMatch() public {
+        limitExercise.grantRole(limitExercise.KEEPER_ROLE(), trader);
+
+        vm.startPrank(trader);
+
+        (, uint256 privateKey) = makeAddrAndKey("trader");
+
+        bytes32 digest = limitExercise.computeDigest(
+            LimitExercise.Order(3, 0, 0, address(0), address(0))
+        );
+
+        IOptionMarket.ExerciseOptionParams memory _params;
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
+
+        limitExercise.limitExercise(
+            trader,
+            LimitExercise.Order(1, 0, 0, address(0), address(0)),
+            LimitExercise.SignatureMeta(v, r, s),
+            _params
+        );
+
+        vm.stopPrank();
+    }
+
+    function testFailOrderExpired() public {
+        vm.warp(100);
+        limitExercise.grantRole(limitExercise.KEEPER_ROLE(), trader);
+
+        vm.startPrank(trader);
+
+        (, uint256 privateKey) = makeAddrAndKey("trader");
+
+        bytes32 digest = limitExercise.computeDigest(
+            LimitExercise.Order(1, 1, 0, address(0), address(0))
+        );
+
+        IOptionMarket.ExerciseOptionParams memory _params;
+
+        _params.optionId = 1;
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
+
+        limitExercise.limitExercise(
+            trader,
+            LimitExercise.Order(1, 1, 0, address(0), address(0)),
+            LimitExercise.SignatureMeta(v, r, s),
+            _params
+        );
+
+        vm.stopPrank();
+    }
+
+    function testFailNoProfit() public {
+        vm.startPrank(trader);
+        uint256 l = LiquidityAmounts.getLiquidityForAmount1(
+            tickLowerCalls.getSqrtRatioAtTick(),
+            tickUpperCalls.getSqrtRatioAtTick(),
+            5e18
+        );
+        uint256 _premiumAmount = optionMarket.getPremiumAmount(
+            false,
+            block.timestamp + 20 minutes,
+            optionMarket.getPricePerCallAssetViaTick(pool, tickUpperCalls),
+            optionMarket.getCurrentPricePerCallAsset(pool),
+            optionMarket.ttlToVol(20 minutes),
+            5e18
+        );
+        uint256 _fee = optionMarket.getFee(0, 0, _premiumAmount);
+        uint256 cost = _premiumAmount + _fee;
+        token1.mint(trader, cost);
+        token1.approve(address(optionMarket), cost);
+        DopexV2OptionMarket.OptionTicks[]
+            memory opTicks = new DopexV2OptionMarket.OptionTicks[](1);
+        opTicks[0] = DopexV2OptionMarket.OptionTicks({
+            _handler: uniV3Handler,
+            pool: pool,
+            tickLower: tickLowerCalls,
+            tickUpper: tickUpperCalls,
+            liquidityToUse: l
+        });
+        optionMarket.mintOption(
+            DopexV2OptionMarket.OptionParams({
+                optionTicks: opTicks,
+                tickLower: tickLowerCalls,
+                tickUpper: tickUpperCalls,
+                ttl: 20 minutes,
+                isCall: true,
+                maxCostAllowance: cost
+            })
+        );
+        vm.stopPrank();
+
+        (, uint256 privateKey) = makeAddrAndKey("trader");
+
+        uint256 optionId = 1;
+
+        LimitExercise.Order memory order = LimitExercise.Order(
+            1,
+            5e18,
+            block.timestamp + 20 minutes,
+            address(optionMarket),
+            trader
+        );
+
+        LimitExercise.SignatureMeta memory sigMeta;
+
+        bytes32 digest = limitExercise.computeDigest(order);
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
+
+        sigMeta.v = v;
+        sigMeta.r = r;
+        sigMeta.s = s;
+
+        vm.startPrank(trader);
+        optionMarket.updateExerciseDelegate(address(limitExercise), true);
+        vm.stopPrank();
+
+        limitExercise.grantRole(limitExercise.KEEPER_ROLE(), bot);
+
+        vm.startPrank(bot);
+        limitExercise.limitExercise(
+            (bot),
+            order,
+            sigMeta,
+            _getExerciseParams(optionId)
+        );
+    }
+
     function testLimitExerciseCall() public {
         vm.startPrank(trader);
         uint256 l = LiquidityAmounts.getLiquidityForAmount1(
@@ -257,7 +491,13 @@ contract LimitPriceExerciseTest is Test {
 
         uint256 totalProfit = 137046592384897080728;
         uint256 minProfit = 5e18;
-        LimitExercise.Order memory order = LimitExercise.Order(1, 5e18, 0);
+        LimitExercise.Order memory order = LimitExercise.Order(
+            1,
+            5e18,
+            block.timestamp + 20 minutes,
+            address(optionMarket),
+            trader
+        );
 
         LimitExercise.SignatureMeta memory sigMeta;
 
@@ -268,9 +508,6 @@ contract LimitPriceExerciseTest is Test {
         sigMeta.v = v;
         sigMeta.r = r;
         sigMeta.s = s;
-
-        console.log("digest");
-        console.logBytes32(digest);
 
         assertEq(
             limitExercise.verify(
@@ -303,7 +540,6 @@ contract LimitPriceExerciseTest is Test {
         vm.startPrank(bot);
         limitExercise.limitExercise(
             (bot),
-            IOptionMarket(address(optionMarket)),
             order,
             sigMeta,
             _getExerciseParams(optionId)
@@ -311,6 +547,110 @@ contract LimitPriceExerciseTest is Test {
 
         assertEqUint(token0.balanceOf(trader), minProfit);
         assertEqUint(token0.balanceOf(bot), totalProfit - minProfit);
+    }
+
+    function testFuzzMinProfit(uint256 _minProfit) public {
+        console.log(_minProfit);
+        if (_minProfit == 0) return;
+        vm.startPrank(trader);
+
+        uint256 l = LiquidityAmounts.getLiquidityForAmount0(
+            tickLowerPuts.getSqrtRatioAtTick(),
+            tickUpperPuts.getSqrtRatioAtTick(),
+            10_000e18
+        );
+
+        uint256 _premiumAmountPuts = optionMarket.getPremiumAmount(
+            true,
+            block.timestamp + 20 minutes,
+            optionMarket.getPricePerCallAssetViaTick(pool, tickLowerPuts),
+            optionMarket.getCurrentPricePerCallAsset(pool),
+            optionMarket.ttlToVol(20 minutes),
+            (10_000e18 * 1e18) /
+                optionMarket.getPricePerCallAssetViaTick(pool, tickLowerPuts)
+        );
+
+        uint256 _fee = optionMarket.getFee(0, 0, _premiumAmountPuts);
+        uint256 cost = _premiumAmountPuts + _fee;
+        token0.mint(trader, cost);
+        token0.approve(address(optionMarket), cost);
+
+        DopexV2OptionMarket.OptionTicks[]
+            memory opTicks = new DopexV2OptionMarket.OptionTicks[](1);
+
+        opTicks[0] = DopexV2OptionMarket.OptionTicks({
+            _handler: uniV3Handler,
+            pool: pool,
+            tickLower: tickLowerPuts,
+            tickUpper: tickUpperPuts,
+            liquidityToUse: l
+        });
+
+        optionMarket.mintOption(
+            DopexV2OptionMarket.OptionParams({
+                optionTicks: opTicks,
+                tickLower: tickLowerPuts,
+                tickUpper: tickUpperPuts,
+                ttl: 20 minutes,
+                isCall: false,
+                maxCostAllowance: cost
+            })
+        );
+        vm.stopPrank();
+
+        (, uint256 privateKey) = makeAddrAndKey("trader");
+
+        uint256 optionId = 1;
+
+        uint256 totalProfit = 119820039967268616;
+
+        if (_minProfit > totalProfit) return;
+
+        LimitExercise.Order memory order = LimitExercise.Order(
+            1,
+            _minProfit,
+            block.timestamp + 20 minutes,
+            address(optionMarket),
+            trader
+        );
+
+        LimitExercise.SignatureMeta memory sigMeta;
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            privateKey,
+            limitExercise.computeDigest(order)
+        );
+
+        sigMeta.v = v;
+        sigMeta.r = r;
+        sigMeta.s = s;
+
+        vm.startPrank(trader);
+        optionMarket.updateExerciseDelegate(address(limitExercise), true);
+        vm.stopPrank();
+
+        limitExercise.grantRole(limitExercise.KEEPER_ROLE(), bot);
+
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
+                user: garbage,
+                pool: pool,
+                amountIn: 250e18,
+                zeroForOne: false,
+                requireMint: true
+            })
+        );
+
+        vm.startPrank(bot);
+        limitExercise.limitExercise(
+            (bot),
+            order,
+            sigMeta,
+            _getExerciseParams(optionId)
+        );
+
+        assertEqUint(token1.balanceOf(trader), _minProfit);
+        assertEqUint(token1.balanceOf(bot), totalProfit - _minProfit);
     }
 
     function testLimitExercisePut() public {
@@ -366,7 +706,13 @@ contract LimitPriceExerciseTest is Test {
 
         uint256 totalProfit = 119820039967268616;
         uint256 minProfit = 0.05 ether;
-        LimitExercise.Order memory order = LimitExercise.Order(1, minProfit, 0);
+        LimitExercise.Order memory order = LimitExercise.Order(
+            1,
+            minProfit,
+            block.timestamp + 20 minutes,
+            address(optionMarket),
+            trader
+        );
 
         LimitExercise.SignatureMeta memory sigMeta;
 
@@ -397,7 +743,6 @@ contract LimitPriceExerciseTest is Test {
         vm.startPrank(bot);
         limitExercise.limitExercise(
             (bot),
-            IOptionMarket(address(optionMarket)),
             order,
             sigMeta,
             _getExerciseParams(optionId)
