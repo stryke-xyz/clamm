@@ -13,7 +13,7 @@ import {IOptionMarket} from "../interfaces/IOptionMarket.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 
-contract LimitPriceExercise is AccessControl, EIP712 {
+contract LimitExercise is AccessControl, EIP712 {
     using ECDSA for bytes32;
 
     struct Order {
@@ -23,9 +23,9 @@ contract LimitPriceExercise is AccessControl, EIP712 {
     }
 
     struct SignatureMeta {
+        uint8 v;
         bytes32 r;
         bytes32 s;
-        uint8 v;
     }
 
     event LimitOrderExercise_LimitExercise(
@@ -45,7 +45,7 @@ contract LimitPriceExercise is AccessControl, EIP712 {
         _setupRole(KEEPER_ROLE, msg.sender);
     }
 
-    function limitPriceExercise(
+    function limitExercise(
         address _extraProfitTo,
         IOptionMarket optionMarket,
         Order calldata _order,
@@ -116,7 +116,7 @@ contract LimitPriceExercise is AccessControl, EIP712 {
     function verify(
         address _signer,
         Order calldata _order,
-        SignatureMeta memory _signatureMeta
+        SignatureMeta calldata _signatureMeta
     ) public view returns (bool) {
         bytes32 digest = computeDigest(_order);
         return
@@ -135,8 +135,8 @@ contract LimitPriceExercise is AccessControl, EIP712 {
             keccak256(
                 abi.encode(
                     ORDER_TYPE,
-                    _order.minProfit,
                     _order.optionId,
+                    _order.minProfit,
                     _order.deadline
                 )
             );

@@ -19,7 +19,7 @@ import {DopexV2OptionMarket} from "../../src/DopexV2OptionMarket.sol";
 import {OptionPricing} from "../pricing/OptionPricing.sol";
 import {DopexV2ClammFeeStrategy} from "../../src/pricing/fees/DopexV2ClammFeeStrategy.sol";
 import {SwapRouterSwapper} from "../../src/swapper/SwapRouterSwapper.sol";
-import {LimitPriceExercise} from "../../src/periphery/LimitPriceExercise.sol";
+import {LimitExercise} from "../../src/periphery/LimitExercise.sol";
 
 import {IOptionPricing} from "../../src/pricing/IOptionPricing.sol";
 import {IHandler} from "../../src/interfaces/IHandler.sol";
@@ -69,7 +69,7 @@ contract LimitPriceExerciseTest is Test {
     DopexV2OptionMarket optionMarket;
     UniswapV3SingleTickLiquidityHandler uniV3Handler;
     DopexV2ClammFeeStrategy feeStrategy;
-    LimitPriceExercise limitPriceExercise;
+    LimitExercise limitExercise;
 
     function setUp() public {
         vm.warp(1693352493);
@@ -92,7 +92,7 @@ contract LimitPriceExerciseTest is Test {
 
         positionManager = new DopexV2PositionManager();
 
-        limitPriceExercise = new LimitPriceExercise();
+        limitExercise = new LimitExercise();
 
         uniV3Handler = new UniswapV3SingleTickLiquidityHandler(
             address(uniswapV3TestLib.factory()),
@@ -257,15 +257,11 @@ contract LimitPriceExerciseTest is Test {
 
         uint256 totalProfit = 137046592384897080728;
         uint256 minProfit = 5e18;
-        LimitPriceExercise.Order memory order = LimitPriceExercise.Order(
-            1,
-            5e18,
-            0
-        );
+        LimitExercise.Order memory order = LimitExercise.Order(1, 5e18, 0);
 
-        LimitPriceExercise.SignatureMeta memory sigMeta;
+        LimitExercise.SignatureMeta memory sigMeta;
 
-        bytes32 digest = limitPriceExercise.computeDigest(order);
+        bytes32 digest = limitExercise.computeDigest(order);
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
 
@@ -273,20 +269,23 @@ contract LimitPriceExerciseTest is Test {
         sigMeta.r = r;
         sigMeta.s = s;
 
+        console.log("digest");
+        console.logBytes32(digest);
+
         assertEq(
-            limitPriceExercise.verify(
+            limitExercise.verify(
                 trader,
                 order,
-                LimitPriceExercise.SignatureMeta(r, s, v)
+                LimitExercise.SignatureMeta(v, r, s)
             ),
             true
         );
 
         vm.startPrank(trader);
-        optionMarket.updateExerciseDelegate(address(limitPriceExercise), true);
+        optionMarket.updateExerciseDelegate(address(limitExercise), true);
         vm.stopPrank();
 
-        limitPriceExercise.grantRole(limitPriceExercise.KEEPER_ROLE(), bot);
+        limitExercise.grantRole(limitExercise.KEEPER_ROLE(), bot);
 
         uniswapV3TestLib.performSwap(
             UniswapV3TestLib.SwapParamsStruct({
@@ -302,7 +301,7 @@ contract LimitPriceExerciseTest is Test {
         assertEqUint(token0.balanceOf(bot), 0);
 
         vm.startPrank(bot);
-        limitPriceExercise.limitPriceExercise(
+        limitExercise.limitExercise(
             (bot),
             IOptionMarket(address(optionMarket)),
             order,
@@ -367,15 +366,11 @@ contract LimitPriceExerciseTest is Test {
 
         uint256 totalProfit = 119820039967268616;
         uint256 minProfit = 0.05 ether;
-        LimitPriceExercise.Order memory order = LimitPriceExercise.Order(
-            1,
-            minProfit,
-            0
-        );
+        LimitExercise.Order memory order = LimitExercise.Order(1, minProfit, 0);
 
-        LimitPriceExercise.SignatureMeta memory sigMeta;
+        LimitExercise.SignatureMeta memory sigMeta;
 
-        bytes32 digest = limitPriceExercise.computeDigest(order);
+        bytes32 digest = limitExercise.computeDigest(order);
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
 
@@ -384,10 +379,10 @@ contract LimitPriceExerciseTest is Test {
         sigMeta.s = s;
 
         vm.startPrank(trader);
-        optionMarket.updateExerciseDelegate(address(limitPriceExercise), true);
+        optionMarket.updateExerciseDelegate(address(limitExercise), true);
         vm.stopPrank();
 
-        limitPriceExercise.grantRole(limitPriceExercise.KEEPER_ROLE(), bot);
+        limitExercise.grantRole(limitExercise.KEEPER_ROLE(), bot);
 
         uniswapV3TestLib.performSwap(
             UniswapV3TestLib.SwapParamsStruct({
@@ -400,7 +395,7 @@ contract LimitPriceExerciseTest is Test {
         );
 
         vm.startPrank(bot);
-        limitPriceExercise.limitPriceExercise(
+        limitExercise.limitExercise(
             (bot),
             IOptionMarket(address(optionMarket)),
             order,
