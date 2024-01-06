@@ -37,10 +37,10 @@ contract LimitExercise is AccessControl, EIP712 {
     );
 
     bytes32 public constant KEEPER_ROLE = keccak256("KEEPER_ROLE");
-    string public constant ORDER_TYPE =
-        "Order(uint256 optionId,uint256 minProfit,uint256 deadline)";
+    bytes32 public constant ORDER_TYPEHASH =
+        keccak256("Order(uint256 optionId,uint256 minProfit,uint256 deadline)");
 
-    constructor() EIP712("Dopex_V2_CLAMM_Limit_Exercise", "1.0") {
+    constructor() EIP712("LimitExercise", "1") {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setupRole(KEEPER_ROLE, msg.sender);
     }
@@ -119,6 +119,7 @@ contract LimitExercise is AccessControl, EIP712 {
         SignatureMeta calldata _signatureMeta
     ) public view returns (bool) {
         bytes32 digest = computeDigest(_order);
+
         return
             _signer ==
             digest.recover(
@@ -134,7 +135,7 @@ contract LimitExercise is AccessControl, EIP712 {
         return
             keccak256(
                 abi.encode(
-                    ORDER_TYPE,
+                    ORDER_TYPEHASH,
                     _order.optionId,
                     _order.minProfit,
                     _order.deadline
