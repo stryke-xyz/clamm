@@ -22,6 +22,7 @@ contract LimitExercise is AccessControl, EIP712 {
         uint256 optionId;
         uint256 minProfit;
         uint256 deadline;
+        address profitToken;
         address optionMarket;
         address signer;
     }
@@ -32,66 +33,45 @@ contract LimitExercise is AccessControl, EIP712 {
         bytes32 s;
     }
 
-    event LimitOrderExercise_LimitExercise(
-        uint256 optionId,
-        uint256 optionOwnerProfit,
-        uint256 executorProfit,
-        IERC20 profitToken,
-        IOptionMarket optionMarket
-    );
+    error LimitExercise_InvalidSignature();
 
     bytes32 public constant KEEPER_ROLE = keccak256("KEEPER_ROLE");
     bytes32 public constant ORDER_TYPEHASH =
         keccak256(
-            "Order(uint256 optionId,uint256 minProfit,uint256 deadline,address optionMarket,address signer)"
+            "Order(uint256 optionId,uint256 minProfit,uint256 deadline,address profitToken,address optionMarket,address signer)"
         );
 
-    constructor() EIP712("LimitExercise", "1") {
+    constructor() EIP712("DopexV2_Clamm_Limit_Exercise_Order", "1") {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setupRole(KEEPER_ROLE, msg.sender);
     }
 
     function limitExercise(
-        address _extraProfitTo,
         Order calldata _order,
         SignatureMeta calldata _signatureMeta,
         IOptionMarket.ExerciseOptionParams calldata _exerciseParams
-    ) external onlyRole(KEEPER_ROLE) {
-        require(
-            _order.optionId == _exerciseParams.optionId,
-            "optionIds don't match"
-        );
-        require(_order.minProfit != 0, "minProfit is zero");
-        require(_order.deadline > block.timestamp, "Order Expired");
-
+    ) external onlyRole(KEEPER_ROLE) returns (uint256 executorProfit) {
         IOptionMarket optionMarket = IOptionMarket(_order.optionMarket);
 
         // Should verify signature in general and should also revert incase the limit order was placed by a signer different than the owner.
-        require(
-            verify(
+        if (
+            !verify(
                 optionMarket.ownerOf(_exerciseParams.optionId),
                 _order,
                 _signatureMeta
-            ),
-            "Unable to verify signature"
-        );
-
-        bool isCall = optionMarket.opData(_exerciseParams.optionId).isCall;
-
-        IERC20 tokenInContext = isCall
-            ? IERC20(optionMarket.putAsset())
-            : IERC20(optionMarket.callAsset());
-
-        uint256 tokenBalance = tokenInContext.balanceOf(address(this));
+            )
+        ) {
+            revert LimitExercise_InvalidSignature();
+        }
 
         optionMarket.exerciseOption(_exerciseParams);
 
-        tokenBalance = tokenInContext.balanceOf(address(this)) - tokenBalance;
-
-        require(_order.minProfit <= tokenBalance, "minProfit exceeds profit");
+        uint256 tokenBalance = IERC20(_order.profitToken).balanceOf(
+            address(this)
+        );
 
         if (tokenBalance >= 0) {
-            uint256 executorProfit = tokenBalance > _order.minProfit
+            executorProfit = tokenBalance > _order.minProfit
                 ? tokenBalance - _order.minProfit
                 : 0;
 
@@ -101,23 +81,18 @@ contract LimitExercise is AccessControl, EIP712 {
 
             // transfer complete profit if its above min profit or transfer min profit and extra to provided address
             if (executorProfit > 0) {
-                tokenInContext.safeTransfer(_extraProfitTo, executorProfit);
+                IERC20(_order.profitToken).safeTransfer(
+                    msg.sender,
+                    executorProfit
+                );
             }
 
             if (userProfit > 0) {
-                tokenInContext.safeTransfer(
+                IERC20(_order.profitToken).safeTransfer(
                     optionMarket.ownerOf(_exerciseParams.optionId),
                     userProfit
                 );
             }
-
-            emit LimitOrderExercise_LimitExercise(
-                _exerciseParams.optionId,
-                userProfit,
-                executorProfit,
-                tokenInContext,
-                optionMarket
-            );
         }
     }
 
@@ -147,6 +122,7 @@ contract LimitExercise is AccessControl, EIP712 {
                     _order.optionId,
                     _order.minProfit,
                     _order.deadline,
+                    _order.profitToken,
                     _order.optionMarket,
                     _order.signer
                 )

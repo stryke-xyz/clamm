@@ -218,7 +218,7 @@ contract LimitExerciseTest is Test {
         IOptionMarket.ExerciseOptionParams memory _params;
         LimitExercise.SignatureMeta memory _sigMeta;
 
-        limitExercise.limitExercise(trader, _order, _sigMeta, _params);
+        limitExercise.limitExercise(_order, _sigMeta, _params);
         vm.stopPrank();
     }
 
@@ -231,10 +231,10 @@ contract LimitExerciseTest is Test {
         (, uint256 privateKey1) = makeAddrAndKey("trader");
 
         bytes32 digest0 = limitExercise.computeDigest(
-            LimitExercise.Order(1, 2, 3, address(1), address(1))
+            LimitExercise.Order(1, 2, 3, address(0), address(1), address(1))
         );
         bytes32 digest1 = limitExercise.computeDigest(
-            LimitExercise.Order(2, 3, 4, address(2), address(1))
+            LimitExercise.Order(2, 3, 4, address(0), address(2), address(1))
         );
 
         (uint8 v0, bytes32 r0, bytes32 s0) = vm.sign(privateKey0, digest0);
@@ -243,7 +243,14 @@ contract LimitExerciseTest is Test {
         assertEq(
             limitExercise.verify(
                 alice,
-                LimitExercise.Order(1, 2, 3, address(1), address(1)),
+                LimitExercise.Order(
+                    1,
+                    2,
+                    3,
+                    address(0),
+                    address(1),
+                    address(1)
+                ),
                 LimitExercise.SignatureMeta(v0, r0, s0)
             ),
             true
@@ -252,7 +259,14 @@ contract LimitExerciseTest is Test {
         assertEq(
             limitExercise.verify(
                 alice,
-                LimitExercise.Order(1, 2, 3, address(1), address(1)),
+                LimitExercise.Order(
+                    1,
+                    2,
+                    3,
+                    address(1),
+                    address(1),
+                    address(1)
+                ),
                 LimitExercise.SignatureMeta(v0, r1, s0)
             ),
             false
@@ -261,7 +275,14 @@ contract LimitExerciseTest is Test {
         assertEq(
             limitExercise.verify(
                 alice,
-                LimitExercise.Order(1, 2, 3, address(1), address(1)),
+                LimitExercise.Order(
+                    1,
+                    2,
+                    3,
+                    address(1),
+                    address(1),
+                    address(1)
+                ),
                 LimitExercise.SignatureMeta(v0, r1, s1)
             ),
             false
@@ -270,7 +291,14 @@ contract LimitExerciseTest is Test {
         assertEq(
             limitExercise.verify(
                 alice,
-                LimitExercise.Order(1, 2, 3, address(1), address(1)),
+                LimitExercise.Order(
+                    1,
+                    2,
+                    3,
+                    address(1),
+                    address(1),
+                    address(1)
+                ),
                 LimitExercise.SignatureMeta(v0, r0, s1)
             ),
             false
@@ -279,7 +307,14 @@ contract LimitExerciseTest is Test {
         assertEq(
             limitExercise.verify(
                 alice,
-                LimitExercise.Order(1, 2, 3, address(1), address(1)),
+                LimitExercise.Order(
+                    1,
+                    2,
+                    3,
+                    address(1),
+                    address(1),
+                    address(1)
+                ),
                 LimitExercise.SignatureMeta(v0, r0, s1)
             ),
             false
@@ -288,7 +323,14 @@ contract LimitExerciseTest is Test {
         assertEq(
             limitExercise.verify(
                 trader,
-                LimitExercise.Order(1, 2, 3, address(1), address(1)),
+                LimitExercise.Order(
+                    1,
+                    2,
+                    3,
+                    address(1),
+                    address(1),
+                    address(1)
+                ),
                 LimitExercise.SignatureMeta(v0, r0, s0)
             ),
             false
@@ -297,7 +339,14 @@ contract LimitExerciseTest is Test {
         assertEq(
             limitExercise.verify(
                 trader,
-                LimitExercise.Order(1, 2, 3, address(1), address(1)),
+                LimitExercise.Order(
+                    1,
+                    2,
+                    3,
+                    address(1),
+                    address(1),
+                    address(1)
+                ),
                 LimitExercise.SignatureMeta(v1, r1, s1)
             ),
             false
@@ -306,7 +355,14 @@ contract LimitExerciseTest is Test {
         assertEq(
             limitExercise.verify(
                 trader,
-                LimitExercise.Order(2, 3, 4, address(2), address(1)),
+                LimitExercise.Order(
+                    2,
+                    3,
+                    4,
+                    address(0),
+                    address(2),
+                    address(1)
+                ),
                 LimitExercise.SignatureMeta(v1, r1, s1)
             ),
             true
@@ -323,7 +379,7 @@ contract LimitExerciseTest is Test {
         (, uint256 privateKey) = makeAddrAndKey("trader");
 
         bytes32 digest = limitExercise.computeDigest(
-            LimitExercise.Order(3, 0, 0, address(0), address(0))
+            LimitExercise.Order(3, 0, 0, address(1), address(0), address(0))
         );
 
         IOptionMarket.ExerciseOptionParams memory _params;
@@ -331,8 +387,7 @@ contract LimitExerciseTest is Test {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
 
         limitExercise.limitExercise(
-            trader,
-            LimitExercise.Order(1, 0, 0, address(0), address(0)),
+            LimitExercise.Order(1, 0, 0, address(1), address(0), address(0)),
             LimitExercise.SignatureMeta(v, r, s),
             _params
         );
@@ -349,7 +404,7 @@ contract LimitExerciseTest is Test {
         (, uint256 privateKey) = makeAddrAndKey("trader");
 
         bytes32 digest = limitExercise.computeDigest(
-            LimitExercise.Order(1, 1, 0, address(0), address(0))
+            LimitExercise.Order(1, 1, 0, address(0), address(0), address(0))
         );
 
         IOptionMarket.ExerciseOptionParams memory _params;
@@ -359,8 +414,7 @@ contract LimitExerciseTest is Test {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
 
         limitExercise.limitExercise(
-            trader,
-            LimitExercise.Order(1, 1, 0, address(0), address(0)),
+            LimitExercise.Order(1, 1, 0, address(0), address(0), address(0)),
             LimitExercise.SignatureMeta(v, r, s),
             _params
         );
@@ -416,6 +470,7 @@ contract LimitExerciseTest is Test {
             1,
             5e18,
             block.timestamp + 20 minutes,
+            address(token0),
             address(optionMarket),
             trader
         );
@@ -438,7 +493,6 @@ contract LimitExerciseTest is Test {
 
         vm.startPrank(bot);
         limitExercise.limitExercise(
-            (bot),
             order,
             sigMeta,
             _getExerciseParams(optionId)
@@ -495,6 +549,7 @@ contract LimitExerciseTest is Test {
             1,
             5e18,
             block.timestamp + 20 minutes,
+            address(token0),
             address(optionMarket),
             trader
         );
@@ -539,7 +594,6 @@ contract LimitExerciseTest is Test {
 
         vm.startPrank(bot);
         limitExercise.limitExercise(
-            (bot),
             order,
             sigMeta,
             _getExerciseParams(optionId)
@@ -610,6 +664,7 @@ contract LimitExerciseTest is Test {
             1,
             _minProfit,
             block.timestamp + 20 minutes,
+            address(token1),
             address(optionMarket),
             trader
         );
@@ -643,7 +698,6 @@ contract LimitExerciseTest is Test {
 
         vm.startPrank(bot);
         limitExercise.limitExercise(
-            (bot),
             order,
             sigMeta,
             _getExerciseParams(optionId)
@@ -710,6 +764,7 @@ contract LimitExerciseTest is Test {
             1,
             minProfit,
             block.timestamp + 20 minutes,
+            address(token1),
             address(optionMarket),
             trader
         );
@@ -742,7 +797,6 @@ contract LimitExerciseTest is Test {
 
         vm.startPrank(bot);
         limitExercise.limitExercise(
-            (bot),
             order,
             sigMeta,
             _getExerciseParams(optionId)
