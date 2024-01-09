@@ -10,7 +10,7 @@ contract DeployOptionPricingLinear is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
 
         vm.startBroadcast(deployerPrivateKey);
-        OptionPricingLinear opl = new OptionPricingLinear(1e4, 1e3);
+        OptionPricingLinear opl = new OptionPricingLinear(1e4, 1e3, 1e7);
         console.log(address(opl));
         vm.stopBroadcast();
     }
