@@ -14,7 +14,7 @@ import {IOptionMarket} from "../interfaces/IOptionMarket.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 
-contract LimitExercise is AccessControl, EIP712 {
+contract LimitExercise is AccessControl, EIP712,Multicall {
     using ECDSA for bytes32;
     using SafeERC20 for IERC20;
 
