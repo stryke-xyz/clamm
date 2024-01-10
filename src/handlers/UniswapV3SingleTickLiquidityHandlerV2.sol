@@ -18,7 +18,7 @@ import {FixedPoint128} from "@uniswap/v3-core/contracts/libraries/FixedPoint128.
 // Contracts
 import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
 import {Pausable} from "openzeppelin-contracts/contracts/security/Pausable.sol";
-import {ERC1155} from "openzeppelin-contracts/contracts/token/ERC1155/ERC1155.sol";
+import {ERC6909} from "../ERC6909.sol";
 import {LiquidityManager} from "../uniswap-v3/LiquidityManager.sol";
 
 /**
@@ -28,7 +28,7 @@ import {LiquidityManager} from "../uniswap-v3/LiquidityManager.sol";
  * for Uniswap V3 Style AMMs. The V2 version supports reserved liquidity and hooks.
  */
 contract UniswapV3SingleTickLiquidityHandlerV2 is
-    ERC1155(""),
+    ERC6909,
     IHandler,
     Pausable,
     AccessControl,
@@ -355,7 +355,7 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
             sharesMinted = posCache.liquidity;
         }
 
-        _mint(context, tokenId, sharesMinted, "");
+        _mint(context, tokenId, sharesMinted);
 
         emit LogMintedPosition(
             tokenId,
@@ -1231,7 +1231,7 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
      */
     function supportsInterface(
         bytes4 interfaceId
-    ) public view override(ERC1155, AccessControl) returns (bool) {
+    ) public view override(ERC6909, AccessControl) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
 }
