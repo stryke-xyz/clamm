@@ -43,6 +43,9 @@ contract positionManagerHarnessTest is Test {
     UniswapV3SingleTickLiquidityHarnessV2 positionManagerHarness;
     UniswapV3SingleTickLiquidityHandlerV2 uniV3Handler;
 
+    address hook = address(0);
+    bytes hookData = new bytes(0);
+
     function setUp() public {
         ETH = address(new ERC20Mock());
         LUSD = address(new ERC20Mock());
@@ -112,6 +115,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             bob
         );
 
@@ -123,6 +127,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             jason
         );
     }
@@ -145,6 +150,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             bob
         );
 
@@ -166,6 +172,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             jason
         );
     }
@@ -198,6 +205,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             bob
         );
 
@@ -219,6 +227,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             jason
         );
     }
@@ -238,6 +247,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             bob
         );
 
@@ -269,6 +279,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             jason
         );
 
@@ -301,12 +312,12 @@ contract positionManagerHarnessTest is Test {
 
         uint256 bobBalance = uniV3Handler.balanceOf(
             bob,
-            positionManagerHarness.getTokenId(pool, tickLower, tickUpper)
+            positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper)
         );
 
         uint256 jasonBalance = uniV3Handler.balanceOf(
             jason,
-            positionManagerHarness.getTokenId(pool, tickLower, tickUpper)
+            positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper)
         );
 
         positionManagerHarness.burnPosition(
@@ -314,6 +325,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             bob
         );
 
@@ -322,6 +334,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             jason
         );
     }
@@ -338,6 +351,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             bob
         );
 
@@ -359,17 +373,18 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             jason
         );
 
         uint256 bobBalance = uniV3Handler.balanceOf(
             bob,
-            positionManagerHarness.getTokenId(pool, tickLower, tickUpper)
+            positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper)
         );
 
         uint256 jasonBalance = uniV3Handler.balanceOf(
             jason,
-            positionManagerHarness.getTokenId(pool, tickLower, tickUpper)
+            positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper)
         );
 
         positionManagerHarness.burnPosition(
@@ -377,6 +392,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             bob
         );
 
@@ -385,6 +401,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             jason
         );
     }
@@ -403,6 +420,8 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
+            hookData,
             garbage
         );
 
@@ -438,8 +457,6 @@ contract positionManagerHarnessTest is Test {
         int24 tickUpper = -77410;
 
         positionManagerHarness.unusePosition(
-            token0,
-            token1,
             amount0,
             amount1,
             0,
@@ -447,17 +464,19 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
+            hookData,
             garbage
         );
 
         uint256 bobBalance = uniV3Handler.balanceOf(
             bob,
-            positionManagerHarness.getTokenId(pool, tickLower, tickUpper)
+            positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper)
         );
 
         uint256 jasonBalance = uniV3Handler.balanceOf(
             jason,
-            positionManagerHarness.getTokenId(pool, tickLower, tickUpper)
+            positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper)
         );
 
         positionManagerHarness.burnPosition(
@@ -465,6 +484,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             bob
         );
 
@@ -473,6 +493,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             jason
         );
     }
@@ -498,6 +519,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             garbage
         );
 
@@ -511,6 +533,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             roger
         );
 
@@ -522,6 +545,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             tango
         );
 
@@ -529,22 +553,22 @@ contract positionManagerHarnessTest is Test {
 
         uint256 bobBalance = uniV3Handler.balanceOf(
             bob,
-            positionManagerHarness.getTokenId(pool, tickLower, tickUpper)
+            positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper)
         );
 
         uint256 jasonBalance = uniV3Handler.balanceOf(
             jason,
-            positionManagerHarness.getTokenId(pool, tickLower, tickUpper)
+            positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper)
         );
 
         uint256 rogerBalance = uniV3Handler.balanceOf(
             roger,
-            positionManagerHarness.getTokenId(pool, tickLower, tickUpper)
+            positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper)
         );
 
         uint256 tangoBalance = uniV3Handler.balanceOf(
             tango,
-            positionManagerHarness.getTokenId(pool, tickLower, tickUpper)
+            positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper)
         );
 
         positionManagerHarness.burnPosition(
@@ -552,6 +576,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             bob
         );
 
@@ -560,6 +585,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             jason
         );
         positionManagerHarness.burnPosition(
@@ -567,6 +593,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             roger
         );
         positionManagerHarness.burnPosition(
@@ -574,6 +601,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             tango
         );
     }
@@ -593,6 +621,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             bob
         );
 
@@ -604,6 +633,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             jason
         );
 
@@ -613,6 +643,8 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
+            hookData,
             garbage
         );
 
@@ -625,6 +657,7 @@ contract positionManagerHarnessTest is Test {
                         abi.encode(
                             address(uniV3Handler),
                             pool,
+                            hook,
                             tickLower,
                             tickUpper
                         )
@@ -674,8 +707,6 @@ contract positionManagerHarnessTest is Test {
         // console.log(a0, a1);
 
         positionManagerHarness.unusePosition(
-            token0,
-            token1,
             a0,
             a1,
             0,
@@ -683,6 +714,8 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
+            hookData,
             garbage
         );
 
@@ -714,6 +747,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             bob
         );
 
@@ -725,6 +759,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             jason
         );
 
@@ -734,6 +769,8 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
+            hookData,
             garbage
         );
 
@@ -746,6 +783,7 @@ contract positionManagerHarnessTest is Test {
                         abi.encode(
                             address(uniV3Handler),
                             pool,
+                            hook,
                             tickLower,
                             tickUpper
                         )
@@ -789,8 +827,6 @@ contract positionManagerHarnessTest is Test {
         // console.log(a0, a1);
 
         positionManagerHarness.unusePosition(
-            token0,
-            token1,
             a0,
             a1,
             1,
@@ -798,6 +834,8 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
+            hookData,
             garbage
         );
 
@@ -829,6 +867,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             bob
         );
 
@@ -840,6 +879,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             jason
         );
 
@@ -849,19 +889,22 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
+            hookData,
             garbage
         );
 
         vm.startPrank(bob);
         uint256 bobBalance = uniV3Handler.balanceOf(
             bob,
-            positionManagerHarness.getTokenId(pool, tickLower, tickUpper)
+            positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper)
         );
 
         uniV3Handler.reserveLiquidity(
             abi.encode(
                 UniswapV3SingleTickLiquidityHandlerV2.BurnPositionParams({
                     pool: pool,
+                    hook: hook,
                     tickLower: tickLower,
                     tickUpper: tickUpper,
                     shares: uint128(bobBalance)
@@ -871,8 +914,6 @@ contract positionManagerHarnessTest is Test {
         vm.stopPrank();
 
         positionManagerHarness.unusePosition(
-            token0,
-            token1,
             amount0,
             10e18 - 3,
             0,
@@ -880,6 +921,8 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
+            hookData,
             garbage
         );
 
@@ -904,6 +947,7 @@ contract positionManagerHarnessTest is Test {
             abi.encode(
                 UniswapV3SingleTickLiquidityHandlerV2.BurnPositionParams({
                     pool: pool,
+                    hook: hook,
                     tickLower: tickLower,
                     tickUpper: tickUpper,
                     shares: uint128(bobReserveBalance)
@@ -914,7 +958,7 @@ contract positionManagerHarnessTest is Test {
 
         uint256 jasonBalance = uniV3Handler.balanceOf(
             jason,
-            positionManagerHarness.getTokenId(pool, tickLower, tickUpper)
+            positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper)
         );
 
         positionManagerHarness.burnPosition(
@@ -922,6 +966,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             jason
         );
 
@@ -961,6 +1006,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             bob
         );
 
@@ -972,6 +1018,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             jason
         );
 
@@ -1001,19 +1048,22 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
+            hookData,
             garbage
         );
 
         vm.startPrank(bob);
         uint256 bobBalance = uniV3Handler.balanceOf(
             bob,
-            positionManagerHarness.getTokenId(pool, tickLower, tickUpper)
+            positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper)
         );
 
         uniV3Handler.reserveLiquidity(
             abi.encode(
                 UniswapV3SingleTickLiquidityHandlerV2.BurnPositionParams({
                     pool: pool,
+                    hook: hook,
                     tickLower: tickLower,
                     tickUpper: tickUpper,
                     shares: uint128(bobBalance)
@@ -1043,8 +1093,6 @@ contract positionManagerHarnessTest is Test {
         );
 
         positionManagerHarness.unusePosition(
-            token0,
-            token1,
             amount0,
             amount1,
             0,
@@ -1052,6 +1100,8 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
+            hookData,
             garbage
         );
 
@@ -1096,6 +1146,7 @@ contract positionManagerHarnessTest is Test {
             abi.encode(
                 UniswapV3SingleTickLiquidityHandlerV2.BurnPositionParams({
                     pool: pool,
+                    hook: hook,
                     tickLower: tickLower,
                     tickUpper: tickUpper,
                     shares: uint128(bobReserveBalance)
@@ -1106,7 +1157,7 @@ contract positionManagerHarnessTest is Test {
 
         uint256 jasonBalance = uniV3Handler.balanceOf(
             jason,
-            positionManagerHarness.getTokenId(pool, tickLower, tickUpper)
+            positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper)
         );
 
         positionManagerHarness.burnPosition(
@@ -1114,6 +1165,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             jason
         );
     }
@@ -1133,6 +1185,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             bob
         );
 
@@ -1144,6 +1197,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             bob
         );
 
@@ -1155,19 +1209,21 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             jason
         );
 
         vm.startPrank(bob);
         uint256 bobBalance = uniV3Handler.balanceOf(
             bob,
-            positionManagerHarness.getTokenId(pool, tickLower, tickUpper)
+            positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper)
         );
 
         uniV3Handler.reserveLiquidity(
             abi.encode(
                 UniswapV3SingleTickLiquidityHandlerV2.BurnPositionParams({
                     pool: pool,
+                    hook: hook,
                     tickLower: tickLower,
                     tickUpper: tickUpper,
                     shares: uint128(bobBalance)
@@ -1196,6 +1252,7 @@ contract positionManagerHarnessTest is Test {
             abi.encode(
                 UniswapV3SingleTickLiquidityHandlerV2.BurnPositionParams({
                     pool: pool,
+                    hook: hook,
                     tickLower: tickLower,
                     tickUpper: tickUpper,
                     shares: uint128(bobReserveBalance)
@@ -1206,7 +1263,7 @@ contract positionManagerHarnessTest is Test {
 
         uint256 jasonBalance = uniV3Handler.balanceOf(
             jason,
-            positionManagerHarness.getTokenId(pool, tickLower, tickUpper)
+            positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper)
         );
 
         positionManagerHarness.burnPosition(
@@ -1214,6 +1271,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             jason
         );
     }
@@ -1233,6 +1291,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             bob
         );
 
@@ -1244,6 +1303,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             jason
         );
 
@@ -1253,19 +1313,22 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
+            hookData,
             garbage
         );
 
         vm.startPrank(bob);
         uint256 bobBalance = uniV3Handler.balanceOf(
             bob,
-            positionManagerHarness.getTokenId(pool, tickLower, tickUpper)
+            positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper)
         );
 
         uniV3Handler.reserveLiquidity(
             abi.encode(
                 UniswapV3SingleTickLiquidityHandlerV2.BurnPositionParams({
                     pool: pool,
+                    hook: hook,
                     tickLower: tickLower,
                     tickUpper: tickUpper,
                     shares: uint128(bobBalance)
@@ -1275,8 +1338,6 @@ contract positionManagerHarnessTest is Test {
         vm.stopPrank();
 
         positionManagerHarness.unusePosition(
-            token0,
-            token1,
             amount0,
             10e18 - 3,
             0,
@@ -1284,6 +1345,8 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
+            hookData,
             garbage
         );
 
@@ -1306,6 +1369,7 @@ contract positionManagerHarnessTest is Test {
             abi.encode(
                 UniswapV3SingleTickLiquidityHandlerV2.BurnPositionParams({
                     pool: pool,
+                    hook: hook,
                     tickLower: tickLower,
                     tickUpper: tickUpper,
                     shares: uint128(bobReserveBalance)
@@ -1330,6 +1394,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             bob
         );
 
@@ -1341,6 +1406,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             jason
         );
 
@@ -1350,6 +1416,8 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
+            hookData,
             garbage
         );
 
@@ -1359,19 +1427,22 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
+            hookData,
             garbage
         );
 
         vm.startPrank(bob);
         uint256 bobBalance = uniV3Handler.balanceOf(
             bob,
-            positionManagerHarness.getTokenId(pool, tickLower, tickUpper)
+            positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper)
         );
 
         uniV3Handler.reserveLiquidity(
             abi.encode(
                 UniswapV3SingleTickLiquidityHandlerV2.BurnPositionParams({
                     pool: pool,
+                    hook: hook,
                     tickLower: tickLower,
                     tickUpper: tickUpper,
                     shares: uint128(bobBalance)
@@ -1381,8 +1452,6 @@ contract positionManagerHarnessTest is Test {
         vm.stopPrank();
 
         positionManagerHarness.unusePosition(
-            token0,
-            token1,
             amount0,
             amount1,
             0,
@@ -1390,12 +1459,14 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
+            hookData,
             garbage
         );
 
         uint256 jasonBalance = uniV3Handler.balanceOf(
             jason,
-            positionManagerHarness.getTokenId(pool, tickLower, tickUpper)
+            positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper)
         );
 
         positionManagerHarness.burnPosition(
@@ -1403,6 +1474,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             jason
         );
     }
@@ -1422,6 +1494,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             bob
         );
 
@@ -1433,6 +1506,7 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
             jason
         );
 
@@ -1442,19 +1516,22 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
+            hookData,
             garbage
         );
 
         vm.startPrank(bob);
         uint256 bobBalance = uniV3Handler.balanceOf(
             bob,
-            positionManagerHarness.getTokenId(pool, tickLower, tickUpper)
+            positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper)
         );
 
         uniV3Handler.reserveLiquidity(
             abi.encode(
                 UniswapV3SingleTickLiquidityHandlerV2.BurnPositionParams({
                     pool: pool,
+                    hook: hook,
                     tickLower: tickLower,
                     tickUpper: tickUpper,
                     shares: uint128(bobBalance)
@@ -1464,8 +1541,6 @@ contract positionManagerHarnessTest is Test {
         vm.stopPrank();
 
         positionManagerHarness.unusePosition(
-            token0,
-            token1,
             amount0,
             amount1,
             0,
@@ -1473,6 +1548,8 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
+            hookData,
             garbage
         );
 
@@ -1482,6 +1559,8 @@ contract positionManagerHarnessTest is Test {
             tickLower,
             tickUpper,
             pool,
+            hook,
+            hookData,
             garbage
         );
     }

@@ -35,13 +35,20 @@ contract UniswapV3SingleTickLiquidityHarnessV2 is Test {
 
     function getTokenId(
         IUniswapV3Pool pool,
+        address hook,
         int24 tickLower,
         int24 tickUpper
     ) public view returns (uint256) {
         return
             uint256(
                 keccak256(
-                    abi.encode(address(handler), pool, tickLower, tickUpper)
+                    abi.encode(
+                        address(handler),
+                        pool,
+                        hook,
+                        tickLower,
+                        tickUpper
+                    )
                 )
             );
     }
@@ -54,6 +61,7 @@ contract UniswapV3SingleTickLiquidityHarnessV2 is Test {
         int24 tickLower,
         int24 tickUpper,
         IUniswapV3Pool pool,
+        address hook,
         address user
     ) public returns (uint256 lm) {
         uint128 liquidityToMint = LiquidityAmounts.getLiquidityForAmounts(
@@ -76,6 +84,7 @@ contract UniswapV3SingleTickLiquidityHarnessV2 is Test {
             abi.encode(
                 UniswapV3SingleTickLiquidityHandlerV2.MintPositionParams({
                     pool: pool,
+                    hook: hook,
                     tickLower: tickLower,
                     tickUpper: tickUpper,
                     liquidity: liquidityToMint
@@ -90,6 +99,7 @@ contract UniswapV3SingleTickLiquidityHarnessV2 is Test {
         int24 tickLower,
         int24 tickUpper,
         IUniswapV3Pool pool,
+        address hook,
         address user
     ) public returns (uint256 lb) {
         vm.startPrank(user);
@@ -99,6 +109,7 @@ contract UniswapV3SingleTickLiquidityHarnessV2 is Test {
             abi.encode(
                 UniswapV3SingleTickLiquidityHandlerV2.BurnPositionParams({
                     pool: pool,
+                    hook: hook,
                     tickLower: tickLower,
                     tickUpper: tickUpper,
                     shares: uint128(shares)
@@ -115,6 +126,8 @@ contract UniswapV3SingleTickLiquidityHarnessV2 is Test {
         int24 tickLower,
         int24 tickUpper,
         IUniswapV3Pool pool,
+        address hook,
+        bytes calldata hookData,
         address user
     ) public returns (address[] memory tokens, uint256[] memory amounts) {
         uint128 liquidityToUse = LiquidityAmounts.getLiquidityForAmounts(
@@ -130,18 +143,41 @@ contract UniswapV3SingleTickLiquidityHarnessV2 is Test {
             abi.encode(
                 UniswapV3SingleTickLiquidityHandlerV2.UsePositionParams({
                     pool: pool,
+                    hook: hook,
                     tickLower: tickLower,
                     tickUpper: tickUpper,
                     liquidityToUse: liquidityToUse
-                })
+                }),
+                hookData
             )
         );
         vm.stopPrank();
     }
 
+    struct AmountCache {
+        uint256 a0;
+        uint256 a1;
+        uint160 csp;
+        uint160 tl;
+        uint160 tu;
+    }
+
+    AmountCache amountsCache;
+
+    function _getLiq() internal view returns (uint128) {
+        return
+            uint128(
+                LiquidityAmounts.getLiquidityForAmounts(
+                    amountsCache.csp,
+                    amountsCache.tl,
+                    amountsCache.tu,
+                    amountsCache.a0,
+                    amountsCache.a1
+                )
+            );
+    }
+
     function unusePosition(
-        ERC20Mock token0,
-        ERC20Mock token1,
         uint256 amount0,
         uint256 amount1,
         uint256 amount0ToDonate,
@@ -149,38 +185,57 @@ contract UniswapV3SingleTickLiquidityHarnessV2 is Test {
         int24 tickLower,
         int24 tickUpper,
         IUniswapV3Pool pool,
+        address hook,
+        bytes calldata hookData,
         address user
-    ) public returns (uint256[] memory amounts, uint256 liquidityToUnuse) {
-        liquidityToUnuse = LiquidityAmounts.getLiquidityForAmounts(
-            uniswapV3TestLib.getCurrentSqrtPriceX96(pool),
-            tickLower.getSqrtRatioAtTick(),
-            tickUpper.getSqrtRatioAtTick(),
-            amount0 + amount0ToDonate,
-            amount1 + amount1ToDonate
-        );
+    ) public {
+        // uint256 liquidityToUnuse;
+        // {
+        //     liquidityToUnuse = LiquidityAmounts.getLiquidityForAmounts(
+        //         uniswapV3TestLib.getCurrentSqrtPriceX96(pool),
+        //         tickLower.getSqrtRatioAtTick(),
+        //         tickUpper.getSqrtRatioAtTick(),
+        //         amount0 + amount0ToDonate,
+        //         amount1 + amount1ToDonate
+        //     );
+        // }
+
+        amountsCache = AmountCache({
+            a0: amount0 + amount0ToDonate,
+            a1: amount1 + amount1ToDonate,
+            csp: uniswapV3TestLib.getCurrentSqrtPriceX96(pool),
+            tl: tickLower.getSqrtRatioAtTick(),
+            tu: tickUpper.getSqrtRatioAtTick()
+        });
 
         vm.startPrank(user);
-        if (amount0ToDonate > 0) token0.mint(user, amount0ToDonate);
-        if (amount1ToDonate > 0) token1.mint(user, amount1ToDonate);
+        {
+            if (amount0ToDonate > 0)
+                ERC20Mock(pool.token0()).mint(user, amount0ToDonate);
+            if (amount1ToDonate > 0)
+                ERC20Mock(pool.token1()).mint(user, amount1ToDonate);
 
-        token0.increaseAllowance(
-            address(positionManager),
-            amount0 + amount0ToDonate
-        );
-        token1.increaseAllowance(
-            address(positionManager),
-            amount1 + amount1ToDonate
-        );
+            ERC20Mock(pool.token0()).increaseAllowance(
+                address(positionManager),
+                amount0 + amount0ToDonate
+            );
+            ERC20Mock(pool.token1()).increaseAllowance(
+                address(positionManager),
+                amount1 + amount1ToDonate
+            );
+        }
 
-        (amounts, ) = positionManager.unusePosition(
+        positionManager.unusePosition(
             handler,
             abi.encode(
                 UniswapV3SingleTickLiquidityHandlerV2.UnusePositionParams({
                     pool: pool,
+                    hook: hook,
                     tickLower: tickLower,
                     tickUpper: tickUpper,
-                    liquidityToUnuse: uint128(liquidityToUnuse)
-                })
+                    liquidityToUnuse: _getLiq()
+                }),
+                hookData
             )
         );
         vm.stopPrank();
@@ -196,6 +251,7 @@ contract UniswapV3SingleTickLiquidityHarnessV2 is Test {
         int24 tickLower,
         int24 tickUpper,
         IUniswapV3Pool pool,
+        address hook,
         address user
     ) public returns (uint256[] memory amounts, uint256 liquidityToDonate) {
         liquidityToDonate = LiquidityAmounts.getLiquidityForAmounts(
@@ -224,6 +280,7 @@ contract UniswapV3SingleTickLiquidityHarnessV2 is Test {
             abi.encode(
                 UniswapV3SingleTickLiquidityHandlerV2.DonateParams({
                     pool: pool,
+                    hook: hook,
                     tickLower: tickLower,
                     tickUpper: tickUpper,
                     liquidityToDonate: uint128(liquidityToDonate)

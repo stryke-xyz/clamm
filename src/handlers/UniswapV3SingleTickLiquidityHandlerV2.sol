@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.8.0 <0.9.0;
 
+import "forge-std/Test.sol";
+
 // Interfaces
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {ISwapRouter} from "v3-periphery/SwapRouter.sol";
 import {IHandler} from "../interfaces/IHandler.sol";
+import {IHook} from "../interfaces/IHook.sol";
 
 // Libraries
 import {Math} from "openzeppelin-contracts/contracts/utils/math/Math.sol";
@@ -56,6 +59,7 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
 
     struct MintPositionParams {
         IUniswapV3Pool pool;
+        address hook;
         int24 tickLower;
         int24 tickUpper;
         uint128 liquidity;
@@ -63,6 +67,7 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
 
     struct BurnPositionParams {
         IUniswapV3Pool pool;
+        address hook;
         int24 tickLower;
         int24 tickUpper;
         uint128 shares;
@@ -75,6 +80,7 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
 
     struct UsePositionParams {
         IUniswapV3Pool pool;
+        address hook;
         int24 tickLower;
         int24 tickUpper;
         uint128 liquidityToUse;
@@ -82,6 +88,7 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
 
     struct UnusePositionParams {
         IUniswapV3Pool pool;
+        address hook;
         int24 tickLower;
         int24 tickUpper;
         uint128 liquidityToUnuse;
@@ -89,6 +96,7 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
 
     struct DonateParams {
         IUniswapV3Pool pool;
+        address hook;
         int24 tickLower;
         int24 tickUpper;
         uint128 liquidityToDonate;
@@ -195,6 +203,7 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
                 abi.encode(
                     address(this),
                     _params.pool,
+                    _params.hook,
                     _params.tickLower,
                     _params.tickUpper
                 )
@@ -389,6 +398,7 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
                 abi.encode(
                     address(this),
                     _params.pool,
+                    _params.hook,
                     _params.tickLower,
                     _params.tickUpper
                 )
@@ -495,6 +505,7 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
                 abi.encode(
                     address(this),
                     _params.pool,
+                    _params.hook,
                     _params.tickLower,
                     _params.tickUpper
                 )
@@ -595,6 +606,7 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
                 abi.encode(
                     address(this),
                     _params.pool,
+                    _params.hook,
                     _params.tickLower,
                     _params.tickUpper
                 )
@@ -650,15 +662,17 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
         whenNotPaused
         returns (address[] memory, uint256[] memory, uint256)
     {
-        UsePositionParams memory _params = abi.decode(
+        (UsePositionParams memory _params, bytes memory hookData) = abi.decode(
             _usePositionHandler,
-            (UsePositionParams)
+            (UsePositionParams, bytes)
         );
+
         uint256 tokenId = uint256(
             keccak256(
                 abi.encode(
                     address(this),
                     _params.pool,
+                    _params.hook,
                     _params.tickLower,
                     _params.tickUpper
                 )
@@ -669,6 +683,9 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
 
         if ((tki.totalLiquidity - tki.liquidityUsed) < _params.liquidityToUse)
             revert UniswapV3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
+
+        if (_params.hook != address(0))
+            IHook(_params.hook).onPositionUse(hookData);
 
         (uint256 amount0, uint256 amount1) = _params.pool.burn(
             _params.tickLower,
@@ -720,16 +737,15 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
         whenNotPaused
         returns (uint256[] memory, uint256)
     {
-        UnusePositionParams memory _params = abi.decode(
-            _unusePositionData,
-            (UnusePositionParams)
-        );
+        (UnusePositionParams memory _params, bytes memory hookData) = abi
+            .decode(_unusePositionData, (UnusePositionParams, bytes));
 
         uint256 tokenId = uint256(
             keccak256(
                 abi.encode(
                     address(this),
                     _params.pool,
+                    _params.hook,
                     _params.tickLower,
                     _params.tickUpper
                 )
@@ -737,6 +753,9 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
         );
 
         TokenIdInfo storage tki = tokenIds[tokenId];
+
+        if (_params.hook != address(0))
+            IHook(_params.hook).onPositionUnUse(hookData);
 
         (uint256 amount0, uint256 amount1) = LiquidityAmounts
             .getAmountsForLiquidity(
@@ -805,6 +824,7 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
                 abi.encode(
                     address(this),
                     _params.pool,
+                    _params.hook,
                     _params.tickLower,
                     _params.tickUpper
                 )
@@ -921,14 +941,18 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
     function getHandlerIdentifier(
         bytes calldata _data
     ) external view returns (uint256 handlerIdentifierId) {
-        (IUniswapV3Pool pool, int24 tickLower, int24 tickUpper) = abi.decode(
-            _data,
-            (IUniswapV3Pool, int24, int24)
-        );
+        (
+            IUniswapV3Pool pool,
+            address hook,
+            int24 tickLower,
+            int24 tickUpper
+        ) = abi.decode(_data, (IUniswapV3Pool, address, int24, int24));
 
         return
             uint256(
-                keccak256(abi.encode(address(this), pool, tickLower, tickUpper))
+                keccak256(
+                    abi.encode(address(this), pool, hook, tickLower, tickUpper)
+                )
             );
     }
 
