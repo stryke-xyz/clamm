@@ -16,12 +16,12 @@ import {UniswapV3SingleTickLiquidityHarnessV2} from "./harness/UniswapV3SingleTi
 import {UniswapV3SingleTickLiquidityHandlerV2} from "../src/handlers/UniswapV3SingleTickLiquidityHandlerV2.sol";
 import {DopexV2OptionMarketV2} from "../src/DopexV2OptionMarketV2.sol";
 
-import {OptionPricing} from "./pricing/OptionPricing.sol";
-import {DopexV2ClammFeeStrategy} from "../src/pricing/fees/DopexV2ClammFeeStrategy.sol";
+import {OptionPricingV2} from "./pricing/OptionPricingV2.sol";
+import {DopexV2ClammFeeStrategyV2} from "../src/pricing/fees/DopexV2ClammFeeStrategyV2.sol";
 import {SwapRouterSwapper} from "../src/swapper/SwapRouterSwapper.sol";
 import {AutoExerciseTimeBased} from "../src/periphery/AutoExerciseTimeBased.sol";
 
-import {IOptionPricing} from "../src/pricing/IOptionPricing.sol";
+import {IOptionPricingV2} from "../src/pricing/IOptionPricingV2.sol";
 import {IHandler} from "../src/interfaces/IHandler.sol";
 import {ISwapper} from "../src/interfaces/ISwapper.sol";
 import {IOptionMarket} from "../src/interfaces/IOptionMarket.sol";
@@ -38,7 +38,7 @@ contract optionMarketTest is Test {
     UniswapV3TestLib uniswapV3TestLib;
     IUniswapV3Pool pool;
 
-    OptionPricing op;
+    OptionPricingV2 op;
     SwapRouterSwapper srs;
 
     uint24 fee = 500;
@@ -72,7 +72,7 @@ contract optionMarketTest is Test {
     UniswapV3SingleTickLiquidityHarnessV2 positionManagerHarness;
     DopexV2OptionMarketV2 optionMarket;
     UniswapV3SingleTickLiquidityHandlerV2 uniV3Handler;
-    DopexV2ClammFeeStrategy feeStrategy;
+    DopexV2ClammFeeStrategyV2 feeStrategy;
     AutoExerciseTimeBased autoExercise;
 
     function setUp() public {
@@ -108,10 +108,10 @@ contract optionMarketTest is Test {
             uniV3Handler
         );
 
-        op = new OptionPricing(500, 1e8);
+        op = new OptionPricingV2(500, 1e8);
         srs = new SwapRouterSwapper(address(uniswapV3TestLib.swapRouter()));
 
-        feeStrategy = new DopexV2ClammFeeStrategy();
+        feeStrategy = new DopexV2ClammFeeStrategyV2();
 
         optionMarket = new DopexV2OptionMarketV2(
             address(positionManager),
@@ -133,7 +133,7 @@ contract optionMarketTest is Test {
 
         address feeCollector = makeAddr("feeCollector");
 
-        optionMarket.updateIVs(ttls, IVs);
+        op.updateIVs(ttls, IVs);
         optionMarket.updateAddress(
             feeCollector,
             address(0),
@@ -236,11 +236,10 @@ contract optionMarketTest is Test {
             block.timestamp + 20 minutes,
             optionMarket.getPricePerCallAssetViaTick(pool, tickUpperCalls),
             optionMarket.getCurrentPricePerCallAsset(pool),
-            optionMarket.ttlToVol(20 minutes),
             5e18
         );
 
-        uint256 _fee = optionMarket.getFee(0, 0, _premiumAmountCalls);
+        uint256 _fee = optionMarket.getFee(0, _premiumAmountCalls);
         uint256 cost = _premiumAmountCalls + _fee;
         token1.mint(trader, cost);
         token1.approve(address(optionMarket), cost);
@@ -294,12 +293,11 @@ contract optionMarketTest is Test {
             block.timestamp + 20 minutes,
             optionMarket.getPricePerCallAssetViaTick(pool, tickLowerPuts),
             optionMarket.getCurrentPricePerCallAsset(pool),
-            optionMarket.ttlToVol(20 minutes),
             (10_000e18 * 1e18) /
                 optionMarket.getPricePerCallAssetViaTick(pool, tickLowerPuts)
         );
 
-        uint256 _fee = optionMarket.getFee(0, 0, _premiumAmountPuts);
+        uint256 _fee = optionMarket.getFee(0, _premiumAmountPuts);
         uint256 cost = _premiumAmountPuts + _fee;
         token0.mint(trader, cost);
         token0.approve(address(optionMarket), cost);

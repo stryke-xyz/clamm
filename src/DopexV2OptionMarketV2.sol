@@ -3,9 +3,9 @@ pragma solidity >=0.8.0 <0.9.0;
 
 import {IDopexV2PositionManager} from "./interfaces/IDopexV2PositionManager.sol";
 
-import {IOptionPricing} from "./pricing/IOptionPricing.sol";
+import {IOptionPricingV2} from "./pricing/IOptionPricingV2.sol";
 import {IHandler} from "./interfaces/IHandler.sol";
-import {IDopexV2ClammFeeStrategy} from "./pricing/fees/IDopexV2ClammFeeStrategy.sol";
+import {IDopexV2ClammFeeStrategyV2} from "./pricing/fees/IDopexV2ClammFeeStrategyV2.sol";
 import {ISwapper} from "./interfaces/ISwapper.sol";
 import {ITokenURIFetcher} from "./interfaces/ITokenURIFetcher.sol";
 
@@ -136,8 +136,8 @@ contract DopexV2OptionMarketV2 is
     error DopexV2OptionMarket__NotIVSetter();
     error DopexV2OptionMarket__InvalidPool();
 
-    IDopexV2ClammFeeStrategy public dpFee;
-    IOptionPricing public optionPricing;
+    IDopexV2ClammFeeStrategyV2 public dpFee;
+    IOptionPricingV2 public optionPricing;
 
     IDopexV2PositionManager public immutable positionManager;
     IUniswapV3Pool public immutable primePool;
@@ -149,13 +149,11 @@ contract DopexV2OptionMarketV2 is
     address public feeTo;
     address public tokenURIFetcher;
 
-    mapping(uint256 => uint256) public ttlToVol;
     mapping(uint256 => OptionData) public opData;
     mapping(uint256 => OptionTicks[]) public opTickMap;
     mapping(address => mapping(address => bool)) public exerciseDelegator;
     mapping(address => bool) public approvedPools;
     mapping(address => bool) public settlers;
-    mapping(address => bool) public ivSetter;
 
     uint256 public optionIds;
 
@@ -171,9 +169,9 @@ contract DopexV2OptionMarketV2 is
         callAsset = _callAsset;
         putAsset = _putAsset;
 
-        dpFee = IDopexV2ClammFeeStrategy(_dpFee);
+        dpFee = IDopexV2ClammFeeStrategyV2(_dpFee);
 
-        optionPricing = IOptionPricing(_optionPricing);
+        optionPricing = IOptionPricingV2(_optionPricing);
 
         primePool = IUniswapV3Pool(_primePool);
 
@@ -185,8 +183,6 @@ contract DopexV2OptionMarketV2 is
 
         callAssetDecimals = ERC20(_callAsset).decimals();
         putAssetDecimals = ERC20(_putAsset).decimals();
-
-        ivSetter[msg.sender] = true;
 
         emit LogOptionsMarketInitialized(
             _primePool,
@@ -221,10 +217,6 @@ contract DopexV2OptionMarketV2 is
         bool isAmount0;
 
         address assetToUse = _params.isCall ? callAsset : putAsset;
-
-        uint256 _ttlToVol = ttlToVol[_params.ttl];
-
-        if (_ttlToVol == 0) revert DopexV2OptionMarket__IVNotSet();
 
         OptionTicks memory opTick;
 
@@ -295,18 +287,16 @@ contract DopexV2OptionMarketV2 is
             block.timestamp + _params.ttl, // expiry
             strike, // Strike
             getCurrentPricePerCallAsset(primePool), // Current price
-            _ttlToVol, // IV, strike and expiry param is 0 since we are using flat volatility
             _params.isCall
                 ? totalAssetWithdrawn
                 : (totalAssetWithdrawn * (10 ** putAssetDecimals)) / strike
         );
+
+        if (premiumAmount == 0) revert DopexV2OptionMarket__IVNotSet();
+
         uint256 protocolFees;
         if (feeTo != address(0)) {
-            protocolFees = getFee(
-                totalAssetWithdrawn,
-                _ttlToVol,
-                premiumAmount
-            );
+            protocolFees = getFee(totalAssetWithdrawn, premiumAmount);
             ERC20(assetToUse).transferFrom(msg.sender, feeTo, protocolFees);
         }
 
@@ -731,7 +721,6 @@ contract DopexV2OptionMarketV2 is
      * @param expiry The expiry of the option.
      * @param strike The strike price of the option.
      * @param lastPrice The last price of the underlying asset.
-     * @param baseIv The base implied volatility of the underlying asset.
      * @param amount The amount of the underlying asset.
      * @return The premium amount.
      */
@@ -740,11 +729,9 @@ contract DopexV2OptionMarketV2 is
         uint expiry,
         uint strike,
         uint lastPrice,
-        uint baseIv,
         uint amount
     ) external view returns (uint256) {
-        return
-            _getPremiumAmount(isPut, expiry, strike, lastPrice, baseIv, amount);
+        return _getPremiumAmount(isPut, expiry, strike, lastPrice, amount);
     }
 
     /**
@@ -764,7 +751,6 @@ contract DopexV2OptionMarketV2 is
      * @param expiry The expiry of the option.
      * @param strike The strike price of the option.
      * @param lastPrice The last price of the underlying asset.
-     * @param baseIv The base implied volatility of the underlying asset.
      * @param amount The amount of the underlying asset.
      * @return premiumAmount The premium amount.
      */
@@ -773,17 +759,11 @@ contract DopexV2OptionMarketV2 is
         uint expiry,
         uint strike,
         uint lastPrice,
-        uint baseIv,
         uint amount
     ) internal view returns (uint256 premiumAmount) {
         uint premiumInQuote = (amount *
-            optionPricing.getOptionPrice(
-                isPut,
-                expiry,
-                strike,
-                lastPrice,
-                baseIv
-            )) / (isPut ? 10 ** putAssetDecimals : 10 ** callAssetDecimals);
+            optionPricing.getOptionPrice(isPut, expiry, strike, lastPrice)) /
+            (isPut ? 10 ** putAssetDecimals : 10 ** callAssetDecimals);
 
         if (isPut) {
             return premiumInQuote;
@@ -822,48 +802,17 @@ contract DopexV2OptionMarketV2 is
     /**
      * @notice Gets the fee for the option
      * @param amount Amount being withdrawn
-     * @param iv IV of the option
      * @param premium Premium being paid for the position
      * @return fee for the option
      */
     function getFee(
         uint256 amount,
-        uint256 iv,
         uint256 premium
     ) public view returns (uint256) {
-        return dpFee.onFeeReqReceive(address(this), amount, iv, premium);
+        return dpFee.onFeeReqReceive(address(this), amount, premium);
     }
 
     // admin
-
-    /**
-     * @notice Updates the IV setter
-     * @param _setter Address of the setter
-     * @param _status Status  to set
-     * @dev Only the owner of the contract can call this function
-     */
-    function updateIVSetter(address _setter, bool _status) external onlyOwner {
-        ivSetter[_setter] = _status;
-        emit LogIVSetterUpdate(_setter, _status);
-    }
-
-    /**
-     * @notice Updates the implied volatility (IV) for the given time to expirations (TTLs).
-     * @param _ttls The TTLs to update the IV for.
-     * @param _ttlIV The new IVs for the given TTLs.
-     * @dev Only the IV SETTER can call this function.
-     */
-    function updateIVs(
-        uint256[] calldata _ttls,
-        uint256[] calldata _ttlIV
-    ) external {
-        if (!ivSetter[msg.sender]) revert DopexV2OptionMarket__NotIVSetter();
-
-        for (uint256 i; i < _ttls.length; i++) {
-            ttlToVol[_ttls[i]] = _ttlIV[i];
-        }
-        emit LogIVUpdate(_ttls, _ttlIV);
-    }
 
     /**
      * @notice Updates the addresses of the various components of the contract.
@@ -889,8 +838,8 @@ contract DopexV2OptionMarketV2 is
     ) external onlyOwner {
         feeTo = _feeTo;
         tokenURIFetcher = _tokeURIFetcher;
-        dpFee = IDopexV2ClammFeeStrategy(_dpFee);
-        optionPricing = IOptionPricing(_optionPricing);
+        dpFee = IDopexV2ClammFeeStrategyV2(_dpFee);
+        optionPricing = IOptionPricingV2(_optionPricing);
         settlers[_settler] = _statusSettler;
         approvedPools[_pool] = _statusPools;
 
