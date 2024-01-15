@@ -1185,20 +1185,11 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
         emit LogUpdateWhitelistedApp(_app, _status);
     }
 
-    /**
-     * @notice Updates the locked block duration.
-     * @param _newLockedBlockDuration The new locked block duration.
-     */
-    function updateLockedBlockDuration(
-        uint64 _newLockedBlockDuration
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        newLockedBlockDuration = _newLockedBlockDuration;
-        emit LogUpdatedLockedBlockDuration(_newLockedBlockDuration);
-    }
-
-    function updateReserveCooldownDuration(
+    function updateLockedBlockDurationAndReserveCooldown(
+        uint64 _newLockedBlockDuration,
         uint64 _newReserveCooldown
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        newLockedBlockDuration = _newLockedBlockDuration;
         reserveCooldown = _newReserveCooldown;
     }
 
