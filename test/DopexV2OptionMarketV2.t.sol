@@ -618,6 +618,145 @@ contract optionMarketTest is Test {
         );
     }
 
+    function testSettleOptionCallATM() public {
+        testBuyCallOption();
+        uint256 prevTime = block.timestamp + 20 minutes;
+        vm.warp(block.timestamp + 1201 seconds);
+
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
+                user: garbage,
+                pool: pool,
+                amountIn: 400000e18, // pushes to 2078
+                zeroForOne: true,
+                requireMint: true
+            })
+        );
+
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
+                user: garbage,
+                pool: pool,
+                amountIn: 70e18, // pushes to 2078
+                zeroForOne: false,
+                requireMint: true
+            })
+        );
+
+        console.logInt(uniswapV3TestLib.getCurrentTick(pool));
+
+        uint256 optionId = 1;
+        (uint256 len, , , , ) = optionMarket.opData(optionId);
+
+        (
+            IHandler _handler,
+            IUniswapV3Pool _pool,
+            address _hook,
+            int24 tickLower,
+            int24 tickUpper,
+            uint256 liquidityToUse
+        ) = optionMarket.opTickMap(1, 0);
+
+        uint256[] memory liquidityToSettle = new uint256[](len);
+
+        liquidityToSettle[0] = liquidityToUse;
+
+        bytes[] memory swapDatas = new bytes[](len);
+        swapDatas[0] = abi.encode(pool.fee(), 0);
+
+        ISwapper[] memory swappers = new ISwapper[](len);
+        swappers[0] = srs;
+
+        (uint256 a0, ) = LiquidityAmounts.getAmountsForLiquidity(
+            uniswapV3TestLib.getCurrentTick(pool).getSqrtRatioAtTick(),
+            tickLowerCalls.getSqrtRatioAtTick(),
+            tickUpperCalls.getSqrtRatioAtTick(),
+            uint128(liquidityToUse)
+        );
+
+        token0.mint(address(this), a0);
+        token0.approve(address(optionMarket), a0);
+
+        optionMarket.settleOption(
+            DopexV2OptionMarketV2.SettleOptionParams({
+                optionId: optionId,
+                swapper: swappers,
+                swapData: swapDatas,
+                liquidityToSettle: liquidityToSettle
+            })
+        );
+    }
+
+    function testSettleOptionPutATM() public {
+        testBuyPutOption();
+        uint256 prevTime = block.timestamp + 20 minutes;
+
+        vm.warp(block.timestamp + 1201 seconds);
+
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
+                user: garbage,
+                pool: pool,
+                amountIn: 250e18, // pushes to 1921
+                zeroForOne: false,
+                requireMint: true
+            })
+        );
+
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
+                user: garbage,
+                pool: pool,
+                amountIn: 235000e18, // pushes to 1921
+                zeroForOne: true,
+                requireMint: true
+            })
+        );
+
+        console.logInt(uniswapV3TestLib.getCurrentTick(pool));
+
+        uint256 optionId = 1;
+        (uint256 len, , , , ) = optionMarket.opData(optionId);
+
+        (
+            IHandler _handler,
+            IUniswapV3Pool _pool,
+            address _hook,
+            int24 tickLower,
+            int24 tickUpper,
+            uint256 liquidityToUse
+        ) = optionMarket.opTickMap(1, 0);
+
+        uint256[] memory liquidityToSettle = new uint256[](len);
+
+        liquidityToSettle[0] = liquidityToUse;
+
+        bytes[] memory swapDatas = new bytes[](len);
+        swapDatas[0] = abi.encode(pool.fee(), 0);
+
+        ISwapper[] memory swappers = new ISwapper[](len);
+        swappers[0] = srs;
+
+        (, uint256 a1) = LiquidityAmounts.getAmountsForLiquidity(
+            uniswapV3TestLib.getCurrentTick(pool).getSqrtRatioAtTick(),
+            tickLowerCalls.getSqrtRatioAtTick(),
+            tickUpperCalls.getSqrtRatioAtTick(),
+            uint128(liquidityToUse)
+        );
+
+        token1.mint(address(this), a1);
+        token1.approve(address(optionMarket), a1);
+
+        optionMarket.settleOption(
+            DopexV2OptionMarketV2.SettleOptionParams({
+                optionId: optionId,
+                swapper: swappers,
+                swapData: swapDatas,
+                liquidityToSettle: liquidityToSettle
+            })
+        );
+    }
+
     function testSplitPosition() public {
         testBuyCallOption();
 

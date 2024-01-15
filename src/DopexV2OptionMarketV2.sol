@@ -519,39 +519,8 @@ contract DopexV2OptionMarketV2 is
             ) {
                 if (isAmount0 && amount0 > 0) {
                     ac.assetToUse.approve(address(positionManager), amount0);
-
-                    bytes memory unusePositionData = abi.encode(
-                        opTick.pool,
-                        opTick.hook,
-                        opTick.tickLower,
-                        opTick.tickUpper,
-                        liquidityToSettle,
-                        abi.encode("")
-                    );
-
-                    positionManager.unusePosition(
-                        opTick._handler,
-                        unusePositionData
-                    );
-
-                    opTick.liquidityToUse -= liquidityToSettle;
                 } else if (!isAmount0 && amount1 > 0) {
                     ac.assetToUse.approve(address(positionManager), amount1);
-
-                    bytes memory unusePositionData = abi.encode(
-                        opTick.pool,
-                        opTick.hook,
-                        opTick.tickLower,
-                        opTick.tickUpper,
-                        liquidityToSettle,
-                        abi.encode("")
-                    );
-
-                    positionManager.unusePosition(
-                        opTick._handler,
-                        unusePositionData
-                    );
-                    opTick.liquidityToUse -= liquidityToSettle;
                 } else {
                     uint256 amountToSwap = isAmount0
                         ? LiquidityAmounts.getAmount0ForLiquidity(
@@ -602,28 +571,63 @@ contract DopexV2OptionMarketV2 is
 
                     ac.assetToGet.approve(address(positionManager), amountReq);
 
-                    bytes memory unusePositionData = abi.encode(
-                        opTick.pool,
-                        opTick.hook,
-                        opTick.tickLower,
-                        opTick.tickUpper,
-                        liquidityToSettle,
-                        abi.encode("")
-                    );
-
-                    positionManager.unusePosition(
-                        opTick._handler,
-                        unusePositionData
-                    );
-
-                    opTick.liquidityToUse -= liquidityToSettle;
-
                     ac.assetToGet.transfer(
                         msg.sender,
                         currentBalance - (prevBalance + amountReq)
                     );
                 }
-            } else {}
+            } else {
+                if (isAmount0) {
+                    ac.assetToUse.approve(address(positionManager), amount0);
+                    ac.assetToGet.approve(address(positionManager), amount1);
+
+                    uint256 actualAmount0 = LiquidityAmounts
+                        .getAmount0ForLiquidity(
+                            opTick.tickLower.getSqrtRatioAtTick(),
+                            opTick.tickUpper.getSqrtRatioAtTick(),
+                            uint128(liquidityToSettle)
+                        );
+
+                    ac.assetToGet.transferFrom(
+                        msg.sender,
+                        address(this),
+                        amount1
+                    );
+
+                    ac.assetToUse.transfer(msg.sender, actualAmount0 - amount0);
+                } else {
+                    ac.assetToUse.approve(address(positionManager), amount1);
+                    ac.assetToGet.approve(address(positionManager), amount0);
+
+                    uint256 actualAmount1 = LiquidityAmounts
+                        .getAmount1ForLiquidity(
+                            opTick.tickLower.getSqrtRatioAtTick(),
+                            opTick.tickUpper.getSqrtRatioAtTick(),
+                            uint128(liquidityToSettle)
+                        );
+
+                    ac.assetToGet.transferFrom(
+                        msg.sender,
+                        address(this),
+                        amount0
+                    );
+
+                    ac.assetToUse.transfer(msg.sender, actualAmount1 - amount1);
+                }
+            }
+
+            bytes memory unusePositionData = abi.encode(
+                opTick.pool,
+                opTick.hook,
+                opTick.tickLower,
+                opTick.tickUpper,
+                liquidityToSettle,
+                abi.encode("")
+            );
+
+            positionManager.unusePosition(opTick._handler, unusePositionData);
+
+            opTick.liquidityToUse -= liquidityToSettle;
         }
 
         emit LogSettleOption(ownerOf(_params.optionId), _params.optionId);
