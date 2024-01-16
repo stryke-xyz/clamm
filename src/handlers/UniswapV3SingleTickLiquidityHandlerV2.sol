@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.8.0 <0.9.0;
 
-import "forge-std/Test.sol";
-
 // Interfaces
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
@@ -21,7 +19,7 @@ import {FixedPoint128} from "@uniswap/v3-core/contracts/libraries/FixedPoint128.
 // Contracts
 import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
 import {Pausable} from "openzeppelin-contracts/contracts/security/Pausable.sol";
-import {ERC6909} from "../ERC6909.sol";
+import {ERC6909} from "../libraries/tokens/ERC6909.sol";
 import {LiquidityManager} from "../uniswap-v3/LiquidityManager.sol";
 
 /**
@@ -142,7 +140,10 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
     event LogUnusePosition(uint256 tokenId, uint128 liquidityUnused);
     event LogDonation(uint256 tokenId, uint128 liquidityDonated);
     event LogUpdateWhitelistedApp(address _app, bool _status);
-    event LogUpdatedLockedBlockDuration(uint64 _newLockedBlockDuration);
+    event LogUpdatedLockBlockAndReserveCooldownDuration(
+        uint64 _newLockedBlockDuration,
+        uint64 _newReserveCooldown
+    );
 
     // errors
     error UniswapV3SingleTickLiquidityHandlerV2__NotWhitelisted();
@@ -161,8 +162,8 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
     uint64 public lockedBlockDuration = 100;
     uint64 public newLockedBlockDuration;
 
-    bytes32 public constant PAUSER_ROLE = keccak256("P");
-    bytes32 public constant SOS_ROLE = keccak256("SOS");
+    bytes32 constant PAUSER_ROLE = keccak256("P");
+    bytes32 constant SOS_ROLE = keccak256("SOS");
 
     // modifiers
     modifier onlyWhitelisted() {
@@ -492,6 +493,13 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
         return (_params.shares);
     }
 
+    /**
+     * @notice Reserve Liquidity from future
+     * @param _reserveLiquidityParam The data required for reserving liquidity.
+     * @dev This can be called by the user directly, it uses msg.sender context. Users share would
+     * be burned and they will receive Uniswap V3 fees upto this point.
+     * @return The number of shares burned.
+     */
     function reserveLiquidity(
         bytes calldata _reserveLiquidityParam
     ) external whenNotPaused returns (uint256) {
@@ -593,6 +601,12 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
         return (_params.shares);
     }
 
+    /**
+     * @notice Withdraw reserved liquidity
+     * @param _reserveLiquidityParam The data required for withdraw reserved liquidity.
+     * @dev This can be called by the user directly, it uses msg.sender context. Users can withdraw
+     * liquidity if it is available and their cooldown is over.
+     */
     function withdrawReserveLiquidity(
         bytes calldata _reserveLiquidityParam
     ) external whenNotPaused {
@@ -865,7 +879,6 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
 
         tki.totalLiquidity += liquidity;
 
-        // can it overflow?
         tki.donatedLiquidity = _donationLocked(tokenId) + liquidity;
 
         tki.lastDonation = uint64(block.number);
@@ -1172,6 +1185,7 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
     }
 
     // admin functions
+
     /**
      * @notice Updates the whitelist status of the given app.
      * @param _app The app to update the whitelist status of.
@@ -1185,12 +1199,21 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
         emit LogUpdateWhitelistedApp(_app, _status);
     }
 
+    /**
+     * @notice Updates the locked block duration and reserve cooldown.
+     * @param _newLockedBlockDuration The new lock block duration.
+     * @param _newReserveCooldown The new reserve cooldown.
+     */
     function updateLockedBlockDurationAndReserveCooldown(
         uint64 _newLockedBlockDuration,
         uint64 _newReserveCooldown
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         newLockedBlockDuration = _newLockedBlockDuration;
         reserveCooldown = _newReserveCooldown;
+        emit LogUpdatedLockBlockAndReserveCooldownDuration(
+            _newLockedBlockDuration,
+            _newReserveCooldown
+        );
     }
 
     // SOS admin functions

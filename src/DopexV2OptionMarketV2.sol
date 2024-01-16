@@ -9,7 +9,7 @@ import {IDopexV2ClammFeeStrategyV2} from "./pricing/fees/IDopexV2ClammFeeStrateg
 import {ISwapper} from "./interfaces/ISwapper.sol";
 import {ITokenURIFetcher} from "./interfaces/ITokenURIFetcher.sol";
 
-import {ERC721} from "./ERC721.sol";
+import {ERC721} from "./libraries/tokens/ERC721.sol";
 import {ERC20} from "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
@@ -24,7 +24,7 @@ import {FullMath} from "@uniswap/v3-core/contracts/libraries/FullMath.sol";
  * @title DopexV2OptionMarketV2
  * @author 0xcarrot
  * @dev Allow traders to buy CALL and PUT options using CLAMM liquidity, which can be
- * exercised at any time ITM.
+ * exercised at any time ITM. Supports Hooks for additional functionality.
  */
 contract DopexV2OptionMarketV2 is ReentrancyGuard, Multicall, Ownable, ERC721 {
     using TickMath for int24;
@@ -188,12 +188,20 @@ contract DopexV2OptionMarketV2 is ReentrancyGuard, Multicall, Ownable, ERC721 {
         );
     }
 
+    /**
+     * @notice Provides the name of the token
+     * @return The name of the token
+     */
     function name() public view override returns (string memory) {
         return "Dopex V2 Option Market V2";
     }
 
+    /**
+     * @notice Provides the symbol of the token
+     * @return The symbol of the token
+     */
     function symbol() public view override returns (string memory) {
-        return "DPX-V2-OMV2";
+        return "DPX-V2-OM-V2";
     }
 
     /**
