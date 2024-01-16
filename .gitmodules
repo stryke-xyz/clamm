@@ -8,7 +8,7 @@
 	branch = v4.9.0
 [submodule "lib/v3-core"]
 	path = lib/v3-core
-	url = https://github.com/lib/v3-core
+	url = https://github.com/Uniswap/v3-core
 	branch = 0.8
 [submodule "lib/v3-periphery"]
 	path = lib/v3-periphery
