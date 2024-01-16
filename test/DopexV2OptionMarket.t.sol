@@ -26,6 +26,8 @@ import {IHandler} from "../src/interfaces/IHandler.sol";
 import {ISwapper} from "../src/interfaces/ISwapper.sol";
 import {IOptionMarket} from "../src/interfaces/IOptionMarket.sol";
 
+import {OptionPricingLinear} from "../src/pricing/OptionPricingLinear.sol";
+
 contract optionMarketTest is Test {
     using TickMath for int24;
 
@@ -39,6 +41,7 @@ contract optionMarketTest is Test {
     IUniswapV3Pool pool;
 
     OptionPricing op;
+    OptionPricingLinear opl;
     SwapRouterSwapper srs;
 
     uint24 fee = 500;
@@ -106,6 +109,7 @@ contract optionMarketTest is Test {
         );
 
         op = new OptionPricing(500, 1e8);
+        opl = new OptionPricingLinear(1e4, 1e3, 1e8);
         srs = new SwapRouterSwapper(address(uniswapV3TestLib.swapRouter()));
 
         feeStrategy = new DopexV2ClammFeeStrategy();
@@ -214,6 +218,45 @@ contract optionMarketTest is Test {
             pool,
             jason
         );
+    }
+
+    function testOptionPricingLinear() public {
+        uint256 vol = opl.getVolatility(2000e18, 2300e18, 45);
+        assertEq(vol, 103);
+        vol = opl.getVolatility(2300e18, 2000e18, 45);
+        assertEq(vol, 112);
+        vol = opl.getVolatility(2000e18, 2000e18, 45);
+        assertEq(vol, 45);
+
+        // modify volatility multiplier
+        opl.updateVolatilityMultiplier(2e3);
+        vol = opl.getVolatility(2000e18, 2300e18, 45);
+        assertEq(vol, 162);
+
+        // modify volatility offset
+        opl.updateVolatilityOffset(2e4);
+        vol = opl.getVolatility(2300e18, 2000e18, 45);
+        assertEq(vol, 225);
+
+        // check the option price calculation
+
+        uint256 oplPrice = opl.getOptionPrice(
+            false,
+            block.timestamp + 3600 minutes,
+            2000e18,
+            2300e18,
+            45
+        );
+
+        uint256 opPrice = op.getOptionPrice(
+            false,
+            block.timestamp + 3600 minutes,
+            2000e18,
+            2300e18,
+            45
+        );
+
+        assertGt(oplPrice, opPrice);
     }
 
     function testBuyCallOption() public {
