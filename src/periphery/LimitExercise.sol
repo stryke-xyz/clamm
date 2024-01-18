@@ -14,9 +14,11 @@ import {IOptionMarket} from "../interfaces/IOptionMarket.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 
-contract LimitExercise is AccessControl, EIP712,Multicall {
+contract LimitExercise is AccessControl, EIP712, Multicall {
     using ECDSA for bytes32;
     using SafeERC20 for IERC20;
+
+    mapping(bytes32 => bool) public cancelledOrders;
 
     struct Order {
         uint256 optionId;
@@ -33,7 +35,10 @@ contract LimitExercise is AccessControl, EIP712,Multicall {
         bytes32 s;
     }
 
-    error LimitExercise_InvalidSignature();
+    error LimitExercise__NotSigner();
+    error LimitExercise__CancelledOrder();
+
+    event LogLimitExerciseOrderCancelled(Order order, SignatureMeta sigMeta);
 
     bytes32 public constant KEEPER_ROLE = keccak256("KEEPER_ROLE");
     bytes32 public constant ORDER_TYPEHASH =
@@ -46,6 +51,15 @@ contract LimitExercise is AccessControl, EIP712,Multicall {
         _setupRole(KEEPER_ROLE, msg.sender);
     }
 
+    /**
+     * @notice                Execute a limit exercise order.
+     * @param _order          Order details as specified on signing.
+     * @param _signatureMeta  Signature meta as specified on signing.
+     * @param _exerciseParams Parameters for exercising the option.
+     *                        (refer to DopexV2OptionMarket.exercseOption)
+     * @return executorProfit Profit received by the executor in relevant
+     *                        token precision.
+     */
     function limitExercise(
         Order calldata _order,
         SignatureMeta calldata _signatureMeta,
@@ -61,7 +75,11 @@ contract LimitExercise is AccessControl, EIP712,Multicall {
                 _signatureMeta
             )
         ) {
-            revert LimitExercise_InvalidSignature();
+            revert LimitExercise__NotSigner();
+        }
+
+        if(cancelledOrders[getOrderSigHash(_order, _signatureMeta)]) {
+            revert LimitExercise__CancelledOrder();
         }
 
         optionMarket.exerciseOption(_exerciseParams);
@@ -94,6 +112,39 @@ contract LimitExercise is AccessControl, EIP712,Multicall {
                 );
             }
         }
+    }
+
+    /**
+     * @notice         Nullify an limit exercise order signature.
+     * @param _order   Order details as specified on signing.
+     * @param _sigMeta Signature meta as specified on signing.
+     */
+    function cancelOrder(
+        Order calldata _order,
+        SignatureMeta calldata _sigMeta
+    ) external {
+        if (_order.signer != msg.sender) {
+            revert LimitExercise__NotSigner();
+        }
+
+        cancelledOrders[getOrderSigHash(_order, _sigMeta)] = true;
+
+        emit LogLimitExerciseOrderCancelled(_order, _sigMeta);
+    }
+
+    function getOrderSigHash(
+        Order calldata _order,
+        SignatureMeta calldata _sigMeta
+    ) public pure returns (bytes32) {
+        return
+            keccak256(
+                abi.encodePacked(
+                    getStructHash(_order),
+                    _sigMeta.v,
+                    _sigMeta.r,
+                    _sigMeta.s
+                )
+            );
     }
 
     function verify(

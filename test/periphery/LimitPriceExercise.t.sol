@@ -702,6 +702,285 @@ contract LimitExerciseTest is Test {
         assertEqUint(token1.balanceOf(bot), totalProfit - minProfit);
     }
 
+    function testCancelLimitExerciseOrder() public {
+        vm.startPrank(trader);
+
+        uint256 l = LiquidityAmounts.getLiquidityForAmount0(
+            tickLowerPuts.getSqrtRatioAtTick(),
+            tickUpperPuts.getSqrtRatioAtTick(),
+            10_000e18
+        );
+
+        uint256 _premiumAmountPuts = optionMarket.getPremiumAmount(
+            true,
+            block.timestamp + 20 minutes,
+            optionMarket.getPricePerCallAssetViaTick(pool, tickLowerPuts),
+            optionMarket.getCurrentPricePerCallAsset(pool),
+            optionMarket.ttlToVol(20 minutes),
+            (10_000e18 * 1e18) /
+                optionMarket.getPricePerCallAssetViaTick(pool, tickLowerPuts)
+        );
+
+        uint256 _fee = optionMarket.getFee(0, 0, _premiumAmountPuts);
+        uint256 cost = _premiumAmountPuts + _fee;
+        token0.mint(trader, cost);
+        token0.approve(address(optionMarket), cost);
+
+        DopexV2OptionMarket.OptionTicks[]
+            memory opTicks = new DopexV2OptionMarket.OptionTicks[](1);
+
+        opTicks[0] = DopexV2OptionMarket.OptionTicks({
+            _handler: uniV3Handler,
+            pool: pool,
+            tickLower: tickLowerPuts,
+            tickUpper: tickUpperPuts,
+            liquidityToUse: l
+        });
+
+        optionMarket.mintOption(
+            DopexV2OptionMarket.OptionParams({
+                optionTicks: opTicks,
+                tickLower: tickLowerPuts,
+                tickUpper: tickUpperPuts,
+                ttl: 20 minutes,
+                isCall: false,
+                maxCostAllowance: cost
+            })
+        );
+        vm.stopPrank();
+
+        (, uint256 privateKey) = makeAddrAndKey("trader");
+
+        LimitExercise.Order memory order = LimitExercise.Order(
+            1,
+            0.05 ether,
+            block.timestamp + 20 minutes,
+            address(token1),
+            address(optionMarket),
+            trader
+        );
+
+        LimitExercise.SignatureMeta memory sigMeta;
+
+        bytes32 digest = limitExercise.computeDigest(order);
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
+
+        sigMeta.v = v;
+        sigMeta.r = r;
+        sigMeta.s = s;
+
+        vm.startPrank(trader);
+        optionMarket.updateExerciseDelegate(address(limitExercise), true);
+        vm.stopPrank();
+
+        limitExercise.grantRole(limitExercise.KEEPER_ROLE(), bot);
+
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
+                user: garbage,
+                pool: pool,
+                amountIn: 250e18,
+                zeroForOne: false,
+                requireMint: true
+            })
+        );
+
+        bytes32 orderSigHash = limitExercise.getOrderSigHash(order, sigMeta);
+        assertEq(limitExercise.cancelledOrders(orderSigHash), false);
+
+        vm.startPrank(trader);
+        limitExercise.cancelOrder(order, sigMeta);
+        vm.stopPrank();
+
+        assertEq(limitExercise.cancelledOrders(orderSigHash), true);
+    }
+
+    function testFailCancelLimitOrderFromNotSigner() public {
+        vm.startPrank(trader);
+
+        uint256 l = LiquidityAmounts.getLiquidityForAmount0(
+            tickLowerPuts.getSqrtRatioAtTick(),
+            tickUpperPuts.getSqrtRatioAtTick(),
+            10_000e18
+        );
+
+        uint256 _premiumAmountPuts = optionMarket.getPremiumAmount(
+            true,
+            block.timestamp + 20 minutes,
+            optionMarket.getPricePerCallAssetViaTick(pool, tickLowerPuts),
+            optionMarket.getCurrentPricePerCallAsset(pool),
+            optionMarket.ttlToVol(20 minutes),
+            (10_000e18 * 1e18) /
+                optionMarket.getPricePerCallAssetViaTick(pool, tickLowerPuts)
+        );
+
+        uint256 _fee = optionMarket.getFee(0, 0, _premiumAmountPuts);
+        uint256 cost = _premiumAmountPuts + _fee;
+        token0.mint(trader, cost);
+        token0.approve(address(optionMarket), cost);
+
+        DopexV2OptionMarket.OptionTicks[]
+            memory opTicks = new DopexV2OptionMarket.OptionTicks[](1);
+
+        opTicks[0] = DopexV2OptionMarket.OptionTicks({
+            _handler: uniV3Handler,
+            pool: pool,
+            tickLower: tickLowerPuts,
+            tickUpper: tickUpperPuts,
+            liquidityToUse: l
+        });
+
+        optionMarket.mintOption(
+            DopexV2OptionMarket.OptionParams({
+                optionTicks: opTicks,
+                tickLower: tickLowerPuts,
+                tickUpper: tickUpperPuts,
+                ttl: 20 minutes,
+                isCall: false,
+                maxCostAllowance: cost
+            })
+        );
+        vm.stopPrank();
+
+        (, uint256 privateKey) = makeAddrAndKey("trader");
+
+        LimitExercise.Order memory order = LimitExercise.Order(
+            1,
+            0.05 ether,
+            block.timestamp + 20 minutes,
+            address(token1),
+            address(optionMarket),
+            trader
+        );
+
+        LimitExercise.SignatureMeta memory sigMeta;
+
+        bytes32 digest = limitExercise.computeDigest(order);
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
+
+        sigMeta.v = v;
+        sigMeta.r = r;
+        sigMeta.s = s;
+
+        vm.startPrank(trader);
+        optionMarket.updateExerciseDelegate(address(limitExercise), true);
+        vm.stopPrank();
+
+        limitExercise.grantRole(limitExercise.KEEPER_ROLE(), bot);
+
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
+                user: garbage,
+                pool: pool,
+                amountIn: 250e18,
+                zeroForOne: false,
+                requireMint: true
+            })
+        );
+
+        vm.startPrank(bot);
+        limitExercise.cancelOrder(order, sigMeta);
+    }
+
+    function testFailExecuteCancelledLimitOrder() public {
+        vm.startPrank(trader);
+
+        uint256 l = LiquidityAmounts.getLiquidityForAmount0(
+            tickLowerPuts.getSqrtRatioAtTick(),
+            tickUpperPuts.getSqrtRatioAtTick(),
+            10_000e18
+        );
+
+        uint256 _premiumAmountPuts = optionMarket.getPremiumAmount(
+            true,
+            block.timestamp + 20 minutes,
+            optionMarket.getPricePerCallAssetViaTick(pool, tickLowerPuts),
+            optionMarket.getCurrentPricePerCallAsset(pool),
+            optionMarket.ttlToVol(20 minutes),
+            (10_000e18 * 1e18) /
+                optionMarket.getPricePerCallAssetViaTick(pool, tickLowerPuts)
+        );
+
+        uint256 _fee = optionMarket.getFee(0, 0, _premiumAmountPuts);
+        uint256 cost = _premiumAmountPuts + _fee;
+        token0.mint(trader, cost);
+        token0.approve(address(optionMarket), cost);
+
+        DopexV2OptionMarket.OptionTicks[]
+            memory opTicks = new DopexV2OptionMarket.OptionTicks[](1);
+
+        opTicks[0] = DopexV2OptionMarket.OptionTicks({
+            _handler: uniV3Handler,
+            pool: pool,
+            tickLower: tickLowerPuts,
+            tickUpper: tickUpperPuts,
+            liquidityToUse: l
+        });
+
+        optionMarket.mintOption(
+            DopexV2OptionMarket.OptionParams({
+                optionTicks: opTicks,
+                tickLower: tickLowerPuts,
+                tickUpper: tickUpperPuts,
+                ttl: 20 minutes,
+                isCall: false,
+                maxCostAllowance: cost
+            })
+        );
+        vm.stopPrank();
+
+        (, uint256 privateKey) = makeAddrAndKey("trader");
+
+        uint256 optionId = 1;
+
+        uint256 minProfit = 0.05 ether;
+        LimitExercise.Order memory order = LimitExercise.Order(
+            1,
+            minProfit,
+            block.timestamp + 20 minutes,
+            address(token1),
+            address(optionMarket),
+            trader
+        );
+
+        LimitExercise.SignatureMeta memory sigMeta;
+
+        bytes32 digest = limitExercise.computeDigest(order);
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
+
+        sigMeta.v = v;
+        sigMeta.r = r;
+        sigMeta.s = s;
+
+        vm.startPrank(trader);
+        limitExercise.cancelOrder(order, sigMeta);
+        optionMarket.updateExerciseDelegate(address(limitExercise), true);
+        vm.stopPrank();
+
+        limitExercise.grantRole(limitExercise.KEEPER_ROLE(), bot);
+
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
+                user: garbage,
+                pool: pool,
+                amountIn: 250e18,
+                zeroForOne: false,
+                requireMint: true
+            })
+        );
+
+        vm.startPrank(bot);
+        limitExercise.limitExercise(
+            order,
+            sigMeta,
+            _getExerciseParams(optionId)
+        );
+        vm.stopPrank();
+    }
+
     function _getExerciseParams(
         uint256 optionId
     ) private view returns (IOptionMarket.ExerciseOptionParams memory) {
