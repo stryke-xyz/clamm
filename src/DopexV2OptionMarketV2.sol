@@ -722,7 +722,10 @@ contract DopexV2OptionMarketV2 is ReentrancyGuard, Multicall, Ownable, ERC721 {
     function getCurrentPricePerCallAsset(
         IUniswapV3Pool _pool
     ) public view returns (uint256) {
-        (uint160 sqrtPriceX96, , , , , , ) = _pool.slot0();
+        (, bytes memory result) = address(_pool).staticcall(
+            abi.encodeWithSignature("slot0()")
+        );
+        uint160 sqrtPriceX96 = abi.decode(result, (uint160));
         return _getPrice(_pool, sqrtPriceX96);
     }
 
@@ -753,7 +756,10 @@ contract DopexV2OptionMarketV2 is ReentrancyGuard, Multicall, Ownable, ERC721 {
     function _getCurrentSqrtPriceX96(
         IUniswapV3Pool pool
     ) internal view returns (uint160 sqrtPriceX96) {
-        (sqrtPriceX96, , , , , , ) = pool.slot0();
+        (, bytes memory result) = address(pool).staticcall(
+            abi.encodeWithSignature("slot0()")
+        );
+        sqrtPriceX96 = abi.decode(result, (uint160));
     }
 
     /**
