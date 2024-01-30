@@ -78,7 +78,7 @@ contract LimitExercise is AccessControl, EIP712, Multicall {
             revert LimitExercise__NotSigner();
         }
 
-        if(cancelledOrders[getOrderSigHash(_order, _signatureMeta)]) {
+        if (cancelledOrders[getOrderSigHash(_order, _signatureMeta)]) {
             revert LimitExercise__CancelledOrder();
         }
 
@@ -139,7 +139,12 @@ contract LimitExercise is AccessControl, EIP712, Multicall {
         return
             keccak256(
                 abi.encodePacked(
-                    getStructHash(_order),
+                    _order.optionId,
+                    _order.minProfit,
+                    _order.deadline,
+                    _order.profitToken,
+                    _order.optionMarket,
+                    _order.signer,
                     _sigMeta.v,
                     _sigMeta.r,
                     _sigMeta.s
