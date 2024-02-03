@@ -111,11 +111,18 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
         uint256 amount1;
     }
 
+    struct BurnPositionCache {
+        uint128 liquidityToBurn;
+        uint256 amount0;
+        uint256 amount1;
+    }
+
     // events
     event LogMintedPosition(
         uint256 tokenId,
         uint128 liquidityMinted,
         address pool,
+        address hook,
         address user,
         int24 tickLower,
         int24 tickUpper
@@ -124,6 +131,7 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
         uint256 tokenId,
         uint128 liquidityBurned,
         address pool,
+        address hook,
         address user,
         int24 tickLower,
         int24 tickUpper
@@ -377,6 +385,7 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
             tokenId,
             posCache.liquidity,
             address(_params.pool),
+            _params.hook,
             context,
             posCache.tickLower,
             posCache.tickUpper
@@ -414,15 +423,21 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
 
         TokenIdInfo storage tki = tokenIds[tokenId];
 
-        uint128 liquidityToBurn = _convertToAssets(_params.shares, tokenId);
+        BurnPositionCache memory posCache = BurnPositionCache({
+            liquidityToBurn: 0,
+            amount0: 0,
+            amount1: 0
+        });
 
-        if ((tki.totalLiquidity - tki.liquidityUsed) < liquidityToBurn)
+        posCache.liquidityToBurn = _convertToAssets(_params.shares, tokenId);
+
+        if ((tki.totalLiquidity - tki.liquidityUsed) < posCache.liquidityToBurn)
             revert UniswapV3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
 
-        (uint256 amount0, uint256 amount1) = _params.pool.burn(
+        (posCache.amount0, posCache.amount1) = _params.pool.burn(
             _params.tickLower,
             _params.tickUpper,
-            liquidityToBurn
+            posCache.liquidityToBurn
         );
 
         _feeCalculation(
@@ -435,7 +450,7 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
         (uint128 feesOwedToken0, uint128 feesOwedToken1) = _feesTokenOwed(
             _params.tickLower,
             _params.tickUpper,
-            liquidityToBurn,
+            posCache.liquidityToBurn,
             tki.totalLiquidity,
             tki.tokensOwed0,
             tki.tokensOwed1
@@ -448,23 +463,25 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
             context,
             _params.tickLower,
             _params.tickUpper,
-            uint128(amount0 + feesOwedToken0),
-            uint128(amount1 + feesOwedToken1)
+            uint128(posCache.amount0 + feesOwedToken0),
+            uint128(posCache.amount1 + feesOwedToken1)
         );
 
-        tki.totalLiquidity -= liquidityToBurn;
+        tki.totalLiquidity -= posCache.liquidityToBurn;
         tki.totalSupply -= _params.shares;
 
         _burn(context, tokenId, _params.shares);
 
         emit LogBurnedPosition(
             tokenId,
-            liquidityToBurn,
+            posCache.liquidityToBurn,
             address(_params.pool),
+            _params.hook,
             context,
             _params.tickLower,
             _params.tickUpper
         );
+        
         return (_params.shares);
     }
 
@@ -546,6 +563,7 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
             tokenId,
             liquidityToBurn,
             address(_params.pool),
+            _params.hook,
             msg.sender,
             _params.tickLower,
             _params.tickUpper
