@@ -403,6 +403,8 @@ contract DopexV2OptionMarketV2 is ReentrancyGuard, Multicall, Ownable, ERC721 {
         ac.assetToGet = ERC20(oData.isCall ? putAsset : callAsset);
 
         for (uint256 i; i < oData.opTickArrayLen; i++) {
+            if (_params.liquidityToExercise[i] == 0) continue;
+
             OptionTicks storage opTick = opTickMap[_params.optionId][i];
 
             uint256 amountToSwap = isAmount0
@@ -502,10 +504,11 @@ contract DopexV2OptionMarketV2 is ReentrancyGuard, Multicall, Ownable, ERC721 {
         ac.assetToGet = ERC20(oData.isCall ? putAsset : callAsset);
 
         for (uint256 i; i < oData.opTickArrayLen; i++) {
+            if (_params.liquidityToSettle[i] == 0) continue;
+
             OptionTicks storage opTick = opTickMap[_params.optionId][i];
-            uint256 liquidityToSettle = _params.liquidityToSettle[i] != 0
-                ? _params.liquidityToSettle[i]
-                : opTick.liquidityToUse;
+
+            uint256 liquidityToSettle = _params.liquidityToSettle[i];
 
             (uint256 amount0, uint256 amount1) = LiquidityAmounts
                 .getAmountsForLiquidity(
