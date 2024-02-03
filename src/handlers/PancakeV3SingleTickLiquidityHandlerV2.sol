@@ -432,45 +432,14 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
             _params.tickUpper
         );
 
-        uint128 feesOwedToken0;
-        uint128 feesOwedToken1;
-
-        {
-            uint256 userLiquidity0 = LiquidityAmounts.getAmount0ForLiquidity(
-                _params.tickLower.getSqrtRatioAtTick(),
-                _params.tickUpper.getSqrtRatioAtTick(),
-                uint128(liquidityToBurn)
-            );
-
-            uint256 userLiquidity1 = LiquidityAmounts.getAmount1ForLiquidity(
-                _params.tickLower.getSqrtRatioAtTick(),
-                _params.tickUpper.getSqrtRatioAtTick(),
-                uint128(liquidityToBurn)
-            );
-
-            uint256 totalLiquidity0 = LiquidityAmounts.getAmount0ForLiquidity(
-                _params.tickLower.getSqrtRatioAtTick(),
-                _params.tickUpper.getSqrtRatioAtTick(),
-                uint128(tki.totalLiquidity)
-            );
-
-            uint256 totalLiquidity1 = LiquidityAmounts.getAmount1ForLiquidity(
-                _params.tickLower.getSqrtRatioAtTick(),
-                _params.tickUpper.getSqrtRatioAtTick(),
-                uint128(tki.totalLiquidity)
-            );
-
-            if (totalLiquidity0 > 0) {
-                feesOwedToken0 = uint128(
-                    (tki.tokensOwed0 * userLiquidity0) / totalLiquidity0
-                );
-            }
-            if (totalLiquidity1 > 0) {
-                feesOwedToken1 = uint128(
-                    (tki.tokensOwed1 * userLiquidity1) / totalLiquidity1
-                );
-            }
-        }
+        (uint128 feesOwedToken0, uint128 feesOwedToken1) = _feesTokenOwed(
+            _params.tickLower,
+            _params.tickUpper,
+            liquidityToBurn,
+            tki.totalLiquidity,
+            tki.tokensOwed0,
+            tki.tokensOwed1
+        );
 
         tki.tokensOwed0 -= feesOwedToken0;
         tki.tokensOwed1 -= feesOwedToken1;
@@ -539,45 +508,14 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
             _params.tickUpper
         );
 
-        uint128 feesOwedToken0;
-        uint128 feesOwedToken1;
-
-        {
-            uint256 userLiquidity0 = LiquidityAmounts.getAmount0ForLiquidity(
-                _params.tickLower.getSqrtRatioAtTick(),
-                _params.tickUpper.getSqrtRatioAtTick(),
-                uint128(liquidityToBurn)
-            );
-
-            uint256 userLiquidity1 = LiquidityAmounts.getAmount1ForLiquidity(
-                _params.tickLower.getSqrtRatioAtTick(),
-                _params.tickUpper.getSqrtRatioAtTick(),
-                uint128(liquidityToBurn)
-            );
-
-            uint256 totalLiquidity0 = LiquidityAmounts.getAmount0ForLiquidity(
-                _params.tickLower.getSqrtRatioAtTick(),
-                _params.tickUpper.getSqrtRatioAtTick(),
-                uint128(tki.totalLiquidity)
-            );
-
-            uint256 totalLiquidity1 = LiquidityAmounts.getAmount1ForLiquidity(
-                _params.tickLower.getSqrtRatioAtTick(),
-                _params.tickUpper.getSqrtRatioAtTick(),
-                uint128(tki.totalLiquidity)
-            );
-
-            if (totalLiquidity0 > 0) {
-                feesOwedToken0 = uint128(
-                    (tki.tokensOwed0 * userLiquidity0) / totalLiquidity0
-                );
-            }
-            if (totalLiquidity1 > 0) {
-                feesOwedToken1 = uint128(
-                    (tki.tokensOwed1 * userLiquidity1) / totalLiquidity1
-                );
-            }
-        }
+        (uint128 feesOwedToken0, uint128 feesOwedToken1) = _feesTokenOwed(
+            _params.tickLower,
+            _params.tickUpper,
+            liquidityToBurn,
+            tki.totalLiquidity,
+            tki.tokensOwed0,
+            tki.tokensOwed1
+        );
 
         tki.tokensOwed0 -= feesOwedToken0;
         tki.tokensOwed1 -= feesOwedToken1;
@@ -616,6 +554,50 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
         emit LogReservedLiquidity(tokenId, liquidityToBurn);
 
         return (_params.shares);
+    }
+
+    function _feesTokenOwed(
+        int24 tickLower,
+        int24 tickUpper,
+        uint128 liquidityToBurn,
+        uint128 totalLiquidity,
+        uint128 tokensOwed0,
+        uint128 tokensOwed1
+    ) private returns (uint128 feesOwedToken0, uint128 feesOwedToken1) {
+        uint256 userLiquidity0 = LiquidityAmounts.getAmount0ForLiquidity(
+            tickLower.getSqrtRatioAtTick(),
+            tickUpper.getSqrtRatioAtTick(),
+            liquidityToBurn
+        );
+
+        uint256 userLiquidity1 = LiquidityAmounts.getAmount1ForLiquidity(
+            tickLower.getSqrtRatioAtTick(),
+            tickUpper.getSqrtRatioAtTick(),
+            liquidityToBurn
+        );
+
+        uint256 totalLiquidity0 = LiquidityAmounts.getAmount0ForLiquidity(
+            tickLower.getSqrtRatioAtTick(),
+            tickUpper.getSqrtRatioAtTick(),
+            totalLiquidity
+        );
+
+        uint256 totalLiquidity1 = LiquidityAmounts.getAmount1ForLiquidity(
+            tickLower.getSqrtRatioAtTick(),
+            tickUpper.getSqrtRatioAtTick(),
+            totalLiquidity
+        );
+
+        if (totalLiquidity0 > 0) {
+            feesOwedToken0 = uint128(
+                (tokensOwed0 * userLiquidity0) / totalLiquidity0
+            );
+        }
+        if (totalLiquidity1 > 0) {
+            feesOwedToken1 = uint128(
+                (tokensOwed1 * userLiquidity1) / totalLiquidity1
+            );
+        }
     }
 
     /**
