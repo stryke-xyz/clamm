@@ -27,6 +27,7 @@ import {LiquidityManager} from "../uniswap-v3/LiquidityManager.sol";
  * @author 0xcarrot
  * @dev This is a handler contract for providing liquidity
  * for Uniswap V3 Style AMMs. The V2 version supports reserved liquidity and hooks.
+ * Do NOT deploy on zkSync, verifyCallback code needs to be updated for zkSync.
  */
 contract UniswapV3SingleTickLiquidityHandlerV2 is
     ERC6909,
