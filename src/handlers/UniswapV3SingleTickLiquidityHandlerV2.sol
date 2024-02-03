@@ -563,7 +563,7 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
         uint128 totalLiquidity,
         uint128 tokensOwed0,
         uint128 tokensOwed1
-    ) private returns (uint128 feesOwedToken0, uint128 feesOwedToken1) {
+    ) private view returns (uint128 feesOwedToken0, uint128 feesOwedToken1) {
         uint256 userLiquidity0 = LiquidityAmounts.getAmount0ForLiquidity(
             tickLower.getSqrtRatioAtTick(),
             tickUpper.getSqrtRatioAtTick(),
