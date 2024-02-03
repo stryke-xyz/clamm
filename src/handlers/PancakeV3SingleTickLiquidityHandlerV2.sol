@@ -177,14 +177,7 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
     uint64 public newLockedBlockDuration;
 
     bytes32 constant PAUSER_ROLE = keccak256("P");
-    bytes32 constant SOS_ROLE = keccak256("SOS");
-
-    // modifiers
-    modifier onlyWhitelisted() {
-        if (!whitelistedApps[msg.sender])
-            revert PancakeV3SingleTickLiquidityHandlerV2__NotWhitelisted();
-        _;
-    }
+    bytes32 constant SOS_ROLE = keccak256("SOS"); // modifiers
 
     constructor(
         address _factory,
@@ -207,7 +200,9 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
     function mintPositionHandler(
         address context,
         bytes calldata _mintPositionData
-    ) external onlyWhitelisted whenNotPaused returns (uint256 sharesMinted) {
+    ) external whenNotPaused returns (uint256 sharesMinted) {
+        onlyWhitelisted();
+
         MintPositionParams memory _params = abi.decode(
             _mintPositionData,
             (MintPositionParams)
@@ -403,7 +398,9 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
     function burnPositionHandler(
         address context,
         bytes calldata _burnPositionData
-    ) external onlyWhitelisted whenNotPaused returns (uint256) {
+    ) external whenNotPaused returns (uint256) {
+        onlyWhitelisted();
+
         BurnPositionParams memory _params = abi.decode(
             _burnPositionData,
             (BurnPositionParams)
@@ -695,10 +692,11 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
         bytes calldata _usePositionHandler
     )
         external
-        onlyWhitelisted
         whenNotPaused
         returns (address[] memory, uint256[] memory, uint256)
     {
+        onlyWhitelisted();
+
         (UsePositionParams memory _params, bytes memory hookData) = abi.decode(
             _usePositionHandler,
             (UsePositionParams, bytes)
@@ -768,12 +766,9 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
      */
     function unusePositionHandler(
         bytes calldata _unusePositionData
-    )
-        external
-        onlyWhitelisted
-        whenNotPaused
-        returns (uint256[] memory, uint256)
-    {
+    ) external whenNotPaused returns (uint256[] memory, uint256) {
+        onlyWhitelisted();
+
         (UnusePositionParams memory _params, bytes memory hookData) = abi
             .decode(_unusePositionData, (UnusePositionParams, bytes));
 
@@ -848,12 +843,9 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
      */
     function donateToPosition(
         bytes calldata _donateData
-    )
-        external
-        onlyWhitelisted
-        whenNotPaused
-        returns (uint256[] memory, uint256)
-    {
+    ) external whenNotPaused returns (uint256[] memory, uint256) {
+        onlyWhitelisted();
+
         DonateParams memory _params = abi.decode(_donateData, (DonateParams));
 
         uint256 tokenId = uint256(
@@ -1205,6 +1197,11 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
         uint256 tokenId
     ) external view returns (TokenIdInfo memory) {
         return tokenIds[tokenId];
+    }
+
+    function onlyWhitelisted() private {
+        if (!whitelistedApps[msg.sender])
+            revert PancakeV3SingleTickLiquidityHandlerV2__NotWhitelisted();
     }
 
     // admin functions
