@@ -635,6 +635,11 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
         if (rld.lastReserve + reserveCooldown > block.timestamp)
             revert PancakeV3SingleTickLiquidityHandlerV2__BeforeReserveCooldown();
 
+        if (
+            ((tki.totalLiquidity + tki.reservedLiquidity) - tki.liquidityUsed) <
+            _params.shares
+        ) revert PancakeV3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
+
         (uint256 amount0, uint256 amount1) = _params.pool.burn(
             _params.tickLower,
             _params.tickUpper,
