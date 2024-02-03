@@ -695,11 +695,11 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
 
         TokenIdInfo storage tki = tokenIds[tokenId];
 
-        if ((tki.totalLiquidity - tki.liquidityUsed) < _params.liquidityToUse)
-            revert PancakeV3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
-
         if (_params.hook != address(0))
             IHook(_params.hook).onPositionUse(hookData);
+
+        if ((tki.totalLiquidity - tki.liquidityUsed) < _params.liquidityToUse)
+            revert PancakeV3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
 
         (uint256 amount0, uint256 amount1) = _params.pool.burn(
             _params.tickLower,
