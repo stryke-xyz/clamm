@@ -994,28 +994,7 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
     function tokensToPullForMint(
         bytes calldata _mintPositionData
     ) external view returns (address[] memory, uint256[] memory) {
-        MintPositionParams memory _params = abi.decode(
-            _mintPositionData,
-            (MintPositionParams)
-        );
-
-        (uint256 amount0, uint256 amount1) = LiquidityAmounts
-            .getAmountsForLiquidity(
-                _getCurrentSqrtPriceX96(_params.pool),
-                _params.tickLower.getSqrtRatioAtTick(),
-                _params.tickUpper.getSqrtRatioAtTick(),
-                uint128(_params.liquidity)
-            );
-
-        address[] memory tokens = new address[](2);
-        tokens[0] = _params.pool.token0();
-        tokens[1] = _params.pool.token1();
-
-        uint256[] memory amounts = new uint256[](2);
-        amounts[0] = amount0;
-        amounts[1] = amount1;
-
-        return (tokens, amounts);
+        return _tokensToPull(_mintPositionData);
     }
 
     /**
@@ -1027,28 +1006,7 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
     function tokensToPullForUnUse(
         bytes calldata _unusePositionData
     ) external view returns (address[] memory, uint256[] memory) {
-        UnusePositionParams memory _params = abi.decode(
-            _unusePositionData,
-            (UnusePositionParams)
-        );
-
-        (uint256 amount0, uint256 amount1) = LiquidityAmounts
-            .getAmountsForLiquidity(
-                _getCurrentSqrtPriceX96(_params.pool),
-                _params.tickLower.getSqrtRatioAtTick(),
-                _params.tickUpper.getSqrtRatioAtTick(),
-                uint128(_params.liquidityToUnuse)
-            );
-
-        address[] memory tokens = new address[](2);
-        tokens[0] = _params.pool.token0();
-        tokens[1] = _params.pool.token1();
-
-        uint256[] memory amounts = new uint256[](2);
-        amounts[0] = amount0;
-        amounts[1] = amount1;
-
-        return (tokens, amounts);
+        return _tokensToPull(_unusePositionData);
     }
 
     /**
@@ -1059,9 +1017,15 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
     function tokensToPullForDonate(
         bytes calldata _donatePosition
     ) external view returns (address[] memory, uint256[] memory) {
-        DonateParams memory _params = abi.decode(
-            _donatePosition,
-            (DonateParams)
+        return _tokensToPull(_donatePosition);
+    }
+
+    function _tokensToPull(
+        bytes calldata _positionData
+    ) private view returns (address[] memory, uint256[] memory) {
+        MintPositionParams memory _params = abi.decode(
+            _positionData,
+            (MintPositionParams)
         );
 
         (uint256 amount0, uint256 amount1) = LiquidityAmounts
@@ -1069,7 +1033,7 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
                 _getCurrentSqrtPriceX96(_params.pool),
                 _params.tickLower.getSqrtRatioAtTick(),
                 _params.tickUpper.getSqrtRatioAtTick(),
-                uint128(_params.liquidityToDonate)
+                uint128(_params.liquidity)
             );
 
         address[] memory tokens = new address[](2);
