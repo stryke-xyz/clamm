@@ -117,6 +117,7 @@ contract DopexV2OptionMarketV2 is ReentrancyGuard, Multicall, Ownable, ERC721 {
     );
 
     // errors
+    error DopexV2OptionMarket__MaxOptionBuyReached();
     error DopexV2OptionMarket__IVNotSet();
     error DopexV2OptionMarket__NotValidStrikeTick();
     error DopexV2OptionMarket__PoolNotApproved();
@@ -219,6 +220,9 @@ contract DopexV2OptionMarketV2 is ReentrancyGuard, Multicall, Ownable, ERC721 {
      */
     function mintOption(OptionParams calldata _params) external nonReentrant {
         optionIds += 1;
+
+        if (_params.optionTicks.length > 20)
+            revert DopexV2OptionMarket__MaxOptionBuyReached();
 
         uint256[] memory amountsPerOptionTicks = new uint256[](
             _params.optionTicks.length
