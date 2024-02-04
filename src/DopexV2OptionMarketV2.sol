@@ -96,8 +96,7 @@ contract DopexV2OptionMarketV2 is ReentrancyGuard, Multicall, Ownable, ERC721 {
         uint256 newTokenId,
         address to
     );
-    event LogIVSetterUpdate(address _setter, bool _status);
-    event LogIVUpdate(uint256[] ttl, uint256[] iv);
+
     event LogUpdateExerciseDelegate(
         address owner,
         address delegate,
