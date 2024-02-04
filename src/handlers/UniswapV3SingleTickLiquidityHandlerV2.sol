@@ -155,12 +155,13 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
     );
     event LogReservedLiquidity(
         uint256 tokenId,
-        address user,
-        uint128 liquidityReserved
+        uint128 liquidityReserved,
+        address user
     );
     event LogWithdrawReservedLiquidity(
         uint256 tokenId,
-        uint128 liquidityWithdrawn
+        uint128 liquidityWithdrawn,
+        address user
     );
 
     // errors
@@ -570,7 +571,7 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
             _params.tickUpper
         );
 
-        emit LogReservedLiquidity(tokenId, msg.sender, liquidityToBurn);
+        emit LogReservedLiquidity(tokenId, liquidityToBurn, msg.sender);
 
         return (_params.shares);
     }
@@ -682,7 +683,7 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
         tki.reservedLiquidity -= _params.shares;
         rld.liquidity -= _params.shares;
 
-        emit LogWithdrawReservedLiquidity(tokenId, _params.shares);
+        emit LogWithdrawReservedLiquidity(tokenId, _params.shares, msg.sender);
     }
 
     /**
