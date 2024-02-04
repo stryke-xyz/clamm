@@ -131,8 +131,8 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
         uint256 tokenId,
         uint128 liquidityBurned,
         address pool,
-        address hook,
         address user,
+        address hook,
         int24 tickLower,
         int24 tickUpper
     );
@@ -473,8 +473,8 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
             tokenId,
             posCache.liquidityToBurn,
             address(_params.pool),
-            _params.hook,
             context,
+            _params.hook,
             _params.tickLower,
             _params.tickUpper
         );
