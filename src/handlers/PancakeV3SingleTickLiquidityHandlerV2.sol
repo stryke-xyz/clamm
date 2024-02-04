@@ -153,7 +153,11 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
         uint64 _newLockedBlockDuration,
         uint64 _newReserveCooldown
     );
-    event LogReservedLiquidity(uint256 tokenId, uint128 liquidityReserved);
+    event LogReservedLiquidity(
+        uint256 tokenId,
+        address user,
+        uint128 liquidityReserved
+    );
     event LogWithdrawReservedLiquidity(
         uint256 tokenId,
         uint128 liquidityWithdrawn
@@ -559,13 +563,13 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
             tokenId,
             liquidityToBurn,
             address(_params.pool),
-            _params.hook,
             msg.sender,
+            _params.hook,
             _params.tickLower,
             _params.tickUpper
         );
 
-        emit LogReservedLiquidity(tokenId, liquidityToBurn);
+        emit LogReservedLiquidity(tokenId, msg.sender, liquidityToBurn);
 
         return (_params.shares);
     }
