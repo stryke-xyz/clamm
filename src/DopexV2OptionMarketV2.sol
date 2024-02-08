@@ -82,7 +82,7 @@ contract DopexV2OptionMarketV2 is ReentrancyGuard, Multicall, Ownable, ERC721 {
         bool isCall,
         uint256 premiumAmount,
         uint256 totalAssetWithdrawn,
-        uint256 protoclFees
+        uint256 protocolFees
     );
     event LogExerciseOption(
         address user,
