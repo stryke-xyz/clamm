@@ -382,7 +382,7 @@ contract DopexV2OptionMarketV2 is ReentrancyGuard, Multicall, Ownable, ERC721 {
      */
     function exerciseOption(
         ExerciseOptionParams calldata _params
-    ) external nonReentrant {
+    ) external nonReentrant returns (AssetsCache memory ac) {
         if (
             ownerOf(_params.optionId) != msg.sender &&
             exerciseDelegator[ownerOf(_params.optionId)][msg.sender] == false
@@ -399,8 +399,6 @@ contract DopexV2OptionMarketV2 is ReentrancyGuard, Multicall, Ownable, ERC721 {
         bool isAmount0 = oData.isCall
             ? primePool.token0() == callAsset
             : primePool.token0() == putAsset;
-
-        AssetsCache memory ac;
 
         ac.assetToUse = ERC20(oData.isCall ? callAsset : putAsset);
         ac.assetToGet = ERC20(oData.isCall ? putAsset : callAsset);
