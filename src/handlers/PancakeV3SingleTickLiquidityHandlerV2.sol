@@ -27,6 +27,7 @@ import {LiquidityManager} from "../pancake-v3/LiquidityManager.sol";
  * @author 0xcarrot
  * @dev This is a handler contract for providing liquidity
  * for Pancake V3 Style AMMs. The V2 version supports reserved liquidity and hooks.
+ * Do NOT deploy on zkSync, verifyCallback code needs to be updated for zkSync.
  */
 contract PancakeV3SingleTickLiquidityHandlerV2 is
     ERC6909,
@@ -110,12 +111,19 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
         uint256 amount1;
     }
 
+    struct BurnPositionCache {
+        uint128 liquidityToBurn;
+        uint256 amount0;
+        uint256 amount1;
+    }
+
     // events
     event LogMintedPosition(
         uint256 tokenId,
         uint128 liquidityMinted,
         address pool,
         address user,
+        address hook,
         int24 tickLower,
         int24 tickUpper
     );
@@ -124,6 +132,7 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
         uint128 liquidityBurned,
         address pool,
         address user,
+        address hook,
         int24 tickLower,
         int24 tickUpper
     );
@@ -144,6 +153,16 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
         uint64 _newLockedBlockDuration,
         uint64 _newReserveCooldown
     );
+    event LogReservedLiquidity(
+        uint256 tokenId,
+        uint128 liquidityReserved,
+        address user
+    );
+    event LogWithdrawReservedLiquidity(
+        uint256 tokenId,
+        uint128 liquidityWithdrawn,
+        address user
+    );
 
     // errors
     error PancakeV3SingleTickLiquidityHandlerV2__NotWhitelisted();
@@ -163,14 +182,7 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
     uint64 public newLockedBlockDuration;
 
     bytes32 constant PAUSER_ROLE = keccak256("P");
-    bytes32 constant SOS_ROLE = keccak256("SOS");
-
-    // modifiers
-    modifier onlyWhitelisted() {
-        if (!whitelistedApps[msg.sender])
-            revert PancakeV3SingleTickLiquidityHandlerV2__NotWhitelisted();
-        _;
-    }
+    bytes32 constant SOS_ROLE = keccak256("SOS"); // modifiers
 
     constructor(
         address _factory,
@@ -193,7 +205,9 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
     function mintPositionHandler(
         address context,
         bytes calldata _mintPositionData
-    ) external onlyWhitelisted whenNotPaused returns (uint256 sharesMinted) {
+    ) external whenNotPaused returns (uint256 sharesMinted) {
+        onlyWhitelisted();
+
         MintPositionParams memory _params = abi.decode(
             _mintPositionData,
             (MintPositionParams)
@@ -372,6 +386,7 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
             posCache.liquidity,
             address(_params.pool),
             context,
+            _params.hook,
             posCache.tickLower,
             posCache.tickUpper
         );
@@ -388,7 +403,9 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
     function burnPositionHandler(
         address context,
         bytes calldata _burnPositionData
-    ) external onlyWhitelisted whenNotPaused returns (uint256) {
+    ) external whenNotPaused returns (uint256) {
+        onlyWhitelisted();
+
         BurnPositionParams memory _params = abi.decode(
             _burnPositionData,
             (BurnPositionParams)
@@ -408,15 +425,21 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
 
         TokenIdInfo storage tki = tokenIds[tokenId];
 
-        uint128 liquidityToBurn = _convertToAssets(_params.shares, tokenId);
+        BurnPositionCache memory posCache = BurnPositionCache({
+            liquidityToBurn: 0,
+            amount0: 0,
+            amount1: 0
+        });
 
-        if ((tki.totalLiquidity - tki.liquidityUsed) < liquidityToBurn)
+        posCache.liquidityToBurn = _convertToAssets(_params.shares, tokenId);
+
+        if ((tki.totalLiquidity - tki.liquidityUsed) < posCache.liquidityToBurn)
             revert PancakeV3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
 
-        (uint256 amount0, uint256 amount1) = _params.pool.burn(
+        (posCache.amount0, posCache.amount1) = _params.pool.burn(
             _params.tickLower,
             _params.tickUpper,
-            liquidityToBurn
+            posCache.liquidityToBurn
         );
 
         _feeCalculation(
@@ -426,45 +449,14 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
             _params.tickUpper
         );
 
-        uint128 feesOwedToken0;
-        uint128 feesOwedToken1;
-
-        {
-            uint256 userLiquidity0 = LiquidityAmounts.getAmount0ForLiquidity(
-                _params.tickLower.getSqrtRatioAtTick(),
-                _params.tickUpper.getSqrtRatioAtTick(),
-                uint128(liquidityToBurn)
-            );
-
-            uint256 userLiquidity1 = LiquidityAmounts.getAmount1ForLiquidity(
-                _params.tickLower.getSqrtRatioAtTick(),
-                _params.tickUpper.getSqrtRatioAtTick(),
-                uint128(liquidityToBurn)
-            );
-
-            uint256 totalLiquidity0 = LiquidityAmounts.getAmount0ForLiquidity(
-                _params.tickLower.getSqrtRatioAtTick(),
-                _params.tickUpper.getSqrtRatioAtTick(),
-                uint128(tki.totalLiquidity)
-            );
-
-            uint256 totalLiquidity1 = LiquidityAmounts.getAmount1ForLiquidity(
-                _params.tickLower.getSqrtRatioAtTick(),
-                _params.tickUpper.getSqrtRatioAtTick(),
-                uint128(tki.totalLiquidity)
-            );
-
-            if (totalLiquidity0 > 0) {
-                feesOwedToken0 = uint128(
-                    (tki.tokensOwed0 * userLiquidity0) / totalLiquidity0
-                );
-            }
-            if (totalLiquidity1 > 0) {
-                feesOwedToken1 = uint128(
-                    (tki.tokensOwed1 * userLiquidity1) / totalLiquidity1
-                );
-            }
-        }
+        (uint128 feesOwedToken0, uint128 feesOwedToken1) = _feesTokenOwed(
+            _params.tickLower,
+            _params.tickUpper,
+            posCache.liquidityToBurn,
+            tki.totalLiquidity,
+            tki.tokensOwed0,
+            tki.tokensOwed1
+        );
 
         tki.tokensOwed0 -= feesOwedToken0;
         tki.tokensOwed1 -= feesOwedToken1;
@@ -473,20 +465,21 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
             context,
             _params.tickLower,
             _params.tickUpper,
-            uint128(amount0 + feesOwedToken0),
-            uint128(amount1 + feesOwedToken1)
+            uint128(posCache.amount0 + feesOwedToken0),
+            uint128(posCache.amount1 + feesOwedToken1)
         );
 
-        tki.totalLiquidity -= liquidityToBurn;
+        tki.totalLiquidity -= posCache.liquidityToBurn;
         tki.totalSupply -= _params.shares;
 
         _burn(context, tokenId, _params.shares);
 
         emit LogBurnedPosition(
             tokenId,
-            liquidityToBurn,
+            posCache.liquidityToBurn,
             address(_params.pool),
             context,
+            _params.hook,
             _params.tickLower,
             _params.tickUpper
         );
@@ -533,45 +526,14 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
             _params.tickUpper
         );
 
-        uint128 feesOwedToken0;
-        uint128 feesOwedToken1;
-
-        {
-            uint256 userLiquidity0 = LiquidityAmounts.getAmount0ForLiquidity(
-                _params.tickLower.getSqrtRatioAtTick(),
-                _params.tickUpper.getSqrtRatioAtTick(),
-                uint128(liquidityToBurn)
-            );
-
-            uint256 userLiquidity1 = LiquidityAmounts.getAmount1ForLiquidity(
-                _params.tickLower.getSqrtRatioAtTick(),
-                _params.tickUpper.getSqrtRatioAtTick(),
-                uint128(liquidityToBurn)
-            );
-
-            uint256 totalLiquidity0 = LiquidityAmounts.getAmount0ForLiquidity(
-                _params.tickLower.getSqrtRatioAtTick(),
-                _params.tickUpper.getSqrtRatioAtTick(),
-                uint128(tki.totalLiquidity)
-            );
-
-            uint256 totalLiquidity1 = LiquidityAmounts.getAmount1ForLiquidity(
-                _params.tickLower.getSqrtRatioAtTick(),
-                _params.tickUpper.getSqrtRatioAtTick(),
-                uint128(tki.totalLiquidity)
-            );
-
-            if (totalLiquidity0 > 0) {
-                feesOwedToken0 = uint128(
-                    (tki.tokensOwed0 * userLiquidity0) / totalLiquidity0
-                );
-            }
-            if (totalLiquidity1 > 0) {
-                feesOwedToken1 = uint128(
-                    (tki.tokensOwed1 * userLiquidity1) / totalLiquidity1
-                );
-            }
-        }
+        (uint128 feesOwedToken0, uint128 feesOwedToken1) = _feesTokenOwed(
+            _params.tickLower,
+            _params.tickUpper,
+            liquidityToBurn,
+            tki.totalLiquidity,
+            tki.tokensOwed0,
+            tki.tokensOwed1
+        );
 
         tki.tokensOwed0 -= feesOwedToken0;
         tki.tokensOwed1 -= feesOwedToken1;
@@ -598,7 +560,63 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
 
         _burn(msg.sender, tokenId, _params.shares);
 
+        emit LogBurnedPosition(
+            tokenId,
+            liquidityToBurn,
+            address(_params.pool),
+            msg.sender,
+            _params.hook,
+            _params.tickLower,
+            _params.tickUpper
+        );
+
+        emit LogReservedLiquidity(tokenId, liquidityToBurn, msg.sender);
+
         return (_params.shares);
+    }
+
+    function _feesTokenOwed(
+        int24 tickLower,
+        int24 tickUpper,
+        uint128 liquidityToBurn,
+        uint128 totalLiquidity,
+        uint128 tokensOwed0,
+        uint128 tokensOwed1
+    ) private view returns (uint128 feesOwedToken0, uint128 feesOwedToken1) {
+        uint256 userLiquidity0 = LiquidityAmounts.getAmount0ForLiquidity(
+            tickLower.getSqrtRatioAtTick(),
+            tickUpper.getSqrtRatioAtTick(),
+            liquidityToBurn
+        );
+
+        uint256 userLiquidity1 = LiquidityAmounts.getAmount1ForLiquidity(
+            tickLower.getSqrtRatioAtTick(),
+            tickUpper.getSqrtRatioAtTick(),
+            liquidityToBurn
+        );
+
+        uint256 totalLiquidity0 = LiquidityAmounts.getAmount0ForLiquidity(
+            tickLower.getSqrtRatioAtTick(),
+            tickUpper.getSqrtRatioAtTick(),
+            totalLiquidity
+        );
+
+        uint256 totalLiquidity1 = LiquidityAmounts.getAmount1ForLiquidity(
+            tickLower.getSqrtRatioAtTick(),
+            tickUpper.getSqrtRatioAtTick(),
+            totalLiquidity
+        );
+
+        if (totalLiquidity0 > 0) {
+            feesOwedToken0 = uint128(
+                (tokensOwed0 * userLiquidity0) / totalLiquidity0
+            );
+        }
+        if (totalLiquidity1 > 0) {
+            feesOwedToken1 = uint128(
+                (tokensOwed1 * userLiquidity1) / totalLiquidity1
+            );
+        }
     }
 
     /**
@@ -635,6 +653,11 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
         if (rld.lastReserve + reserveCooldown > block.timestamp)
             revert PancakeV3SingleTickLiquidityHandlerV2__BeforeReserveCooldown();
 
+        if (
+            ((tki.totalLiquidity + tki.reservedLiquidity) - tki.liquidityUsed) <
+            _params.shares
+        ) revert PancakeV3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
+
         (uint256 amount0, uint256 amount1) = _params.pool.burn(
             _params.tickLower,
             _params.tickUpper,
@@ -658,6 +681,8 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
 
         tki.reservedLiquidity -= _params.shares;
         rld.liquidity -= _params.shares;
+
+        emit LogWithdrawReservedLiquidity(tokenId, _params.shares, msg.sender);
     }
 
     /**
@@ -672,10 +697,11 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
         bytes calldata _usePositionHandler
     )
         external
-        onlyWhitelisted
         whenNotPaused
         returns (address[] memory, uint256[] memory, uint256)
     {
+        onlyWhitelisted();
+
         (UsePositionParams memory _params, bytes memory hookData) = abi.decode(
             _usePositionHandler,
             (UsePositionParams, bytes)
@@ -695,11 +721,11 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
 
         TokenIdInfo storage tki = tokenIds[tokenId];
 
-        if ((tki.totalLiquidity - tki.liquidityUsed) < _params.liquidityToUse)
-            revert PancakeV3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
-
         if (_params.hook != address(0))
             IHook(_params.hook).onPositionUse(hookData);
+
+        if ((tki.totalLiquidity - tki.liquidityUsed) < _params.liquidityToUse)
+            revert PancakeV3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
 
         (uint256 amount0, uint256 amount1) = _params.pool.burn(
             _params.tickLower,
@@ -745,12 +771,9 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
      */
     function unusePositionHandler(
         bytes calldata _unusePositionData
-    )
-        external
-        onlyWhitelisted
-        whenNotPaused
-        returns (uint256[] memory, uint256)
-    {
+    ) external whenNotPaused returns (uint256[] memory, uint256) {
+        onlyWhitelisted();
+
         (UnusePositionParams memory _params, bytes memory hookData) = abi
             .decode(_unusePositionData, (UnusePositionParams, bytes));
 
@@ -825,12 +848,9 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
      */
     function donateToPosition(
         bytes calldata _donateData
-    )
-        external
-        onlyWhitelisted
-        whenNotPaused
-        returns (uint256[] memory, uint256)
-    {
+    ) external whenNotPaused returns (uint256[] memory, uint256) {
+        onlyWhitelisted();
+
         DonateParams memory _params = abi.decode(_donateData, (DonateParams));
 
         uint256 tokenId = uint256(
@@ -978,28 +998,7 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
     function tokensToPullForMint(
         bytes calldata _mintPositionData
     ) external view returns (address[] memory, uint256[] memory) {
-        MintPositionParams memory _params = abi.decode(
-            _mintPositionData,
-            (MintPositionParams)
-        );
-
-        (uint256 amount0, uint256 amount1) = LiquidityAmounts
-            .getAmountsForLiquidity(
-                _getCurrentSqrtPriceX96(_params.pool),
-                _params.tickLower.getSqrtRatioAtTick(),
-                _params.tickUpper.getSqrtRatioAtTick(),
-                uint128(_params.liquidity)
-            );
-
-        address[] memory tokens = new address[](2);
-        tokens[0] = _params.pool.token0();
-        tokens[1] = _params.pool.token1();
-
-        uint256[] memory amounts = new uint256[](2);
-        amounts[0] = amount0;
-        amounts[1] = amount1;
-
-        return (tokens, amounts);
+        return _tokensToPull(_mintPositionData);
     }
 
     /**
@@ -1011,28 +1010,7 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
     function tokensToPullForUnUse(
         bytes calldata _unusePositionData
     ) external view returns (address[] memory, uint256[] memory) {
-        UnusePositionParams memory _params = abi.decode(
-            _unusePositionData,
-            (UnusePositionParams)
-        );
-
-        (uint256 amount0, uint256 amount1) = LiquidityAmounts
-            .getAmountsForLiquidity(
-                _getCurrentSqrtPriceX96(_params.pool),
-                _params.tickLower.getSqrtRatioAtTick(),
-                _params.tickUpper.getSqrtRatioAtTick(),
-                uint128(_params.liquidityToUnuse)
-            );
-
-        address[] memory tokens = new address[](2);
-        tokens[0] = _params.pool.token0();
-        tokens[1] = _params.pool.token1();
-
-        uint256[] memory amounts = new uint256[](2);
-        amounts[0] = amount0;
-        amounts[1] = amount1;
-
-        return (tokens, amounts);
+        return _tokensToPull(_unusePositionData);
     }
 
     /**
@@ -1043,9 +1021,15 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
     function tokensToPullForDonate(
         bytes calldata _donatePosition
     ) external view returns (address[] memory, uint256[] memory) {
-        DonateParams memory _params = abi.decode(
-            _donatePosition,
-            (DonateParams)
+        return _tokensToPull(_donatePosition);
+    }
+
+    function _tokensToPull(
+        bytes calldata _positionData
+    ) private view returns (address[] memory, uint256[] memory) {
+        MintPositionParams memory _params = abi.decode(
+            _positionData,
+            (MintPositionParams)
         );
 
         (uint256 amount0, uint256 amount1) = LiquidityAmounts
@@ -1053,7 +1037,7 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
                 _getCurrentSqrtPriceX96(_params.pool),
                 _params.tickLower.getSqrtRatioAtTick(),
                 _params.tickUpper.getSqrtRatioAtTick(),
-                uint128(_params.liquidityToDonate)
+                uint128(_params.liquidity)
             );
 
         address[] memory tokens = new address[](2);
@@ -1182,6 +1166,11 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
         uint256 tokenId
     ) external view returns (TokenIdInfo memory) {
         return tokenIds[tokenId];
+    }
+
+    function onlyWhitelisted() private {
+        if (!whitelistedApps[msg.sender])
+            revert PancakeV3SingleTickLiquidityHandlerV2__NotWhitelisted();
     }
 
     // admin functions

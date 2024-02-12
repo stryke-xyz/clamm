@@ -2,7 +2,6 @@
 pragma solidity ^0.8.13;
 
 // Interfaces
-import {IERC20Metadata} from "openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IDopexV2ClammFeeStrategyV2} from "./IDopexV2ClammFeeStrategyV2.sol";
 
 // Contracts

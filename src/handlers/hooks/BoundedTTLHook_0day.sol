@@ -5,7 +5,7 @@ import {IHook} from "../../interfaces/IHook.sol";
 
 contract BoundedTTLHook_0day is IHook {
     function onPositionUse(bytes calldata _data) external {
-        (, uint256 ttl) = abi.decode(_data, (uint256, uint256));
+        (, uint256 ttl) = abi.decode(_data, (address, uint256));
         if (ttl > 20 minutes) revert();
     }
 

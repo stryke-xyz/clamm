@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.0 <0.9.0;
 
-import {IERC6909} from "../../interfaces/IERC6909.sol";
-
 /// @notice Minimalist and gas efficient standard ERC6909 implementation.
 /// @author Solmate (https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC6909.sol)
 /// @dev Copied from the commit at 4b47a19038b798b4a33d9749d25e570443520647

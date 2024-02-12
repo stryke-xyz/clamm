@@ -81,7 +81,8 @@ contract DopexV2OptionMarketV2 is ReentrancyGuard, Multicall, Ownable, ERC721 {
         uint256 tokenId,
         bool isCall,
         uint256 premiumAmount,
-        uint256 totalAssetWithdrawn
+        uint256 totalAssetWithdrawn,
+        uint256 protocolFees
     );
     event LogExerciseOption(
         address user,
@@ -96,8 +97,7 @@ contract DopexV2OptionMarketV2 is ReentrancyGuard, Multicall, Ownable, ERC721 {
         uint256 newTokenId,
         address to
     );
-    event LogIVSetterUpdate(address _setter, bool _status);
-    event LogIVUpdate(uint256[] ttl, uint256[] iv);
+
     event LogUpdateExerciseDelegate(
         address owner,
         address delegate,
@@ -117,6 +117,7 @@ contract DopexV2OptionMarketV2 is ReentrancyGuard, Multicall, Ownable, ERC721 {
     );
 
     // errors
+    error DopexV2OptionMarket__MaxOptionBuyReached();
     error DopexV2OptionMarket__IVNotSet();
     error DopexV2OptionMarket__NotValidStrikeTick();
     error DopexV2OptionMarket__PoolNotApproved();
@@ -219,6 +220,9 @@ contract DopexV2OptionMarketV2 is ReentrancyGuard, Multicall, Ownable, ERC721 {
      */
     function mintOption(OptionParams calldata _params) external nonReentrant {
         optionIds += 1;
+
+        if (_params.optionTicks.length > 20)
+            revert DopexV2OptionMarket__MaxOptionBuyReached();
 
         uint256[] memory amountsPerOptionTicks = new uint256[](
             _params.optionTicks.length
@@ -362,7 +366,8 @@ contract DopexV2OptionMarketV2 is ReentrancyGuard, Multicall, Ownable, ERC721 {
             optionIds,
             _params.isCall,
             premiumAmount,
-            totalAssetWithdrawn
+            totalAssetWithdrawn,
+            protocolFees
         );
     }
 
@@ -379,7 +384,7 @@ contract DopexV2OptionMarketV2 is ReentrancyGuard, Multicall, Ownable, ERC721 {
      */
     function exerciseOption(
         ExerciseOptionParams calldata _params
-    ) external nonReentrant {
+    ) external nonReentrant returns (AssetsCache memory ac) {
         if (
             ownerOf(_params.optionId) != msg.sender &&
             exerciseDelegator[ownerOf(_params.optionId)][msg.sender] == false
@@ -397,12 +402,12 @@ contract DopexV2OptionMarketV2 is ReentrancyGuard, Multicall, Ownable, ERC721 {
             ? primePool.token0() == callAsset
             : primePool.token0() == putAsset;
 
-        AssetsCache memory ac;
-
         ac.assetToUse = ERC20(oData.isCall ? callAsset : putAsset);
         ac.assetToGet = ERC20(oData.isCall ? putAsset : callAsset);
 
         for (uint256 i; i < oData.opTickArrayLen; i++) {
+            if (_params.liquidityToExercise[i] == 0) continue;
+
             OptionTicks storage opTick = opTickMap[_params.optionId][i];
 
             uint256 amountToSwap = isAmount0
@@ -502,10 +507,11 @@ contract DopexV2OptionMarketV2 is ReentrancyGuard, Multicall, Ownable, ERC721 {
         ac.assetToGet = ERC20(oData.isCall ? putAsset : callAsset);
 
         for (uint256 i; i < oData.opTickArrayLen; i++) {
+            if (_params.liquidityToSettle[i] == 0) continue;
+
             OptionTicks storage opTick = opTickMap[_params.optionId][i];
-            uint256 liquidityToSettle = _params.liquidityToSettle[i] != 0
-                ? _params.liquidityToSettle[i]
-                : opTick.liquidityToUse;
+
+            uint256 liquidityToSettle = _params.liquidityToSettle[i];
 
             (uint256 amount0, uint256 amount1) = LiquidityAmounts
                 .getAmountsForLiquidity(

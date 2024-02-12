@@ -63,11 +63,11 @@ interface IERC6909 {
         uint256 amount
     ) external returns (bool);
 
-    /// @notice Sets or removes a spender as an operator for the caller.
-    /// @param spender The address of the spender.
+    /// @notice Sets or removes a operator as an operator for the caller.
+    /// @param operator The address of the operator.
     /// @param approved The approval status.
     function setOperator(
-        address spender,
+        address operator,
         bool approved
     ) external returns (bool);
 }
