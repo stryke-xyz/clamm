@@ -122,8 +122,8 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
         uint256 tokenId,
         uint128 liquidityMinted,
         address pool,
-        address user,
         address hook,
+        address user,
         int24 tickLower,
         int24 tickUpper
     );
@@ -131,8 +131,8 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
         uint256 tokenId,
         uint128 liquidityBurned,
         address pool,
-        address user,
         address hook,
+        address user,
         int24 tickLower,
         int24 tickUpper
     );
@@ -153,15 +153,10 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
         uint64 _newLockedBlockDuration,
         uint64 _newReserveCooldown
     );
-    event LogReservedLiquidity(
-        uint256 tokenId,
-        uint128 liquidityReserved,
-        address user
-    );
+    event LogReservedLiquidity(uint256 tokenId, uint128 liquidityReserved);
     event LogWithdrawReservedLiquidity(
         uint256 tokenId,
-        uint128 liquidityWithdrawn,
-        address user
+        uint128 liquidityWithdrawn
     );
 
     // errors
@@ -385,8 +380,8 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
             tokenId,
             posCache.liquidity,
             address(_params.pool),
-            context,
             _params.hook,
+            context,
             posCache.tickLower,
             posCache.tickUpper
         );
@@ -478,8 +473,8 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
             tokenId,
             posCache.liquidityToBurn,
             address(_params.pool),
-            context,
             _params.hook,
+            context,
             _params.tickLower,
             _params.tickUpper
         );
@@ -565,13 +560,13 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
             tokenId,
             liquidityToBurn,
             address(_params.pool),
-            msg.sender,
             _params.hook,
+            msg.sender,
             _params.tickLower,
             _params.tickUpper
         );
 
-        emit LogReservedLiquidity(tokenId, liquidityToBurn, msg.sender);
+        emit LogReservedLiquidity(tokenId, liquidityToBurn);
 
         return (_params.shares);
     }
@@ -683,7 +678,7 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
         tki.reservedLiquidity -= _params.shares;
         rld.liquidity -= _params.shares;
 
-        emit LogWithdrawReservedLiquidity(tokenId, _params.shares, msg.sender);
+        emit LogWithdrawReservedLiquidity(tokenId, _params.shares);
     }
 
     /**
@@ -1214,29 +1209,27 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
      * @param tickLower The lower tick of the position to withdraw liquidity from.
      * @param tickUpper The upper tick of the position to withdraw liquidity from.
      * @param liquidity The amount of liquidity to withdraw.
+     * @param token The token to recover from this pool
      */
-    function forceWithdrawUniswapV3Liquidity(
+    function forceWithdrawUniswapV3LiquidityAndToken(
         IUniswapV3Pool pool,
         int24 tickLower,
         int24 tickUpper,
-        uint128 liquidity
+        uint128 liquidity,
+        address token
     ) external onlyRole(SOS_ROLE) {
+        if(token != address(0)) {
+            IERC20(token).transfer(
+                msg.sender,
+                IERC20(token).balanceOf(address(this))
+            );
+            return;
+        }
         pool.burn(tickLower, tickUpper, liquidity);
         (, , , uint128 t0, uint128 t1) = pool.positions(
             _computePositionKey(address(this), tickLower, tickUpper)
         );
         pool.collect(msg.sender, tickLower, tickUpper, t0, t1);
-    }
-
-    /**
-     * @notice Emergency withdraws the given token from the contract.
-     * @param token The token to withdraw.
-     */
-    function emergencyWithdraw(address token) external onlyRole(SOS_ROLE) {
-        IERC20(token).transfer(
-            msg.sender,
-            IERC20(token).balanceOf(address(this))
-        );
     }
 
     /**

@@ -1213,29 +1213,27 @@ contract PancakeV3SingleTickLiquidityHandlerV2 is
      * @param tickLower The lower tick of the position to withdraw liquidity from.
      * @param tickUpper The upper tick of the position to withdraw liquidity from.
      * @param liquidity The amount of liquidity to withdraw.
+     * @param token The token to recover from this pool
      */
     function forceWithdrawPancakeV3Liquidity(
         IPancakeV3Pool pool,
         int24 tickLower,
         int24 tickUpper,
-        uint128 liquidity
+        uint128 liquidity,
+        address token
     ) external onlyRole(SOS_ROLE) {
+        if(token != address(0)) {
+            IERC20(token).transfer(
+                msg.sender,
+                IERC20(token).balanceOf(address(this))
+            );
+            return;
+        }
         pool.burn(tickLower, tickUpper, liquidity);
         (, , , uint128 t0, uint128 t1) = pool.positions(
             _computePositionKey(address(this), tickLower, tickUpper)
         );
         pool.collect(msg.sender, tickLower, tickUpper, t0, t1);
-    }
-
-    /**
-     * @notice Emergency withdraws the given token from the contract.
-     * @param token The token to withdraw.
-     */
-    function emergencyWithdraw(address token) external onlyRole(SOS_ROLE) {
-        IERC20(token).transfer(
-            msg.sender,
-            IERC20(token).balanceOf(address(this))
-        );
     }
 
     /**
