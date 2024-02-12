@@ -27,7 +27,7 @@ import {IHandler} from "../../src/interfaces/IHandler.sol";
 import {ISwapper} from "../../src/interfaces/ISwapper.sol";
 import {IOptionMarket} from "../../src/interfaces/IOptionMarket.sol";
 
-import {BoundedTTLHook_0day} from "../../src/handlers/hooks/BoundedTTLHook_0day.sol";
+import {BoundedTTLHook_20mins} from "../../src/handlers/hooks/sample/BoundedTTLHook_20mins.sol";
 
 contract optionMarketTest is Test {
     using TickMath for int24;
@@ -174,7 +174,7 @@ contract optionMarketTest is Test {
 
         autoExercise.grantRole(keccak256("EXECUTOR"), autoExercisoor);
 
-        hook = address(new BoundedTTLHook_0day());
+        hook = address(new BoundedTTLHook_20mins());
 
         // for calls
         positionManagerHarness.mintPosition(

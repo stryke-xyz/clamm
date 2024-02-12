@@ -97,6 +97,8 @@ contract OptionPricingV2 is Ownable {
     ) external view returns (uint256 optionPrice) {
         uint256 timeToExpiry = expiry.sub(block.timestamp).div(864);
 
+        if(ttlToVol[expiry - block.timestamp] == 0) revert();
+
         optionPrice = BlackScholes
             .calculate(
                 isPut ? 1 : 0, // 0 - Put, 1 - Call
