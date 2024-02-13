@@ -153,10 +153,15 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
         uint64 _newLockedBlockDuration,
         uint64 _newReserveCooldown
     );
-    event LogReservedLiquidity(uint256 tokenId, uint128 liquidityReserved);
+    event LogReservedLiquidity(
+        uint256 tokenId,
+        uint128 liquidityReserved,
+        address user
+    );
     event LogWithdrawReservedLiquidity(
         uint256 tokenId,
-        uint128 liquidityWithdrawn
+        uint128 liquidityWithdrawn,
+        address user
     );
 
     // errors
@@ -566,7 +571,7 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
             _params.tickUpper
         );
 
-        emit LogReservedLiquidity(tokenId, liquidityToBurn);
+        emit LogReservedLiquidity(tokenId, liquidityToBurn, msg.sender);
 
         return (_params.shares);
     }
@@ -678,7 +683,7 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
         tki.reservedLiquidity -= _params.shares;
         rld.liquidity -= _params.shares;
 
-        emit LogWithdrawReservedLiquidity(tokenId, _params.shares);
+        emit LogWithdrawReservedLiquidity(tokenId, _params.shares, msg.sender);
     }
 
     /**
@@ -1218,7 +1223,7 @@ contract UniswapV3SingleTickLiquidityHandlerV2 is
         uint128 liquidity,
         address token
     ) external onlyRole(SOS_ROLE) {
-        if(token != address(0)) {
+        if (token != address(0)) {
             IERC20(token).transfer(
                 msg.sender,
                 IERC20(token).balanceOf(address(this))
