@@ -122,6 +122,37 @@ contract OptionPricingLinearV2 is Ownable {
         return optionPrice;
     }
 
+    /// @notice computes the option price (with liquidity multiplier)
+    /// @param isPut is put option
+    /// @param ttl time to live for the option
+    /// @param strike strike price
+    /// @param lastPrice current price
+    function getOptionPriceViaTTL(bool isPut, uint256 ttl, uint256 strike, uint256 lastPrice)
+        external
+        view
+        returns (uint256)
+    {
+        uint256 timeToExpiry = ttl.div(864);
+
+        uint256 volatility = ttlToVol[ttl];
+
+        if (volatility == 0) revert();
+
+        volatility = getVolatility(strike, lastPrice, volatility);
+
+        uint256 optionPrice = BlackScholes.calculate(isPut ? 1 : 0, lastPrice, strike, timeToExpiry, 0, volatility) // 0 - Put, 1 - Call
+                // Number of days to expiry mul by 100
+            .div(BlackScholes.DIVISOR);
+
+        uint256 minOptionPrice = lastPrice.mul(minOptionPricePercentage).div(1e10);
+
+        if (minOptionPrice > optionPrice) {
+            return minOptionPrice;
+        }
+
+        return optionPrice;
+    }
+
     /// @notice computes the volatility for a strike
     /// @param strike strike price
     /// @param lastPrice current price
