@@ -14,3 +14,6 @@
 	path = lib/v3-periphery
 	url = https://github.com/uniswap/v3-periphery
 	branch = 0.8
+[submodule "lib/BokkyPooBahsDateTimeLibrary"]
+	path = lib/BokkyPooBahsDateTimeLibrary
+	url = https://github.com/bokkypoobah/BokkyPooBahsDateTimeLibrary
