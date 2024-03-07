@@ -101,7 +101,8 @@ contract ClTest is Test {
             })
         );
 
-        (uint128 selfLiquidity,,,,) = pool.positions(keccak256(abi.encodePacked(user, tickLower, tickUpper)));
+        (uint128 selfLiquidity,,,,) =
+            pool.positions(keccak256(abi.encodePacked(user, uint256(0), tickLower, tickUpper)));
 
         assert(selfLiquidity == liquidity);
         vm.stopPrank();
