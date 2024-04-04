@@ -6,27 +6,27 @@ import "forge-std/Test.sol";
 import {IUniswapV3Factory} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 
-import {UniswapV3TestLib} from "./uniswap-v3-utils/UniswapV3TestLib.sol";
-import {ERC20Mock} from "./mocks/ERC20Mock.sol";
+import {UniswapV3TestLib} from "../uniswap-v3-utils/UniswapV3TestLib.sol";
+import {ERC20Mock} from "../mocks/ERC20Mock.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
 
-import {DopexV2PositionManager} from "../src/DopexV2PositionManager.sol";
-import {UniswapV3SingleTickLiquidityHarness} from "./harness/UniswapV3SingleTickLiquidityHandler.harness.sol";
-import {UniswapV3SingleTickLiquidityHandler} from "../src/handlers/UniswapV3SingleTickLiquidityHandler.sol";
-import {DopexV2OptionMarket} from "../src/DopexV2OptionMarket.sol";
+import {DopexV2PositionManager} from "../../src/DopexV2PositionManager.sol";
+import {UniswapV3SingleTickLiquidityHarnessV2} from "../harness/UniswapV3SingleTickLiquidityHandlerV2.harness.sol";
+import {UniswapV3SingleTickLiquidityHandlerV2} from "../../src/handlers/UniswapV3SingleTickLiquidityHandlerV2.sol";
+import {DopexV2OptionMarketV2} from "../../src/DopexV2OptionMarketV2.sol";
 
-import {OptionPricing} from "./pricing/OptionPricing.sol";
-import {DopexV2ClammFeeStrategy} from "../src/pricing/fees/DopexV2ClammFeeStrategy.sol";
-import {SwapRouterSwapper} from "../src/swapper/SwapRouterSwapper.sol";
-import {AutoExerciseTimeBased} from "../src/periphery/AutoExerciseTimeBased.sol";
+import {OptionPricingV2} from "../pricing/OptionPricingV2.sol";
+import {DopexV2ClammFeeStrategyV2} from "../../src/pricing/fees/DopexV2ClammFeeStrategyV2.sol";
+import {SwapRouterSwapper} from "../../src/swapper/SwapRouterSwapper.sol";
+import {AutoExerciseTimeBased} from "../../src/periphery/AutoExerciseTimeBased.sol";
 
-import {IOptionPricing} from "../src/pricing/IOptionPricing.sol";
-import {IHandler} from "../src/interfaces/IHandler.sol";
-import {ISwapper} from "../src/interfaces/ISwapper.sol";
-import {IOptionMarket} from "../src/interfaces/IOptionMarket.sol";
+import {IOptionPricingV2} from "../../src/pricing/IOptionPricingV2.sol";
+import {IHandler} from "../../src/interfaces/IHandler.sol";
+import {ISwapper} from "../../src/interfaces/ISwapper.sol";
+import {IOptionMarket} from "../../src/interfaces/IOptionMarket.sol";
 
-import {OptionPricingLinear} from "../src/pricing/OptionPricingLinear.sol";
+import {BoundedTTLHook_20mins} from "../../src/handlers/hooks/sample/BoundedTTLHook_20mins.sol";
 
 contract optionMarketTest is Test {
     using TickMath for int24;
@@ -40,8 +40,7 @@ contract optionMarketTest is Test {
     UniswapV3TestLib uniswapV3TestLib;
     IUniswapV3Pool pool;
 
-    OptionPricing op;
-    OptionPricingLinear opl;
+    OptionPricingV2 op;
     SwapRouterSwapper srs;
 
     uint24 fee = 500;
@@ -69,11 +68,12 @@ contract optionMarketTest is Test {
     address autoExercisoor = makeAddr("autoExercisoor"); // auto exciseroor role
 
     DopexV2PositionManager positionManager;
-    UniswapV3SingleTickLiquidityHarness positionManagerHarness;
-    DopexV2OptionMarket optionMarket;
-    UniswapV3SingleTickLiquidityHandler uniV3Handler;
-    DopexV2ClammFeeStrategy feeStrategy;
+    UniswapV3SingleTickLiquidityHarnessV2 positionManagerHarness;
+    DopexV2OptionMarketV2 optionMarket;
+    UniswapV3SingleTickLiquidityHandlerV2 uniV3Handler;
+    DopexV2ClammFeeStrategyV2 feeStrategy;
     AutoExerciseTimeBased autoExercise;
+    address hook;
 
     function setUp() public {
         vm.warp(1693352493);
@@ -96,25 +96,24 @@ contract optionMarketTest is Test {
 
         positionManager = new DopexV2PositionManager();
 
-        uniV3Handler = new UniswapV3SingleTickLiquidityHandler(
+        uniV3Handler = new UniswapV3SingleTickLiquidityHandlerV2(
             address(uniswapV3TestLib.factory()),
             0xa598dd2fba360510c5a8f02f44423a4468e902df5857dbce3ca162a43a3a31ff,
             address(uniswapV3TestLib.swapRouter())
         );
 
-        positionManagerHarness = new UniswapV3SingleTickLiquidityHarness(
+        positionManagerHarness = new UniswapV3SingleTickLiquidityHarnessV2(
             uniswapV3TestLib,
             positionManager,
             uniV3Handler
         );
 
-        op = new OptionPricing(500, 1e8);
-        opl = new OptionPricingLinear(1e4, 1e3, 1e8);
+        op = new OptionPricingV2(500, 1e8);
         srs = new SwapRouterSwapper(address(uniswapV3TestLib.swapRouter()));
 
-        feeStrategy = new DopexV2ClammFeeStrategy();
+        feeStrategy = new DopexV2ClammFeeStrategyV2();
 
-        optionMarket = new DopexV2OptionMarket(
+        optionMarket = new DopexV2OptionMarketV2(
             address(positionManager),
             address(op),
             address(feeStrategy),
@@ -126,15 +125,17 @@ contract optionMarketTest is Test {
         // Add 0.15% fee to the market
         feeStrategy.registerOptionMarket(address(optionMarket), 350000);
 
-        uint256[] memory ttls = new uint256[](1);
+        uint256[] memory ttls = new uint256[](2);
         ttls[0] = 20 minutes;
+        ttls[1] = 1 hours;
 
-        uint256[] memory IVs = new uint256[](1);
+        uint256[] memory IVs = new uint256[](2);
         IVs[0] = 100;
+        IVs[1] = 200;
 
         address feeCollector = makeAddr("feeCollector");
 
-        optionMarket.updateIVs(ttls, IVs);
+        op.updateIVs(ttls, IVs);
         optionMarket.updateAddress(
             feeCollector,
             address(0),
@@ -173,6 +174,8 @@ contract optionMarketTest is Test {
 
         autoExercise.grantRole(keccak256("EXECUTOR"), autoExercisoor);
 
+        hook = address(new BoundedTTLHook_20mins());
+
         // for calls
         positionManagerHarness.mintPosition(
             token0,
@@ -182,6 +185,7 @@ contract optionMarketTest is Test {
             -76260, // ~2050,
             -76250, // ~2048,
             pool,
+            hook,
             bob
         );
 
@@ -193,6 +197,7 @@ contract optionMarketTest is Test {
             -76260, // ~2050,
             -76250, // ~2048,
             pool,
+            hook,
             jason
         );
 
@@ -205,6 +210,7 @@ contract optionMarketTest is Test {
             -75770, // ~1950,
             -75760, // ~1952,
             pool,
+            hook,
             bob
         );
 
@@ -216,47 +222,9 @@ contract optionMarketTest is Test {
             -75770, // ~1950,
             -75760, // ~1952,
             pool,
+            hook,
             jason
         );
-    }
-
-    function testOptionPricingLinear() public {
-        uint256 vol = opl.getVolatility(2000e18, 2300e18, 45);
-        assertEq(vol, 103);
-        vol = opl.getVolatility(2300e18, 2000e18, 45);
-        assertEq(vol, 112);
-        vol = opl.getVolatility(2000e18, 2000e18, 45);
-        assertEq(vol, 45);
-
-        // modify volatility multiplier
-        opl.updateVolatilityMultiplier(2e3);
-        vol = opl.getVolatility(2000e18, 2300e18, 45);
-        assertEq(vol, 162);
-
-        // modify volatility offset
-        opl.updateVolatilityOffset(2e4);
-        vol = opl.getVolatility(2300e18, 2000e18, 45);
-        assertEq(vol, 225);
-
-        // check the option price calculation
-
-        uint256 oplPrice = opl.getOptionPrice(
-            false,
-            block.timestamp + 3600 minutes,
-            2000e18,
-            2300e18,
-            45
-        );
-
-        uint256 opPrice = op.getOptionPrice(
-            false,
-            block.timestamp + 3600 minutes,
-            2000e18,
-            2300e18,
-            45
-        );
-
-        assertGt(oplPrice, opPrice);
     }
 
     function testBuyCallOption() public {
@@ -272,28 +240,28 @@ contract optionMarketTest is Test {
             block.timestamp + 20 minutes,
             optionMarket.getPricePerCallAssetViaTick(pool, tickUpperCalls),
             optionMarket.getCurrentPricePerCallAsset(pool),
-            optionMarket.ttlToVol(20 minutes),
             5e18
         );
 
-        uint256 _fee = optionMarket.getFee(0, 0, _premiumAmountCalls);
+        uint256 _fee = optionMarket.getFee(0, _premiumAmountCalls);
         uint256 cost = _premiumAmountCalls + _fee;
         token1.mint(trader, cost);
         token1.approve(address(optionMarket), cost);
 
-        DopexV2OptionMarket.OptionTicks[]
-            memory opTicks = new DopexV2OptionMarket.OptionTicks[](1);
+        DopexV2OptionMarketV2.OptionTicks[]
+            memory opTicks = new DopexV2OptionMarketV2.OptionTicks[](1);
 
-        opTicks[0] = DopexV2OptionMarket.OptionTicks({
+        opTicks[0] = DopexV2OptionMarketV2.OptionTicks({
             _handler: uniV3Handler,
             pool: pool,
+            hook: hook,
             tickLower: tickLowerCalls,
             tickUpper: tickUpperCalls,
             liquidityToUse: l
         });
 
         optionMarket.mintOption(
-            DopexV2OptionMarket.OptionParams({
+            DopexV2OptionMarketV2.OptionParams({
                 optionTicks: opTicks,
                 tickLower: tickLowerCalls,
                 tickUpper: tickUpperCalls,
@@ -306,6 +274,7 @@ contract optionMarketTest is Test {
         (
             IHandler _handler,
             IUniswapV3Pool _pool,
+            address _hook,
             int24 tickLower,
             int24 tickUpper,
             uint256 liquidityToUse
@@ -328,29 +297,29 @@ contract optionMarketTest is Test {
             block.timestamp + 20 minutes,
             optionMarket.getPricePerCallAssetViaTick(pool, tickLowerPuts),
             optionMarket.getCurrentPricePerCallAsset(pool),
-            optionMarket.ttlToVol(20 minutes),
             (10_000e18 * 1e18) /
                 optionMarket.getPricePerCallAssetViaTick(pool, tickLowerPuts)
         );
 
-        uint256 _fee = optionMarket.getFee(0, 0, _premiumAmountPuts);
+        uint256 _fee = optionMarket.getFee(0, _premiumAmountPuts);
         uint256 cost = _premiumAmountPuts + _fee;
         token0.mint(trader, cost);
         token0.approve(address(optionMarket), cost);
 
-        DopexV2OptionMarket.OptionTicks[]
-            memory opTicks = new DopexV2OptionMarket.OptionTicks[](1);
+        DopexV2OptionMarketV2.OptionTicks[]
+            memory opTicks = new DopexV2OptionMarketV2.OptionTicks[](1);
 
-        opTicks[0] = DopexV2OptionMarket.OptionTicks({
+        opTicks[0] = DopexV2OptionMarketV2.OptionTicks({
             _handler: uniV3Handler,
             pool: pool,
+            hook: hook,
             tickLower: tickLowerPuts,
             tickUpper: tickUpperPuts,
             liquidityToUse: l
         });
 
         optionMarket.mintOption(
-            DopexV2OptionMarket.OptionParams({
+            DopexV2OptionMarketV2.OptionParams({
                 optionTicks: opTicks,
                 tickLower: tickLowerPuts,
                 tickUpper: tickUpperPuts,
@@ -363,6 +332,121 @@ contract optionMarketTest is Test {
         (
             IHandler _handler,
             IUniswapV3Pool _pool,
+            address _hook,
+            int24 tickLower,
+            int24 tickUpper,
+            uint256 liquidityToUse
+        ) = optionMarket.opTickMap(1, 0);
+
+        vm.stopPrank();
+    }
+
+    function testFail_BuyCallOption() public {
+        vm.startPrank(trader);
+        uint256 l = LiquidityAmounts.getLiquidityForAmount1(
+            tickLowerCalls.getSqrtRatioAtTick(),
+            tickUpperCalls.getSqrtRatioAtTick(),
+            5e18
+        );
+
+        uint256 _premiumAmountCalls = optionMarket.getPremiumAmount(
+            false,
+            block.timestamp + 1 hours,
+            optionMarket.getPricePerCallAssetViaTick(pool, tickUpperCalls),
+            optionMarket.getCurrentPricePerCallAsset(pool),
+            5e18
+        );
+
+        uint256 _fee = optionMarket.getFee(0, _premiumAmountCalls);
+        uint256 cost = _premiumAmountCalls + _fee;
+        token1.mint(trader, cost);
+        token1.approve(address(optionMarket), cost);
+
+        DopexV2OptionMarketV2.OptionTicks[]
+            memory opTicks = new DopexV2OptionMarketV2.OptionTicks[](1);
+
+        opTicks[0] = DopexV2OptionMarketV2.OptionTicks({
+            _handler: uniV3Handler,
+            pool: pool,
+            hook: hook,
+            tickLower: tickLowerCalls,
+            tickUpper: tickUpperCalls,
+            liquidityToUse: l
+        });
+
+        optionMarket.mintOption(
+            DopexV2OptionMarketV2.OptionParams({
+                optionTicks: opTicks,
+                tickLower: tickLowerCalls,
+                tickUpper: tickUpperCalls,
+                ttl: 1 hours,
+                isCall: true,
+                maxCostAllowance: cost
+            })
+        );
+
+        (
+            IHandler _handler,
+            IUniswapV3Pool _pool,
+            address _hook,
+            int24 tickLower,
+            int24 tickUpper,
+            uint256 liquidityToUse
+        ) = optionMarket.opTickMap(1, 0);
+
+        vm.stopPrank();
+    }
+
+    function testFail_BuyPutOption() public {
+        vm.startPrank(trader);
+
+        uint256 l = LiquidityAmounts.getLiquidityForAmount0(
+            tickLowerPuts.getSqrtRatioAtTick(),
+            tickUpperPuts.getSqrtRatioAtTick(),
+            10_000e18
+        );
+
+        uint256 _premiumAmountPuts = optionMarket.getPremiumAmount(
+            true,
+            block.timestamp + 1 hours,
+            optionMarket.getPricePerCallAssetViaTick(pool, tickLowerPuts),
+            optionMarket.getCurrentPricePerCallAsset(pool),
+            (10_000e18 * 1e18) /
+                optionMarket.getPricePerCallAssetViaTick(pool, tickLowerPuts)
+        );
+
+        uint256 _fee = optionMarket.getFee(0, _premiumAmountPuts);
+        uint256 cost = _premiumAmountPuts + _fee;
+        token0.mint(trader, cost);
+        token0.approve(address(optionMarket), cost);
+
+        DopexV2OptionMarketV2.OptionTicks[]
+            memory opTicks = new DopexV2OptionMarketV2.OptionTicks[](1);
+
+        opTicks[0] = DopexV2OptionMarketV2.OptionTicks({
+            _handler: uniV3Handler,
+            pool: pool,
+            hook: hook,
+            tickLower: tickLowerPuts,
+            tickUpper: tickUpperPuts,
+            liquidityToUse: l
+        });
+
+        optionMarket.mintOption(
+            DopexV2OptionMarketV2.OptionParams({
+                optionTicks: opTicks,
+                tickLower: tickLowerPuts,
+                tickUpper: tickUpperPuts,
+                ttl: 1 hours,
+                isCall: false,
+                maxCostAllowance: cost
+            })
+        );
+
+        (
+            IHandler _handler,
+            IUniswapV3Pool _pool,
+            address _hook,
             int24 tickLower,
             int24 tickUpper,
             uint256 liquidityToUse
@@ -392,6 +476,7 @@ contract optionMarketTest is Test {
         (
             IHandler _handler,
             IUniswapV3Pool _pool,
+            address _hook,
             int24 tickLower,
             int24 tickUpper,
             uint256 liquidityToUse
@@ -408,7 +493,7 @@ contract optionMarketTest is Test {
         swappers[0] = srs;
 
         optionMarket.exerciseOption(
-            DopexV2OptionMarket.ExerciseOptionParams({
+            DopexV2OptionMarketV2.ExerciseOptionParams({
                 optionId: optionId,
                 swapper: swappers,
                 swapData: swapDatas,
@@ -441,6 +526,7 @@ contract optionMarketTest is Test {
         (
             IHandler _handler,
             IUniswapV3Pool _pool,
+            address _hook,
             int24 tickLower,
             int24 tickUpper,
             uint256 liquidityToUse
@@ -457,7 +543,7 @@ contract optionMarketTest is Test {
         swappers[0] = srs;
 
         optionMarket.exerciseOption(
-            DopexV2OptionMarket.ExerciseOptionParams({
+            DopexV2OptionMarketV2.ExerciseOptionParams({
                 optionId: optionId,
                 swapper: swappers,
                 swapData: swapDatas,
@@ -480,6 +566,7 @@ contract optionMarketTest is Test {
         (
             IHandler _handler,
             IUniswapV3Pool _pool,
+            address _hook,
             int24 tickLower,
             int24 tickUpper,
             uint256 liquidityToUse
@@ -496,7 +583,7 @@ contract optionMarketTest is Test {
         swappers[0] = srs;
 
         optionMarket.settleOption(
-            DopexV2OptionMarket.SettleOptionParams({
+            DopexV2OptionMarketV2.SettleOptionParams({
                 optionId: optionId,
                 swapper: swappers,
                 swapData: swapDatas,
@@ -517,6 +604,7 @@ contract optionMarketTest is Test {
         (
             IHandler _handler,
             IUniswapV3Pool _pool,
+            address _hook,
             int24 tickLower,
             int24 tickUpper,
             uint256 liquidityToUse
@@ -533,7 +621,7 @@ contract optionMarketTest is Test {
         swappers[0] = srs;
 
         optionMarket.settleOption(
-            DopexV2OptionMarket.SettleOptionParams({
+            DopexV2OptionMarketV2.SettleOptionParams({
                 optionId: optionId,
                 swapper: swappers,
                 swapData: swapDatas,
@@ -563,6 +651,7 @@ contract optionMarketTest is Test {
         (
             IHandler _handler,
             IUniswapV3Pool _pool,
+            address _hook,
             int24 tickLower,
             int24 tickUpper,
             uint256 liquidityToUse
@@ -579,7 +668,7 @@ contract optionMarketTest is Test {
         swappers[0] = srs;
 
         optionMarket.settleOption(
-            DopexV2OptionMarket.SettleOptionParams({
+            DopexV2OptionMarketV2.SettleOptionParams({
                 optionId: optionId,
                 swapper: swappers,
                 swapData: swapDatas,
@@ -614,6 +703,7 @@ contract optionMarketTest is Test {
         (
             IHandler _handler,
             IUniswapV3Pool _pool,
+            address _hook,
             int24 tickLower,
             int24 tickUpper,
             uint256 liquidityToUse
@@ -630,7 +720,7 @@ contract optionMarketTest is Test {
         swappers[0] = srs;
 
         optionMarket.settleOption(
-            DopexV2OptionMarket.SettleOptionParams({
+            DopexV2OptionMarketV2.SettleOptionParams({
                 optionId: optionId,
                 swapper: swappers,
                 swapData: swapDatas,
@@ -644,6 +734,145 @@ contract optionMarketTest is Test {
         );
     }
 
+    function testSettleOptionCallATM() public {
+        testBuyCallOption();
+        uint256 prevTime = block.timestamp + 20 minutes;
+        vm.warp(block.timestamp + 1201 seconds);
+
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
+                user: garbage,
+                pool: pool,
+                amountIn: 400000e18, // pushes to 2078
+                zeroForOne: true,
+                requireMint: true
+            })
+        );
+
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
+                user: garbage,
+                pool: pool,
+                amountIn: 70e18, // pushes to 2078
+                zeroForOne: false,
+                requireMint: true
+            })
+        );
+
+        console.logInt(uniswapV3TestLib.getCurrentTick(pool));
+
+        uint256 optionId = 1;
+        (uint256 len, , , , ) = optionMarket.opData(optionId);
+
+        (
+            IHandler _handler,
+            IUniswapV3Pool _pool,
+            address _hook,
+            int24 tickLower,
+            int24 tickUpper,
+            uint256 liquidityToUse
+        ) = optionMarket.opTickMap(1, 0);
+
+        uint256[] memory liquidityToSettle = new uint256[](len);
+
+        liquidityToSettle[0] = liquidityToUse;
+
+        bytes[] memory swapDatas = new bytes[](len);
+        swapDatas[0] = abi.encode(pool.fee(), 0);
+
+        ISwapper[] memory swappers = new ISwapper[](len);
+        swappers[0] = srs;
+
+        (uint256 a0, ) = LiquidityAmounts.getAmountsForLiquidity(
+            uniswapV3TestLib.getCurrentTick(pool).getSqrtRatioAtTick(),
+            tickLowerCalls.getSqrtRatioAtTick(),
+            tickUpperCalls.getSqrtRatioAtTick(),
+            uint128(liquidityToUse)
+        );
+
+        token0.mint(address(this), a0);
+        token0.approve(address(optionMarket), a0);
+
+        optionMarket.settleOption(
+            DopexV2OptionMarketV2.SettleOptionParams({
+                optionId: optionId,
+                swapper: swappers,
+                swapData: swapDatas,
+                liquidityToSettle: liquidityToSettle
+            })
+        );
+    }
+
+    function testSettleOptionPutATM() public {
+        testBuyPutOption();
+        uint256 prevTime = block.timestamp + 20 minutes;
+
+        vm.warp(block.timestamp + 1201 seconds);
+
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
+                user: garbage,
+                pool: pool,
+                amountIn: 250e18, // pushes to 1921
+                zeroForOne: false,
+                requireMint: true
+            })
+        );
+
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
+                user: garbage,
+                pool: pool,
+                amountIn: 235000e18, // pushes to 1921
+                zeroForOne: true,
+                requireMint: true
+            })
+        );
+
+        console.logInt(uniswapV3TestLib.getCurrentTick(pool));
+
+        uint256 optionId = 1;
+        (uint256 len, , , , ) = optionMarket.opData(optionId);
+
+        (
+            IHandler _handler,
+            IUniswapV3Pool _pool,
+            address _hook,
+            int24 tickLower,
+            int24 tickUpper,
+            uint256 liquidityToUse
+        ) = optionMarket.opTickMap(1, 0);
+
+        uint256[] memory liquidityToSettle = new uint256[](len);
+
+        liquidityToSettle[0] = liquidityToUse;
+
+        bytes[] memory swapDatas = new bytes[](len);
+        swapDatas[0] = abi.encode(pool.fee(), 0);
+
+        ISwapper[] memory swappers = new ISwapper[](len);
+        swappers[0] = srs;
+
+        (, uint256 a1) = LiquidityAmounts.getAmountsForLiquidity(
+            uniswapV3TestLib.getCurrentTick(pool).getSqrtRatioAtTick(),
+            tickLowerCalls.getSqrtRatioAtTick(),
+            tickUpperCalls.getSqrtRatioAtTick(),
+            uint128(liquidityToUse)
+        );
+
+        token1.mint(address(this), a1);
+        token1.approve(address(optionMarket), a1);
+
+        optionMarket.settleOption(
+            DopexV2OptionMarketV2.SettleOptionParams({
+                optionId: optionId,
+                swapper: swappers,
+                swapData: swapDatas,
+                liquidityToSettle: liquidityToSettle
+            })
+        );
+    }
+
     function testSplitPosition() public {
         testBuyCallOption();
 
@@ -653,6 +882,7 @@ contract optionMarketTest is Test {
         (
             IHandler _handler,
             IUniswapV3Pool _pool,
+            address _hook,
             int24 tickLower,
             int24 tickUpper,
             uint256 liquidityToUse
@@ -664,7 +894,7 @@ contract optionMarketTest is Test {
 
         vm.prank(optionMarket.ownerOf(1));
         optionMarket.positionSplitter(
-            DopexV2OptionMarket.PositionSplitterParams({
+            DopexV2OptionMarketV2.PositionSplitterParams({
                 optionId: optionId,
                 to: garbage,
                 liquidityToSplit: l
@@ -674,6 +904,7 @@ contract optionMarketTest is Test {
         (
             IHandler p_handler,
             IUniswapV3Pool p_pool,
+            address p_hook,
             int24 ptickLower,
             int24 ptickUpper,
             uint256 pliquidityToUse
@@ -683,6 +914,7 @@ contract optionMarketTest is Test {
         (
             IHandler n_handler,
             IUniswapV3Pool n_pool,
+            address n_hook,
             int24 ntickLower,
             int24 ntickUpper,
             uint256 nliquidityToUse
@@ -715,7 +947,7 @@ contract optionMarketTest is Test {
 
         (uint256 len, , , , ) = optionMarket.opData(optionId);
 
-        (, , , , uint256 liquidityToUse) = optionMarket.opTickMap(1, 0);
+        (, , , , , uint256 liquidityToUse) = optionMarket.opTickMap(1, 0);
 
         uint256[] memory liquidityToExercise = new uint256[](len);
 

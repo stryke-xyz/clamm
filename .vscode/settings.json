@@ -3,5 +3,10 @@
   "solidity.packageDefaultDependenciesContractsDirectory": "src",
   "solidity.packageDefaultDependenciesDirectory": "lib",
   "solidity.defaultCompiler": "localFile",
-  "solidity.remappings": ["@uniswap/v3-core/=lib/v3-core"]
+  "solidity.remappings": ["@uniswap/v3-core/=lib/v3-core"],
+  "editor.formatOnSave": true,
+  "[solidity]": {
+    "editor.defaultFormatter": "JuanBlanco.solidity"
+  },
+  "solidity.formatter": "forge"
 }
