@@ -41,10 +41,9 @@ contract LimitExercise is AccessControl, EIP712, Multicall {
     event LogLimitExerciseOrderCancelled(Order order, SignatureMeta sigMeta);
 
     bytes32 public constant KEEPER_ROLE = keccak256("KEEPER_ROLE");
-    bytes32 public constant ORDER_TYPEHASH =
-        keccak256(
-            "Order(uint256 optionId,uint256 minProfit,uint256 deadline,address profitToken,address optionMarket,address signer)"
-        );
+    bytes32 public constant ORDER_TYPEHASH = keccak256(
+        "Order(uint256 optionId,uint256 minProfit,uint256 deadline,address profitToken,address optionMarket,address signer)"
+    );
 
     constructor() EIP712("DopexV2_Clamm_Limit_Exercise_Order", "1") {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -68,13 +67,7 @@ contract LimitExercise is AccessControl, EIP712, Multicall {
         IOptionMarket optionMarket = IOptionMarket(_order.optionMarket);
 
         // Should verify signature in general and should also revert incase the limit order was placed by a signer different than the owner.
-        if (
-            !verify(
-                optionMarket.ownerOf(_exerciseParams.optionId),
-                _order,
-                _signatureMeta
-            )
-        ) {
+        if (!verify(optionMarket.ownerOf(_exerciseParams.optionId), _order, _signatureMeta)) {
             revert LimitExercise__NotSigner();
         }
 
@@ -84,32 +77,20 @@ contract LimitExercise is AccessControl, EIP712, Multicall {
 
         optionMarket.exerciseOption(_exerciseParams);
 
-        uint256 tokenBalance = IERC20(_order.profitToken).balanceOf(
-            address(this)
-        );
+        uint256 tokenBalance = IERC20(_order.profitToken).balanceOf(address(this));
 
         if (tokenBalance >= 0) {
-            executorProfit = tokenBalance > _order.minProfit
-                ? tokenBalance - _order.minProfit
-                : 0;
+            executorProfit = tokenBalance > _order.minProfit ? tokenBalance - _order.minProfit : 0;
 
-            uint256 userProfit = executorProfit > 0
-                ? _order.minProfit
-                : tokenBalance;
+            uint256 userProfit = executorProfit > 0 ? _order.minProfit : tokenBalance;
 
             // transfer complete profit if its above min profit or transfer min profit and extra to provided address
             if (executorProfit > 0) {
-                IERC20(_order.profitToken).safeTransfer(
-                    msg.sender,
-                    executorProfit
-                );
+                IERC20(_order.profitToken).safeTransfer(msg.sender, executorProfit);
             }
 
             if (userProfit > 0) {
-                IERC20(_order.profitToken).safeTransfer(
-                    optionMarket.ownerOf(_exerciseParams.optionId),
-                    userProfit
-                );
+                IERC20(_order.profitToken).safeTransfer(optionMarket.ownerOf(_exerciseParams.optionId), userProfit);
             }
         }
     }
@@ -119,10 +100,7 @@ contract LimitExercise is AccessControl, EIP712, Multicall {
      * @param _order   Order details as specified on signing.
      * @param _sigMeta Signature meta as specified on signing.
      */
-    function cancelOrder(
-        Order calldata _order,
-        SignatureMeta calldata _sigMeta
-    ) external {
+    function cancelOrder(Order calldata _order, SignatureMeta calldata _sigMeta) external {
         if (_order.signer != msg.sender) {
             revert LimitExercise__NotSigner();
         }
@@ -132,62 +110,47 @@ contract LimitExercise is AccessControl, EIP712, Multicall {
         emit LogLimitExerciseOrderCancelled(_order, _sigMeta);
     }
 
-    function getOrderSigHash(
-        Order calldata _order,
-        SignatureMeta calldata _sigMeta
-    ) public pure returns (bytes32) {
-        return
-            keccak256(
-                abi.encodePacked(
-                    _order.optionId,
-                    _order.minProfit,
-                    _order.deadline,
-                    _order.profitToken,
-                    _order.optionMarket,
-                    _order.signer,
-                    _sigMeta.v,
-                    _sigMeta.r,
-                    _sigMeta.s
-                )
-            );
+    function getOrderSigHash(Order calldata _order, SignatureMeta calldata _sigMeta) public pure returns (bytes32) {
+        return keccak256(
+            abi.encodePacked(
+                _order.optionId,
+                _order.minProfit,
+                _order.deadline,
+                _order.profitToken,
+                _order.optionMarket,
+                _order.signer,
+                _sigMeta.v,
+                _sigMeta.r,
+                _sigMeta.s
+            )
+        );
     }
 
-    function verify(
-        address _signer,
-        Order calldata _order,
-        SignatureMeta calldata _signatureMeta
-    ) public view returns (bool) {
+    function verify(address _signer, Order calldata _order, SignatureMeta calldata _signatureMeta)
+        public
+        view
+        returns (bool)
+    {
         bytes32 digest = computeDigest(_order);
 
-        return
-            _signer ==
-            digest.recover(
-                _signatureMeta.v,
-                _signatureMeta.r,
-                _signatureMeta.s
-            );
+        return _signer == digest.recover(_signatureMeta.v, _signatureMeta.r, _signatureMeta.s);
     }
 
-    function getStructHash(
-        Order calldata _order
-    ) public pure returns (bytes32) {
-        return
-            keccak256(
-                abi.encode(
-                    ORDER_TYPEHASH,
-                    _order.optionId,
-                    _order.minProfit,
-                    _order.deadline,
-                    _order.profitToken,
-                    _order.optionMarket,
-                    _order.signer
-                )
-            );
+    function getStructHash(Order calldata _order) public pure returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                ORDER_TYPEHASH,
+                _order.optionId,
+                _order.minProfit,
+                _order.deadline,
+                _order.profitToken,
+                _order.optionMarket,
+                _order.signer
+            )
+        );
     }
 
-    function computeDigest(
-        Order calldata _order
-    ) public view returns (bytes32) {
+    function computeDigest(Order calldata _order) public view returns (bytes32) {
         return _hashTypedDataV4(getStructHash(_order));
     }
 }
