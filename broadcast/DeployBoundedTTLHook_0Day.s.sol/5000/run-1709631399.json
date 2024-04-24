@@ -1,0 +1,36 @@
+{
+  "transactions": [
+    {
+      "hash": "0xc99e60b287e859f0809357784bf39b7a17d9650e3351eec349c408dfc9bab692",
+      "transactionType": "CALL",
+      "contractName": null,
+      "contractAddress": "0xe68Db25857261874359bC5CFB8D04C0C012ac24C",
+      "function": "updateWhitelistedAppsStatus(address,bool)",
+      "arguments": [
+        "0xcDA890C42365dCb1A8a1079F2f47379Ad620bC99",
+        "true"
+      ],
+      "transaction": {
+        "type": "0x00",
+        "from": "0xee82496d3ed1f5afbeb9b29f3f59289fd899d9d0",
+        "to": "0xe68db25857261874359bc5cfb8d04c0c012ac24c",
+        "gas": "0xfa79",
+        "value": "0x0",
+        "data": "0x8e007f70000000000000000000000000cda890c42365dcb1a8a1079f2f47379ad620bc990000000000000000000000000000000000000000000000000000000000000001",
+        "nonce": "0x2d"
+      },
+      "additionalContracts": [],
+      "isFixedGasLimit": false
+    }
+  ],
+  "receipts": [],
+  "libraries": [],
+  "pending": [
+    "0xc99e60b287e859f0809357784bf39b7a17d9650e3351eec349c408dfc9bab692"
+  ],
+  "returns": {},
+  "timestamp": 1709631399,
+  "chain": 5000,
+  "multi": false,
+  "commit": "82af829"
+}

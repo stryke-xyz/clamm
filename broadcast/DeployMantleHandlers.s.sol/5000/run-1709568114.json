@@ -1,0 +1,59 @@
+{
+  "transactions": [
+    {
+      "hash": "0xdba6f5ae8ff460cf276ac682bac224a085a1c9b85797a3b27f663caf96f80513",
+      "transactionType": "CALL",
+      "contractName": null,
+      "contractAddress": "0x5DdA827f304Aeb693573720B344eD160e7D4703C",
+      "function": "updateWhitelistedApps(address,bool)",
+      "arguments": [
+        "0xE4bA6740aF4c666325D49B3112E4758371386aDc",
+        "true"
+      ],
+      "transaction": {
+        "type": "0x00",
+        "from": "0xee82496d3ed1f5afbeb9b29f3f59289fd899d9d0",
+        "to": "0x5dda827f304aeb693573720b344ed160e7d4703c",
+        "gas": "0x10720",
+        "value": "0x0",
+        "data": "0xec944b6d000000000000000000000000e4ba6740af4c666325d49b3112e4758371386adc0000000000000000000000000000000000000000000000000000000000000001",
+        "nonce": "0x4"
+      },
+      "additionalContracts": [],
+      "isFixedGasLimit": false
+    },
+    {
+      "hash": "0x36864dabb8f291d5b9ec87670f27d51ed2458e108813457e6696af5569d73fc0",
+      "transactionType": "CALL",
+      "contractName": null,
+      "contractAddress": "0xE4bA6740aF4c666325D49B3112E4758371386aDc",
+      "function": "updateWhitelistHandler(address,bool)",
+      "arguments": [
+        "0x5DdA827f304Aeb693573720B344eD160e7D4703C",
+        "true"
+      ],
+      "transaction": {
+        "type": "0x00",
+        "from": "0xee82496d3ed1f5afbeb9b29f3f59289fd899d9d0",
+        "to": "0xe4ba6740af4c666325d49b3112e4758371386adc",
+        "gas": "0x1016b",
+        "value": "0x0",
+        "data": "0x05d293e90000000000000000000000005dda827f304aeb693573720b344ed160e7d4703c0000000000000000000000000000000000000000000000000000000000000001",
+        "nonce": "0x5"
+      },
+      "additionalContracts": [],
+      "isFixedGasLimit": false
+    }
+  ],
+  "receipts": [],
+  "libraries": [],
+  "pending": [
+    "0xdba6f5ae8ff460cf276ac682bac224a085a1c9b85797a3b27f663caf96f80513",
+    "0x36864dabb8f291d5b9ec87670f27d51ed2458e108813457e6696af5569d73fc0"
+  ],
+  "returns": {},
+  "timestamp": 1709568114,
+  "chain": 5000,
+  "multi": false,
+  "commit": "82af829"
+}

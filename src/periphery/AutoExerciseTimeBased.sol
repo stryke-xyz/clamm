@@ -24,7 +24,7 @@ contract AutoExerciseTimeBased is AccessControl, Multicall {
 
     uint256 public timeToSettle = 5 minutes;
 
-    bytes32 constant EXECUTOR_ROLE = keccak256("EXECUTOR");
+    bytes32 public constant EXECUTOR_ROLE = keccak256("EXECUTOR");
 
     constructor() {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -44,69 +44,54 @@ contract AutoExerciseTimeBased is AccessControl, Multicall {
     ) external onlyRole(EXECUTOR_ROLE) {
         IOptionMarket.OptionData memory opData = market.opData(tokenId);
 
-        if (opData.expiry < block.timestamp)
+        if (opData.expiry < block.timestamp) {
             revert AutoExerciseOneMin__AlreadyExpired();
+        }
 
-        if (opData.expiry - block.timestamp > timeToSettle)
+        if (opData.expiry - block.timestamp > timeToSettle) {
             revert AutoExerciseOneMin__TooSoon();
+        }
 
-        if (executorFee > MAX_EXECUTOR_FEE)
+        if (executorFee > MAX_EXECUTOR_FEE) {
             revert AutoExerciseOneMin__GreedyExecutor();
+        }
 
         market.exerciseOption(_params);
 
         if (opData.isCall) {
             address putAsset = market.putAsset();
-            uint256 amountAfterExercise = IERC20(putAsset).balanceOf(
-                address(this)
-            );
+            uint256 amountAfterExercise = IERC20(putAsset).balanceOf(address(this));
             uint256 fees;
             if (feeTo != address(0)) {
-                fees =
-                    (amountAfterExercise * executorFee) /
-                    EXECUTOR_FEE_PRECISION;
+                fees = (amountAfterExercise * executorFee) / EXECUTOR_FEE_PRECISION;
 
                 if (fees > 0) {
                     IERC20(putAsset).safeTransfer(feeTo, fees);
                 }
             }
 
-            IERC20(putAsset).safeTransfer(
-                market.ownerOf(tokenId),
-                amountAfterExercise - fees
-            );
+            IERC20(putAsset).safeTransfer(market.ownerOf(tokenId), amountAfterExercise - fees);
         } else {
             address callAsset = market.callAsset();
-            uint256 amountAfterExercise = IERC20(callAsset).balanceOf(
-                address(this)
-            );
+            uint256 amountAfterExercise = IERC20(callAsset).balanceOf(address(this));
             uint256 fees;
             if (feeTo != address(0)) {
-                fees =
-                    (amountAfterExercise * executorFee) /
-                    EXECUTOR_FEE_PRECISION;
+                fees = (amountAfterExercise * executorFee) / EXECUTOR_FEE_PRECISION;
 
                 if (fees > 0) {
                     IERC20(callAsset).safeTransfer(feeTo, fees);
                 }
             }
 
-            IERC20(callAsset).safeTransfer(
-                market.ownerOf(tokenId),
-                amountAfterExercise - fees
-            );
+            IERC20(callAsset).safeTransfer(market.ownerOf(tokenId), amountAfterExercise - fees);
         }
     }
 
-    function updateFeeTo(
-        address _newFeeTo
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function updateFeeTo(address _newFeeTo) external onlyRole(DEFAULT_ADMIN_ROLE) {
         feeTo = _newFeeTo;
     }
 
-    function updateTimeForSettle(
-        uint256 _newTime
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function updateTimeForSettle(uint256 _newTime) external onlyRole(DEFAULT_ADMIN_ROLE) {
         timeToSettle = _newTime;
     }
 }
