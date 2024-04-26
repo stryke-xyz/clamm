@@ -19,7 +19,7 @@ contract ClammRouter is Multicall, IERC721Receiver {
 
     // events
     event LogMintOption(
-        address user, address receiver, address optionMarket, uint256 tokenId, uint256 frontendId, bytes32 referalId
+        address user, address receiver, address optionMarket, uint256 tokenId, bytes32 frontendId, bytes32 referalId
     );
 
     // functions
@@ -31,7 +31,7 @@ contract ClammRouter is Multicall, IERC721Receiver {
         IOptionMarket.OptionParams calldata _params,
         address optionMarket,
         address receiver,
-        uint256 frontendId,
+        bytes32 frontendId,
         bytes32 referalId
     ) external {
         address token =

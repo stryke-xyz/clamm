@@ -53,7 +53,7 @@ contract ClammRouterTest is Test {
 
         address optionMarket = address(0x501B03BdB431154b8Df17BF1c00756E3a8F21744);
         address receiver = address(0xDe9E9238D949df8bf37216406aB8133440edC235);
-        uint256 frontendId = 0;
+        bytes32 frontendId = 0;
         bytes32 referalId = 0;
 
         // assert 0 balance
@@ -98,7 +98,7 @@ contract ClammRouterTest is Test {
             maxCostAllowance: 1e7
         });
 
-        frontendId = 1;
+        frontendId = bytes32("1");
 
         // assert balance
         assertEq(IOptionMarket(optionMarket).balanceOf(receiver), optionBalance + 1);
@@ -146,7 +146,7 @@ contract ClammRouterTest is Test {
 
         address optionMarket = address(0x501B03BdB431154b8Df17BF1c00756E3a8F21744);
         address receiver = address(0xDe9E9238D949df8bf37216406aB8133440edC235);
-        uint256 frontendId = 0;
+        bytes32 frontendId = 0;
         bytes32 referalId = 0;
 
         // assert 0 balance
