@@ -10,6 +10,9 @@ import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Po
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {IOptionMarket} from "../../src/interfaces/IOptionMarket.sol";
 import {IHandler} from "../../src/interfaces/IHandler.sol";
+import {IERC6909} from "../../src/interfaces/IERC6909.sol";
+
+import {UniswapV3SingleTickLiquidityHandlerV2} from "../../src/handlers/UniswapV3SingleTickLiquidityHandlerV2.sol";
 
 contract ClammRouterTest is Test {
     ClammRouter router;
@@ -24,6 +27,7 @@ contract ClammRouterTest is Test {
 
         router = new ClammRouter();
         handler = IHandler(0x29BbF7EbB9C5146c98851e76A5529985E4052116);
+        router.setPositionsManager(0xE4bA6740aF4c666325D49B3112E4758371386aDc);
     }
 
     function test_mintOption() public {
@@ -155,6 +159,45 @@ contract ClammRouterTest is Test {
 
         router.mintOption(_params, optionMarket, receiver, frontendId, referalId);
 
+        vm.stopPrank();
+    }
+
+    function test_mintPosition() public {
+        vm.startPrank(0xDe9E9238D949df8bf37216406aB8133440edC235);
+
+        IERC20(0x82aF49447D8a07e3bd95BD0d56f35241523fBab1).approve(address(router), 1 ether);
+
+        bytes memory data = abi.encode(
+            UniswapV3SingleTickLiquidityHandlerV2.MintPositionParams({
+                pool: IUniswapV3Pool(0xC6962004f452bE9203591991D15f6b388e09E8D0),
+                hook: 0x0000000000000000000000000000000000000000,
+                tickLower: -195360,
+                tickUpper: -195350,
+                liquidity: 467541131811138
+            })
+        );
+
+        address receiver = address(0xDe9E9238D949df8bf37216406aB8133440edC235);
+        bytes32 frontendId = 0;
+        bytes32 referalId = 0;
+
+        uint256 amount = router.mintPosition(
+            IHandler(0x29BbF7EbB9C5146c98851e76A5529985E4052116), data, receiver, frontendId, referalId
+        );
+
+        assertEq(
+            amount,
+            IERC6909(0x29BbF7EbB9C5146c98851e76A5529985E4052116).balanceOf(
+                receiver, 69065842648392217392428702702373800087305271312427941318721945433946963591500
+            )
+        );
+
+        assertEq(
+            0,
+            IERC6909(0x29BbF7EbB9C5146c98851e76A5529985E4052116).balanceOf(
+                address(router), 69065842648392217392428702702373800087305271312427941318721945433946963591500
+            )
+        );
         vm.stopPrank();
     }
 }
