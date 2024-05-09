@@ -12,12 +12,6 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 contract OptionPricingLinearV2 is Ownable {
     using SafeMath for uint256;
 
-    // The offset for volatility calculation in 1e4 precision
-    uint256 public volatilityOffset;
-
-    // The multiplier for volatility calculation in 1e4 precision
-    uint256 public volatilityMultiplier;
-
     // The % of the price of asset which is the minimum option price possible in 1e8 precision
     uint256 public minOptionPricePercentage;
 
@@ -27,14 +21,18 @@ contract OptionPricingLinearV2 is Ownable {
     // Time to expiry => volatility
     mapping(uint256 => uint256) public ttlToVol;
 
+    // TTL => The offset for volatility calculation in 1e4 precision
+    mapping(uint256 => uint256) public volatilityOffsets;
+
+    // TTL => The multiplier for volatility calculation in 1e4 precision
+    mapping(uint256 => uint256) volatilityMultipliers;
+
     // IV Setter addresses
     mapping(address => bool) public ivSetter;
 
     error NotIVSetter();
 
-    constructor(uint256 _volatilityOffset, uint256 _volatilityMultiplier, uint256 _minOptionPricePercentage) {
-        volatilityOffset = _volatilityOffset;
-        volatilityMultiplier = _volatilityMultiplier;
+    constructor(uint256 _minOptionPricePercentage) {
         minOptionPricePercentage = _minOptionPricePercentage;
 
         ivSetter[msg.sender] = true;
@@ -63,19 +61,33 @@ contract OptionPricingLinearV2 is Ownable {
     }
 
     /// @notice updates the offset for volatility calculation
-    /// @param _volatilityOffset the new offset
+    /// @param _volatilityOffsets the new offset
+    /// @param _ttls The TTLs to update the volatility offset for.
     /// @return whether offset was updated
-    function updateVolatilityOffset(uint256 _volatilityOffset) external onlyOwner returns (bool) {
-        volatilityOffset = _volatilityOffset;
+    function updateVolatilityOffset(uint256[] calldata _volatilityOffsets, uint256[] calldata _ttls)
+        external
+        onlyOwner
+        returns (bool)
+    {
+        for (uint256 i = 0; i < _volatilityOffsets.length; i++) {
+            volatilityOffsets[_ttls[i]] = _volatilityOffsets[i];
+        }
 
         return true;
     }
 
     /// @notice updates the multiplier for volatility calculation
-    /// @param _volatilityMultiplier the new multiplier
+    /// @param _volatilityMultipliers the new multiplier
+    /// @param _ttls The TTLs to update the volatility multiplier for.
     /// @return whether multiplier was updated
-    function updateVolatilityMultiplier(uint256 _volatilityMultiplier) external onlyOwner returns (bool) {
-        volatilityMultiplier = _volatilityMultiplier;
+    function updateVolatilityMultiplier(uint256[] calldata _volatilityMultipliers, uint256[] calldata _ttls)
+        external
+        onlyOwner
+        returns (bool)
+    {
+        for (uint256 i = 0; i < _volatilityMultipliers.length; i++) {
+            volatilityMultipliers[_ttls[i]] = _volatilityMultipliers[i];
+        }
 
         return true;
     }
@@ -107,7 +119,7 @@ contract OptionPricingLinearV2 is Ownable {
 
         if (volatility == 0) revert();
 
-        volatility = getVolatility(strike, lastPrice, volatility);
+        volatility = getVolatility(strike, lastPrice, volatility, expiry - block.timestamp);
 
         uint256 optionPrice = BlackScholes.calculate(isPut ? 1 : 0, lastPrice, strike, timeToExpiry, 0, volatility) // 0 - Put, 1 - Call
                 // Number of days to expiry mul by 100
@@ -138,7 +150,7 @@ contract OptionPricingLinearV2 is Ownable {
 
         if (volatility == 0) revert();
 
-        volatility = getVolatility(strike, lastPrice, volatility);
+        volatility = getVolatility(strike, lastPrice, volatility, ttl);
 
         uint256 optionPrice = BlackScholes.calculate(isPut ? 1 : 0, lastPrice, strike, timeToExpiry, 0, volatility) // 0 - Put, 1 - Call
                 // Number of days to expiry mul by 100
@@ -157,7 +169,11 @@ contract OptionPricingLinearV2 is Ownable {
     /// @param strike strike price
     /// @param lastPrice current price
     /// @param volatility volatility
-    function getVolatility(uint256 strike, uint256 lastPrice, uint256 volatility) public view returns (uint256) {
+    function getVolatility(uint256 strike, uint256 lastPrice, uint256 volatility, uint256 ttl)
+        public
+        view
+        returns (uint256)
+    {
         uint256 percentageDifference = strike.mul(1e2).mul(VOLATILITY_PRECISION).div(lastPrice); // 1e4 in percentage precision (1e6 is 100%)
 
         if (strike > lastPrice) {
@@ -167,7 +183,7 @@ contract OptionPricingLinearV2 is Ownable {
         }
 
         uint256 scaleFactor =
-            volatilityOffset + (percentageDifference.mul(volatilityMultiplier).div(VOLATILITY_PRECISION));
+            volatilityOffsets[ttl] + (percentageDifference.mul(volatilityMultipliers[ttl]).div(VOLATILITY_PRECISION));
 
         return (volatility.mul(scaleFactor).div(VOLATILITY_PRECISION));
     }
