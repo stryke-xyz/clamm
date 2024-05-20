@@ -9,7 +9,10 @@ import {ABDKMathQuad} from "../../test/pricing/ABDKMathQuad.sol";
 // Contracts
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-contract OptionPricingLinearV2 is Ownable {
+// Interfaces
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+contract OptionPricingLinearV2_1 is Ownable {
     using SafeMath for uint256;
 
     // The % of the price of asset which is the minimum option price possible in 1e8 precision
@@ -17,6 +20,9 @@ contract OptionPricingLinearV2 is Ownable {
 
     // The decimal precision for volatility calculation
     uint256 public constant VOLATILITY_PRECISION = 1e4;
+
+    // XSYX token address
+    address public xsyx;
 
     // Time to expiry => volatility
     mapping(uint256 => uint256) public ttlToVol;
@@ -30,10 +36,17 @@ contract OptionPricingLinearV2 is Ownable {
     // IV Setter addresses
     mapping(address => bool) public ivSetter;
 
+    // XSYK Balances for each tier
+    uint256[] public xsykBalances;
+
+    // Discount for each tier
+    uint256[] public discounts;
+
     error NotIVSetter();
 
-    constructor(uint256 _minOptionPricePercentage) {
+    constructor(uint256 _minOptionPricePercentage, address _xsyx) {
         minOptionPricePercentage = _minOptionPricePercentage;
+        xsyx = _xsyx;
 
         ivSetter[msg.sender] = true;
     }
@@ -103,6 +116,21 @@ contract OptionPricingLinearV2 is Ownable {
     /// @return whether % was updated
     function updateMinOptionPricePercentage(uint256 _minOptionPricePercentage) external onlyOwner returns (bool) {
         minOptionPricePercentage = _minOptionPricePercentage;
+
+        return true;
+    }
+
+    /// @notice sets the XSYK balances and discounts for each tier
+    /// @param _xsykBalances the XSYK balances
+    /// @param _discounts the discounts
+    /// @return whether the balances and discounts were set
+    function setXSYKBalancesAndDiscounts(uint256[] calldata _xsykBalances, uint256[] calldata _discounts)
+        external
+        onlyOwner
+        returns (bool)
+    {
+        xsykBalances = _xsykBalances;
+        discounts = _discounts;
 
         return true;
     }
@@ -191,6 +219,27 @@ contract OptionPricingLinearV2 is Ownable {
         uint256 scaleFactor =
             volatilityOffsets[ttl] + (percentageDifference.mul(volatilityMultipliers[ttl]).div(VOLATILITY_PRECISION));
 
-        return (volatility.mul(scaleFactor).div(VOLATILITY_PRECISION));
+        volatility = volatility.mul(scaleFactor).div(VOLATILITY_PRECISION);
+
+        address userAddress = tx.origin;
+        uint256 tiers = xsykBalances.length;
+        uint256 userDiscount = 0;
+        if (tiers != 0) {
+            for (uint256 i; i < tiers;) {
+                uint256 balance = IERC20(xsyx).balanceOf(userAddress);
+                if (balance >= xsykBalances[i]) {
+                    userDiscount = discounts[i];
+                } else {
+                    break;
+                }
+                unchecked {
+                    ++i;
+                }
+            }
+        }
+
+        volatility = volatility.mul(1e4 - userDiscount).div(1e4);
+
+        return volatility;
     }
 }
