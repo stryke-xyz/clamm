@@ -10,7 +10,7 @@ contract DeployOptionPricingLinearV2_1 is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
 
         vm.startBroadcast(deployerPrivateKey);
-        OptionPricingLinearV2_1 opl = new OptionPricingLinearV2_1(10000000,0x50E04E222Fc1be96E94E86AcF1136cB0E97E1d40);
+        OptionPricingLinearV2_1 opl = new OptionPricingLinearV2_1(10000000, 0x50E04E222Fc1be96E94E86AcF1136cB0E97E1d40);
         console.log(address(opl));
 
         // Set IV
@@ -55,19 +55,19 @@ contract DeployOptionPricingLinearV2_1 is Script {
 
         opl.updateVolatilityMultiplier(volatilityMultipliers, ttls);
 
-        // Set XSYK Balance requirement and discounts
-        uint256[] memory _xsykBalances = new uint256[](3);
+        // Set xSYK Balance requirement and discounts
+        uint256[] memory _xSykBalances = new uint256[](3);
         uint256[] memory _discounts = new uint256[](3);
 
-        _xsykBalances[0] = 100;
-        _xsykBalances[1] = 1000;
-        _xsykBalances[2] = 10000;
+        _xSykBalances[0] = 100;
+        _xSykBalances[1] = 1000;
+        _xSykBalances[2] = 10000;
 
         _discounts[0] = 1000;
         _discounts[1] = 2000;
         _discounts[2] = 3000;
 
-        opl.setXSYKBalancesAndDiscounts(_xsykBalances, _discounts);
+        opl.setXSykBalancesAndDiscounts(_xSykBalances, _discounts);
 
         vm.stopBroadcast();
     }

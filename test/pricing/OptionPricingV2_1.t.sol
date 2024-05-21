@@ -82,18 +82,18 @@ contract OptionPricingTest is Test {
             true
         );
         vm.stopPrank();
-        uint256[] memory _xsykBalances = new uint256[](3);
+        uint256[] memory _xSykBalances = new uint256[](3);
         uint256[] memory _discounts = new uint256[](3);
 
-        _xsykBalances[0] = 100;
-        _xsykBalances[1] = 1000;
-        _xsykBalances[2] = 10000;
+        _xSykBalances[0] = 100;
+        _xSykBalances[1] = 1000;
+        _xSykBalances[2] = 10000;
 
         _discounts[0] = 1000;
         _discounts[1] = 2000;
         _discounts[2] = 3000;
 
-        pricing.setXSYKBalancesAndDiscounts(_xsykBalances, _discounts);
+        pricing.setXSykBalancesAndDiscounts(_xSykBalances, _discounts);
         pricing.updateIVSetter(address(this), true);
 
         uint256[] memory ttls = new uint256[](1);

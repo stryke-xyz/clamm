@@ -21,8 +21,8 @@ contract OptionPricingLinearV2_1 is Ownable {
     // The decimal precision for volatility calculation
     uint256 public constant VOLATILITY_PRECISION = 1e4;
 
-    // XSYX token address
-    address public xsyx;
+    // xSYK token address
+    address public xSyk;
 
     // Time to expiry => volatility
     mapping(uint256 => uint256) public ttlToVol;
@@ -36,17 +36,17 @@ contract OptionPricingLinearV2_1 is Ownable {
     // IV Setter addresses
     mapping(address => bool) public ivSetter;
 
-    // XSYK Balances for each tier
-    uint256[] public xsykBalances;
+    // xSYK Balances for each tier
+    uint256[] public xSykBalances;
 
     // Discount for each tier
     uint256[] public discounts;
 
     error NotIVSetter();
 
-    constructor(uint256 _minOptionPricePercentage, address _xsyx) {
+    constructor(uint256 _minOptionPricePercentage, address _xSyk) {
         minOptionPricePercentage = _minOptionPricePercentage;
-        xsyx = _xsyx;
+        xSyk = _xSyk;
 
         ivSetter[msg.sender] = true;
     }
@@ -120,16 +120,16 @@ contract OptionPricingLinearV2_1 is Ownable {
         return true;
     }
 
-    /// @notice sets the XSYK balances and discounts for each tier
-    /// @param _xsykBalances the XSYK balances
+    /// @notice sets the xSYK balances and discounts for each tier
+    /// @param _xSykBalances the xSYK balances
     /// @param _discounts the discounts
     /// @return whether the balances and discounts were set
-    function setXSYKBalancesAndDiscounts(uint256[] calldata _xsykBalances, uint256[] calldata _discounts)
+    function setXSykBalancesAndDiscounts(uint256[] calldata _xSykBalances, uint256[] calldata _discounts)
         external
         onlyOwner
         returns (bool)
     {
-        xsykBalances = _xsykBalances;
+        xSykBalances = _xSykBalances;
         discounts = _discounts;
 
         return true;
@@ -222,12 +222,12 @@ contract OptionPricingLinearV2_1 is Ownable {
         volatility = volatility.mul(scaleFactor).div(VOLATILITY_PRECISION);
 
         address userAddress = tx.origin;
-        uint256 tiers = xsykBalances.length;
+        uint256 tiers = xSykBalances.length;
         uint256 userDiscount = 0;
         if (tiers != 0) {
             for (uint256 i; i < tiers;) {
-                uint256 balance = IERC20(xsyx).balanceOf(userAddress);
-                if (balance >= xsykBalances[i]) {
+                uint256 balance = IERC20(xSyk).balanceOf(userAddress);
+                if (balance >= xSykBalances[i]) {
                     userDiscount = discounts[i];
                 } else {
                     break;
