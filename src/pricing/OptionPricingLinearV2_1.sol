@@ -31,7 +31,7 @@ contract OptionPricingLinearV2_1 is Ownable {
     mapping(uint256 => uint256) public volatilityOffsets;
 
     // TTL => The multiplier for volatility calculation in 1e4 precision
-    mapping(uint256 => uint256) volatilityMultipliers;
+    mapping(uint256 => uint256) public volatilityMultipliers;
 
     // IV Setter addresses
     mapping(address => bool) public ivSetter;
