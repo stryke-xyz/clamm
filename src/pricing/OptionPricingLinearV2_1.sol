@@ -44,6 +44,8 @@ contract OptionPricingLinearV2_1 is Ownable {
 
     error NotIVSetter();
 
+    event UpdatedIVs(address sender, uint256[] ttls, uint256[] ttlIVs);
+
     constructor(uint256 _minOptionPricePercentage, address _xSyk) {
         minOptionPricePercentage = _minOptionPricePercentage;
         xSyk = _xSyk;
@@ -63,14 +65,16 @@ contract OptionPricingLinearV2_1 is Ownable {
 
     /// @notice Updates the implied volatility (IV) for the given time to expirations (TTLs).
     /// @param _ttls The TTLs to update the IV for.
-    /// @param _ttlIV The new IVs for the given TTLs.
+    /// @param _ttlIVs The new IVs for the given TTLs.
     /// @dev Only the IV SETTER can call this function.
-    function updateIVs(uint256[] calldata _ttls, uint256[] calldata _ttlIV) external {
+    function updateIVs(uint256[] calldata _ttls, uint256[] calldata _ttlIVs) external {
         if (!ivSetter[msg.sender]) revert NotIVSetter();
 
         for (uint256 i; i < _ttls.length; i++) {
-            ttlToVol[_ttls[i]] = _ttlIV[i];
+            ttlToVol[_ttls[i]] = _ttlIVs[i];
         }
+
+        emit UpdatedIVs(msg.sender, _ttls, _ttlIVs);
     }
 
     /// @notice updates the offset for volatility calculation
