@@ -8,6 +8,8 @@ out/
 /broadcast/**/dry-run/
 /broadcast/Playground.s.sol/
 /broadcast/MultiDeposit.s.sol/
+/broadcast/DeployOptionPricingLinear.s.sol/
+/broadcast/DeployOptionPricingLinearV2.s.sol/
 /broadcast/DeployOptionPricingLinearV2_1.s.sol/
 
 # Docs
