@@ -17,11 +17,6 @@ import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 abstract contract LiquidityManager is IUniswapV3MintCallback {
     address public immutable factory;
     bytes32 public immutable POOL_INIT_CODE_HASH;
-    // bytes32 internal constant POOL_INIT_CODE_HASH =
-    //     0xa598dd2fba360510c5a8f02f44423a4468e902df5857dbce3ca162a43a3a31ff;
-
-    // bytes32 internal constant POOL_INIT_CODE_HASH =
-    //     0xe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54;
 
     struct PoolKey {
         address token0;
@@ -40,18 +35,16 @@ abstract contract LiquidityManager is IUniswapV3MintCallback {
     }
 
     /// @inheritdoc IUniswapV3MintCallback
-    function uniswapV3MintCallback(
-        uint256 amount0Owed,
-        uint256 amount1Owed,
-        bytes calldata data
-    ) external override {
+    function uniswapV3MintCallback(uint256 amount0Owed, uint256 amount1Owed, bytes calldata data) external override {
         MintCallbackData memory decoded = abi.decode(data, (MintCallbackData));
         verifyCallback(factory, decoded.poolKey);
 
-        if (amount0Owed > 0)
+        if (amount0Owed > 0) {
             pay(decoded.poolKey.token0, decoded.payer, msg.sender, amount0Owed);
-        if (amount1Owed > 0)
+        }
+        if (amount1Owed > 0) {
             pay(decoded.poolKey.token1, decoded.payer, msg.sender, amount1Owed);
+        }
     }
 
     struct AddLiquidityParams {
@@ -68,41 +61,22 @@ abstract contract LiquidityManager is IUniswapV3MintCallback {
     }
 
     /// @notice Add liquidity to an initialized pool
-    function addLiquidity(
-        AddLiquidityParams memory params
-    )
+    function addLiquidity(AddLiquidityParams memory params)
         public
-        returns (
-            uint128 liquidity,
-            uint256 amount0,
-            uint256 amount1,
-            IUniswapV3Pool pool
-        )
+        returns (uint128 liquidity, uint256 amount0, uint256 amount1, IUniswapV3Pool pool)
     {
-        PoolKey memory poolKey = PoolKey({
-            token0: params.token0,
-            token1: params.token1,
-            fee: params.fee
-        });
+        PoolKey memory poolKey = PoolKey({token0: params.token0, token1: params.token1, fee: params.fee});
 
         pool = IUniswapV3Pool(computeAddress(factory, poolKey));
 
         // compute the liquidity amount
         {
-            (uint160 sqrtPriceX96, , , , , , ) = pool.slot0();
-            uint160 sqrtRatioAX96 = TickMath.getSqrtRatioAtTick(
-                params.tickLower
-            );
-            uint160 sqrtRatioBX96 = TickMath.getSqrtRatioAtTick(
-                params.tickUpper
-            );
+            (uint160 sqrtPriceX96,,,,,,) = pool.slot0();
+            uint160 sqrtRatioAX96 = TickMath.getSqrtRatioAtTick(params.tickLower);
+            uint160 sqrtRatioBX96 = TickMath.getSqrtRatioAtTick(params.tickUpper);
 
             liquidity = LiquidityAmounts.getLiquidityForAmounts(
-                sqrtPriceX96,
-                sqrtRatioAX96,
-                sqrtRatioBX96,
-                params.amount0Desired,
-                params.amount1Desired
+                sqrtPriceX96, sqrtRatioAX96, sqrtRatioBX96, params.amount0Desired, params.amount1Desired
             );
         }
 
@@ -119,12 +93,7 @@ abstract contract LiquidityManager is IUniswapV3MintCallback {
     /// @param payer The entity that must pay
     /// @param recipient The entity that will receive payment
     /// @param value The amount to pay
-    function pay(
-        address token,
-        address payer,
-        address recipient,
-        uint256 value
-    ) internal {
+    function pay(address token, address payer, address recipient, uint256 value) internal {
         // pull payment
         if (payer == address(this)) {
             SafeERC20.safeTransfer(IERC20(token), recipient, value);
@@ -133,19 +102,12 @@ abstract contract LiquidityManager is IUniswapV3MintCallback {
         }
     }
 
-    function getPoolKey(
-        address tokenA,
-        address tokenB,
-        uint24 fee
-    ) internal pure returns (PoolKey memory) {
+    function getPoolKey(address tokenA, address tokenB, uint24 fee) internal pure returns (PoolKey memory) {
         if (tokenA > tokenB) (tokenA, tokenB) = (tokenB, tokenA);
         return PoolKey({token0: tokenA, token1: tokenB, fee: fee});
     }
 
-    function computeAddress(
-        address _factory,
-        PoolKey memory key
-    ) internal view returns (address pool) {
+    function computeAddress(address _factory, PoolKey memory key) internal view returns (address pool) {
         require(key.token0 < key.token1);
         pool = address(
             uint160(
@@ -154,9 +116,7 @@ abstract contract LiquidityManager is IUniswapV3MintCallback {
                         abi.encodePacked(
                             hex"ff",
                             _factory,
-                            keccak256(
-                                abi.encode(key.token0, key.token1, key.fee)
-                            ),
+                            keccak256(abi.encode(key.token0, key.token1, key.fee)),
                             POOL_INIT_CODE_HASH
                         )
                     )
@@ -165,19 +125,15 @@ abstract contract LiquidityManager is IUniswapV3MintCallback {
         );
     }
 
-    function verifyCallback(
-        address _factory,
-        address tokenA,
-        address tokenB,
-        uint24 fee
-    ) internal view returns (IUniswapV3Pool pool) {
+    function verifyCallback(address _factory, address tokenA, address tokenB, uint24 fee)
+        internal
+        view
+        returns (IUniswapV3Pool pool)
+    {
         return verifyCallback(_factory, getPoolKey(tokenA, tokenB, fee));
     }
 
-    function verifyCallback(
-        address _factory,
-        PoolKey memory poolKey
-    ) internal view returns (IUniswapV3Pool pool) {
+    function verifyCallback(address _factory, PoolKey memory poolKey) internal view returns (IUniswapV3Pool pool) {
         pool = IUniswapV3Pool(computeAddress(_factory, poolKey));
         require(msg.sender == address(pool));
     }
