@@ -13,7 +13,7 @@ import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 
 /// @title Liquidity management functions
-/// @notice Internal functions for safely managing liquidity in Uniswap V3
+/// @notice Internal functions for safely managing liquidity in Sushiswap V3
 abstract contract LiquidityManager is IUniswapV3MintCallback {
     address public immutable factory;
     bytes32 public immutable POOL_INIT_CODE_HASH;

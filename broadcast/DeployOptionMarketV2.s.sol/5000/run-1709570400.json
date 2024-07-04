@@ -1,0 +1,85 @@
+{
+  "transactions": [
+    {
+      "hash": "0xd2cf34a929f81d8c970df2c1fb5342bfc322d32635269b516a597371121ecf62",
+      "transactionType": "CALL",
+      "contractName": null,
+      "contractAddress": "0xE4bA6740aF4c666325D49B3112E4758371386aDc",
+      "function": "updateWhitelistHandlerWithApp(address,address,bool)",
+      "arguments": [
+        "0x5DdA827f304Aeb693573720B344eD160e7D4703C",
+        "0x1D5DE630BbBF68c9bf17D8462605227D79eA910C",
+        "true"
+      ],
+      "transaction": {
+        "type": "0x00",
+        "from": "0xee82496d3ed1f5afbeb9b29f3f59289fd899d9d0",
+        "to": "0xe4ba6740af4c666325d49b3112e4758371386adc",
+        "gas": "0x106ff",
+        "value": "0x0",
+        "data": "0x5ab70f560000000000000000000000005dda827f304aeb693573720b344ed160e7d4703c0000000000000000000000001d5de630bbbf68c9bf17d8462605227d79ea910c0000000000000000000000000000000000000000000000000000000000000001",
+        "nonce": "0xe"
+      },
+      "additionalContracts": [],
+      "isFixedGasLimit": false
+    },
+    {
+      "hash": "0xa04962bd24bdaa3411d72f12836fadf4acfcadfb8171177ce244f2ed1b9af105",
+      "transactionType": "CALL",
+      "contractName": null,
+      "contractAddress": "0xE4bA6740aF4c666325D49B3112E4758371386aDc",
+      "function": "updateWhitelistHandlerWithApp(address,address,bool)",
+      "arguments": [
+        "0x210D2963b555Ce5AC7e3d9b0e2F38d7AEBd4B43F",
+        "0x1D5DE630BbBF68c9bf17D8462605227D79eA910C",
+        "true"
+      ],
+      "transaction": {
+        "type": "0x00",
+        "from": "0xee82496d3ed1f5afbeb9b29f3f59289fd899d9d0",
+        "to": "0xe4ba6740af4c666325d49b3112e4758371386adc",
+        "gas": "0x106ff",
+        "value": "0x0",
+        "data": "0x5ab70f56000000000000000000000000210d2963b555ce5ac7e3d9b0e2f38d7aebd4b43f0000000000000000000000001d5de630bbbf68c9bf17d8462605227d79ea910c0000000000000000000000000000000000000000000000000000000000000001",
+        "nonce": "0xf"
+      },
+      "additionalContracts": [],
+      "isFixedGasLimit": false
+    },
+    {
+      "hash": "0x151aee44482b786d8941ef048bb36658dfb8b3d6d238812e7324f9de5ce78d01",
+      "transactionType": "CALL",
+      "contractName": null,
+      "contractAddress": "0xE4bA6740aF4c666325D49B3112E4758371386aDc",
+      "function": "updateWhitelistHandlerWithApp(address,address,bool)",
+      "arguments": [
+        "0xD648267FC75e144f28436E7b54030C7466031b05",
+        "0x1D5DE630BbBF68c9bf17D8462605227D79eA910C",
+        "true"
+      ],
+      "transaction": {
+        "type": "0x00",
+        "from": "0xee82496d3ed1f5afbeb9b29f3f59289fd899d9d0",
+        "to": "0xe4ba6740af4c666325d49b3112e4758371386adc",
+        "gas": "0x106ff",
+        "value": "0x0",
+        "data": "0x5ab70f56000000000000000000000000d648267fc75e144f28436e7b54030c7466031b050000000000000000000000001d5de630bbbf68c9bf17d8462605227d79ea910c0000000000000000000000000000000000000000000000000000000000000001",
+        "nonce": "0x10"
+      },
+      "additionalContracts": [],
+      "isFixedGasLimit": false
+    }
+  ],
+  "receipts": [],
+  "libraries": [],
+  "pending": [
+    "0xd2cf34a929f81d8c970df2c1fb5342bfc322d32635269b516a597371121ecf62",
+    "0xa04962bd24bdaa3411d72f12836fadf4acfcadfb8171177ce244f2ed1b9af105",
+    "0x151aee44482b786d8941ef048bb36658dfb8b3d6d238812e7324f9de5ce78d01"
+  ],
+  "returns": {},
+  "timestamp": 1709570400,
+  "chain": 5000,
+  "multi": false,
+  "commit": "82af829"
+}

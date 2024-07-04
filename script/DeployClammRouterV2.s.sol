@@ -2,14 +2,15 @@
 pragma solidity ^0.8.13;
 
 import "forge-std/Script.sol";
-import {DopexV2PositionManager} from "../src/DopexV2PositionManager.sol";
+import {ClammRouterV2} from "../src/router/ClammRouterV2.sol";
 
-contract DeployPositionManager is Script {
+contract DeployClammRouterV2 is Script {
     function run() public {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+
         vm.startBroadcast(deployerPrivateKey);
-        DopexV2PositionManager pm = new DopexV2PositionManager();
-        console.log(address(pm));
+        ClammRouterV2 router = new ClammRouterV2();
+        console.log(address(router));
         vm.stopBroadcast();
     }
 }
