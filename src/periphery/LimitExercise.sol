@@ -21,6 +21,7 @@ contract LimitExercise is AccessControl, EIP712, Multicall {
     mapping(bytes32 => bool) public cancelledOrders;
 
     struct Order {
+        uint256 createdAt;
         uint256 optionId;
         uint256 minProfit;
         uint256 deadline;
@@ -37,8 +38,10 @@ contract LimitExercise is AccessControl, EIP712, Multicall {
 
     error LimitExercise__NotSigner();
     error LimitExercise__CancelledOrder();
+    error LimitExercise__OrderNotSatisfied();
 
     event LogLimitExerciseOrderCancelled(Order order, SignatureMeta sigMeta);
+    event LogLimitExericseOrderFullfilled(Order order, uint256 executorProfit, address executor);
 
     bytes32 public constant KEEPER_ROLE = keccak256("KEEPER_ROLE");
     bytes32 public constant ORDER_TYPEHASH = keccak256(
@@ -51,7 +54,9 @@ contract LimitExercise is AccessControl, EIP712, Multicall {
     }
 
     /**
-     * @notice                Execute a limit exercise order.
+     * @notice                Execute a limit exercise order. Reverts
+     *                        if order is not fullfilled properly or
+     *                        signature verification fails.
      * @param _order          Order details as specified on signing.
      * @param _signatureMeta  Signature meta as specified on signing.
      * @param _exerciseParams Parameters for exercising the option.
@@ -71,6 +76,7 @@ contract LimitExercise is AccessControl, EIP712, Multicall {
             revert LimitExercise__NotSigner();
         }
 
+        // Avoid cancelled orders
         if (cancelledOrders[getOrderSigHash(_order, _signatureMeta)]) {
             revert LimitExercise__CancelledOrder();
         }
@@ -79,19 +85,20 @@ contract LimitExercise is AccessControl, EIP712, Multicall {
 
         uint256 tokenBalance = IERC20(_order.profitToken).balanceOf(address(this));
 
-        if (tokenBalance >= 0) {
-            executorProfit = tokenBalance > _order.minProfit ? tokenBalance - _order.minProfit : 0;
+        if (tokenBalance >= _order.minProfit) {
+            uint256 executorProfit = tokenBalance - _order.minProfit;
 
-            uint256 userProfit = executorProfit > 0 ? _order.minProfit : tokenBalance;
-
-            // transfer complete profit if its above min profit or transfer min profit and extra to provided address
+            // Transfer executor's delta to msg.sender
             if (executorProfit > 0) {
                 IERC20(_order.profitToken).safeTransfer(msg.sender, executorProfit);
             }
 
-            if (userProfit > 0) {
-                IERC20(_order.profitToken).safeTransfer(optionMarket.ownerOf(_exerciseParams.optionId), userProfit);
-            }
+            // Transfer options owner's delta
+            IERC20(_order.profitToken).safeTransfer(optionMarket.ownerOf(_exerciseParams.optionId), _order.minProfit);
+
+            emit LogLimitExericseOrderFullfilled(_order, executorProfit, msg.sender);
+        } else {
+            revert LimitExercise__OrderNotSatisfied();
         }
     }
 
