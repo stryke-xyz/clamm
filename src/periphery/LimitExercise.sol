@@ -8,13 +8,14 @@ import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/Safe
 import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {ReentrancyGuard} from "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 
 // Interfaces
 import {IOptionMarket} from "../interfaces/IOptionMarket.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 
-contract LimitExercise is AccessControl, EIP712, Multicall {
+contract LimitExercise is AccessControl, EIP712, Multicall, ReentrancyGuard {
     using ECDSA for bytes32;
     using SafeERC20 for IERC20;
 
@@ -36,9 +37,10 @@ contract LimitExercise is AccessControl, EIP712, Multicall {
         bytes32 s;
     }
 
-    error LimitExercise__NotSigner();
+    error LimitExercise__SignatureVerificationFailed();
     error LimitExercise__CancelledOrder();
     error LimitExercise__OrderNotSatisfied();
+    error LimitExercise__OrderExpired();
 
     event LogLimitExerciseOrderCancelled(Order order, SignatureMeta sigMeta);
     event LogLimitExericseOrderFullfilled(Order order, uint256 executorProfit, address executor);
@@ -68,12 +70,14 @@ contract LimitExercise is AccessControl, EIP712, Multicall {
         Order calldata _order,
         SignatureMeta calldata _signatureMeta,
         IOptionMarket.ExerciseOptionParams calldata _exerciseParams
-    ) external onlyRole(KEEPER_ROLE) returns (uint256 executorProfit) {
+    ) external nonReentrant onlyRole(KEEPER_ROLE) returns (uint256 executorProfit) {
         IOptionMarket optionMarket = IOptionMarket(_order.optionMarket);
 
+        if (_order.deadline <= block.timestamp) revert LimitExercise__OrderExpired();
+
         // Should verify signature in general and should also revert incase the limit order was placed by a signer different than the owner.
-        if (!verify(optionMarket.ownerOf(_exerciseParams.optionId), _order, _signatureMeta)) {
-            revert LimitExercise__NotSigner();
+        if (!verify(_order, _signatureMeta)) {
+            revert LimitExercise__SignatureVerificationFailed();
         }
 
         // Avoid cancelled orders
@@ -86,7 +90,7 @@ contract LimitExercise is AccessControl, EIP712, Multicall {
         uint256 tokenBalance = IERC20(_order.profitToken).balanceOf(address(this));
 
         if (tokenBalance >= _order.minProfit) {
-            uint256 executorProfit = tokenBalance - _order.minProfit;
+            executorProfit = tokenBalance - _order.minProfit;
 
             // Transfer executor's delta to msg.sender
             if (executorProfit > 0) {
@@ -109,7 +113,7 @@ contract LimitExercise is AccessControl, EIP712, Multicall {
      */
     function cancelOrder(Order calldata _order, SignatureMeta calldata _sigMeta) external {
         if (_order.signer != msg.sender) {
-            revert LimitExercise__NotSigner();
+            revert LimitExercise__SignatureVerificationFailed();
         }
 
         cancelledOrders[getOrderSigHash(_order, _sigMeta)] = true;
@@ -133,14 +137,19 @@ contract LimitExercise is AccessControl, EIP712, Multicall {
         );
     }
 
-    function verify(address _signer, Order calldata _order, SignatureMeta calldata _signatureMeta)
-        public
-        view
-        returns (bool)
-    {
+    /**
+     * @notice
+     *  @param  _order         Limit exercise order information.
+     *  @param  _signatureMeta V, R, S of the signature.
+     *  @return verified       Whether signature was signed by
+     *                         signer specified in the order &
+     *                         signer is owner of the options position.
+     */
+    function verify(Order calldata _order, SignatureMeta calldata _signatureMeta) public view returns (bool) {
         bytes32 digest = computeDigest(_order);
 
-        return _signer == digest.recover(_signatureMeta.v, _signatureMeta.r, _signatureMeta.s);
+        return IOptionMarket(_order.optionMarket).ownerOf(_order.optionId)
+            == digest.recover(_signatureMeta.v, _signatureMeta.r, _signatureMeta.s);
     }
 
     function getStructHash(Order calldata _order) public pure returns (bytes32) {
