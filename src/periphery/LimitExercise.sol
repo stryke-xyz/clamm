@@ -124,6 +124,7 @@ contract LimitExercise is AccessControl, EIP712, Multicall, ReentrancyGuard {
     function getOrderSigHash(Order calldata _order, SignatureMeta calldata _sigMeta) public pure returns (bytes32) {
         return keccak256(
             abi.encodePacked(
+                _order.createdAt,
                 _order.optionId,
                 _order.minProfit,
                 _order.deadline,
@@ -156,6 +157,7 @@ contract LimitExercise is AccessControl, EIP712, Multicall, ReentrancyGuard {
         return keccak256(
             abi.encode(
                 ORDER_TYPEHASH,
+                _order.createdAt,
                 _order.optionId,
                 _order.minProfit,
                 _order.deadline,
