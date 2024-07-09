@@ -100,6 +100,9 @@ contract LimitExercise is AccessControl, EIP712, Multicall, ReentrancyGuard {
             // Transfer options owner's delta
             IERC20(_order.profitToken).safeTransfer(optionMarket.ownerOf(_exerciseParams.optionId), _order.minProfit);
 
+            // Cancel the order to avoid re-using the order
+            cancelledOrders[getOrderSigHash(_order, _sigMeta)] = true;
+
             emit LogLimitExericseOrderFullfilled(_order, executorProfit, msg.sender);
         } else {
             revert LimitExercise__OrderNotSatisfied();
