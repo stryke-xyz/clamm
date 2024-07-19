@@ -8,7 +8,6 @@ contract DeployOnSwapReceiver is Script {
     function run() public {
         vm.startBroadcast();
         OnSwapReceiver swapper = new OnSwapReceiver();
-        swapper.setWhitelisted(address(0), true);
         vm.stopBroadcast();
     }
 }
