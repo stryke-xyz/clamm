@@ -104,25 +104,6 @@ contract LimitOrders is EIP712("Strike Limit Orders", "1"), ReentrancyGuard {
     event LogOrderFilled(Order order, uint256 comission, address executor);
     event LogOrderCancelled(Order order);
 
-    function getOrderSigner(Order memory _order, Signature memory _signature) public view returns (address) {
-        return computeDigest(_order).recover(_signature.v, _signature.r, _signature.s);
-    }
-
-    function computeDigest(Order memory _order) public view returns (bytes32) {
-        return _hashTypedDataV4(getOrderStructHash(_order));
-    }
-
-    function cancel(Order memory _order, Signature memory _signature) public {
-        address signer = getOrderSigner(_order, _signature);
-        if (msg.sender != signer) {
-            revert LimitOrders__VerificationFailed();
-        }
-
-        isOrderCancelled[getOrderStructHash(_order)] = true;
-
-        emit LogOrderCancelled(_order);
-    }
-
     function fillOffer(Order memory _order, Signature calldata _signature)
         external
         onFullfillment(_order, _signature)
@@ -283,18 +264,15 @@ contract LimitOrders is EIP712("Strike Limit Orders", "1"), ReentrancyGuard {
         emit LogOrderFilled(_order, comission, msg.sender);
     }
 
-    function getOrderStructHash(Order memory _order) public pure returns (bytes32) {
-        return keccak256(
-            abi.encode(
-                _ORDER_TYPEHASH,
-                _order.createdAt,
-                _order.deadline,
-                _order.maker,
-                _order.validator,
-                _order.flags,
-                _order.data
-            )
-        );
+    function cancel(Order memory _order, Signature memory _signature) public {
+        address signer = getOrderSigner(_order, _signature);
+        if (msg.sender != signer) {
+            revert LimitOrders__VerificationFailed();
+        }
+
+        isOrderCancelled[getOrderStructHash(_order)] = true;
+
+        emit LogOrderCancelled(_order);
     }
 
     modifier onFullfillment(Order memory _order, Signature calldata _signature) {
@@ -329,6 +307,28 @@ contract LimitOrders is EIP712("Strike Limit Orders", "1"), ReentrancyGuard {
     // functions
     function onERC721Received(address, address, uint256, bytes memory) external view returns (bytes4) {
         return this.onERC721Received.selector;
+    }
+
+    function getOrderSigner(Order memory _order, Signature memory _signature) public view returns (address) {
+        return computeDigest(_order).recover(_signature.v, _signature.r, _signature.s);
+    }
+
+    function computeDigest(Order memory _order) public view returns (bytes32) {
+        return _hashTypedDataV4(getOrderStructHash(_order));
+    }
+
+    function getOrderStructHash(Order memory _order) public pure returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                _ORDER_TYPEHASH,
+                _order.createdAt,
+                _order.deadline,
+                _order.maker,
+                _order.validator,
+                _order.flags,
+                _order.data
+            )
+        );
     }
 }
 
