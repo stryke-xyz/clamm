@@ -4,6 +4,7 @@ pragma solidity ^0.8.13;
 import {ISwapper} from "./ISwapper.sol";
 import {IHandler} from "./IHandler.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import {ERC20} from "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 
 interface IOptionMarket {
     struct OptionTicks {
@@ -46,11 +47,26 @@ interface IOptionMarket {
         bool isCall;
     }
 
+    struct PositionSplitterParams {
+        uint256 optionId;
+        address to;
+        uint256[] liquidityToSplit;
+    }
+
+    struct AssetsCache {
+        ERC20 assetToUse;
+        ERC20 assetToGet;
+        uint256 totalProfit;
+        uint256 totalAssetRelocked;
+    }
+
     function opData(uint256 tokenId) external view returns (OptionData memory);
+
+    function opTickMap(uint256 tokenId, uint256 index) external view returns (OptionTicks memory);
 
     function mintOption(OptionParams calldata _params) external;
 
-    function exerciseOption(ExerciseOptionParams calldata _params) external;
+    function exerciseOption(ExerciseOptionParams calldata _params) external returns (AssetsCache memory);
 
     function settleOption(SettleOptionParams calldata _params) external;
 
@@ -63,4 +79,12 @@ interface IOptionMarket {
     function ownerOf(uint256 tokenId) external view returns (address);
 
     function balanceOf(address owner) external view returns (uint256);
+
+    function transferFrom(address from, address to, uint256 tokenId) external;
+
+    function positionSplitter(PositionSplitterParams calldata _params) external;
+
+    function getApproved(uint256 id) external view returns (address result);
+
+    function isApprovedForAll(address owner, address operator) external view returns (bool result);
 }
