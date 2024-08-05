@@ -6,85 +6,19 @@ import {IOptionMarket} from "../../interfaces/IOptionMarket.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {IERC20Permit} from "openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {IERC721Receiver} from "openzeppelin-contracts/contracts/token/ERC721/IERC721Receiver.sol";
+import {IValidator} from "../../interfaces/IValidator.sol";
+import {ILimitOrders} from "../../interfaces/ILimitOrders.sol";
 
 // Libraries
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {OrderLib} from "./OrderLib.sol";
 
 // Contracts
 import {ReentrancyGuard} from "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 
-struct BlockTradeOrder {
-    uint256 payment;
-    uint256 tokenId;
-    IOptionMarket optionMarket;
-    IERC20 token;
-    address taker;
-}
-
-struct LimitPurchaseOrder {
-    uint256 maxCostAllowance;
-    uint256 ttl;
-    IOptionMarket optionMarket;
-    uint256 liquidity;
-    uint256 comission;
-    uint256 ttlThreshold;
-    int24 tickLower;
-    int24 tickUpper;
-    bool isCall;
-}
-
-struct Order {
-    uint256 createdAt;
-    uint256 deadline;
-    address maker;
-    address validator;
-    uint32 flags;
-    bytes data;
-}
-
-struct Signature {
-    bytes32 r;
-    bytes32 s;
-    uint8 v;
-}
-
-library OrderLib {
-    /**
-     * @notice Only allows the specified taker or maker to fullfill
-     *         - Options and payments are exchanged between taker and m
-     */
-    uint32 constant OTC_FLAG = 0x00000001;
-    /**
-     * @notice Allows to be fullfilled by anyone
-     *         Limit exercise orders:
-     *          - exercise the option if min profit condition is satisfied
-     *         OTC/Block trade orders:
-     *          - Purchases option from option market
-     */
-    uint32 constant MARKET_FILL_FLAG = 0x0000010;
-
-    uint32 constant PERMIT2_FLAG = 0x10000000;
-
-    function hasOtcFlag(Order memory order) internal view returns (bool) {
-        return (order.flags & OTC_FLAG) != 0;
-    }
-
-    function hasMarketFillFlag(Order memory order) internal returns (bool) {
-        return (order.flags & MARKET_FILL_FLAG) != 0;
-    }
-
-    function hasPermit2Flag(Order memory order) internal returns (bool) {
-        return (order.flags & PERMIT2_FLAG) != 0;
-    }
-
-    function isExpired(Order memory order) internal view returns (bool) {
-        return order.deadline < block.timestamp;
-    }
-}
-
-contract LimitOrders is EIP712("Strike Limit Orders", "1"), ReentrancyGuard {
+contract LimitOrders is EIP712("Strike Limit Orders", "1"), ReentrancyGuard, ILimitOrders {
     using ECDSA for bytes32;
     using OrderLib for Order;
     using SafeERC20 for IERC20;
@@ -123,8 +57,8 @@ contract LimitOrders is EIP712("Strike Limit Orders", "1"), ReentrancyGuard {
     }
 
     function matchOrders(
-        Order memory _makerOrder,
-        Order memory _takerOrder,
+        Order calldata _makerOrder,
+        Order calldata _takerOrder,
         Signature calldata _makerSignature,
         Signature calldata _takerSignature
     ) external nonReentrant returns (uint256 comission) {
@@ -170,8 +104,8 @@ contract LimitOrders is EIP712("Strike Limit Orders", "1"), ReentrancyGuard {
             blockTradeOrder.token.safeTransferFrom(_takerOrder.maker, msg.sender, purchaseOrder.comission);
         }
 
-        _afterFullFillment(_makerOrder, _makerSignature);
-        _afterFullFillment(_takerOrder, _takerSignature);
+        _afterFullFillment(_makerOrder);
+        _afterFullFillment(_takerOrder);
 
         emit LogOrderFilled(_takerOrder, block.timestamp, msg.sender);
         emit LogOrderFilled(_makerOrder, block.timestamp, msg.sender);
@@ -278,24 +212,26 @@ contract LimitOrders is EIP712("Strike Limit Orders", "1"), ReentrancyGuard {
     modifier onFullfillment(Order memory _order, Signature calldata _signature) {
         _beforeFullFillment(_order, _signature);
         _;
-        _afterFullFillment(_order, _signature);
+        _afterFullFillment(_order);
     }
 
-    function _beforeFullFillment(Order memory _order, Signature calldata _signature) private {
+    function _beforeFullFillment(Order memory _order, Signature calldata _signature)
+        private
+    {
         bytes32 orderHash = getOrderStructHash(_order);
         if (_order.maker != getOrderSigner(_order, _signature)) revert LimitOrders__VerificationFailed();
         if (_order.isExpired()) revert LimitOrders__OrderExpired();
         if (isOrderCancelled[orderHash]) revert LimitOrders__OrderCancelled();
         if (_order.validator != address(0)) {
-            IValidator(_order.validator).beforeFullfillment(_order, _order.data);
+            IValidator(_order.validator).beforeFullfillment(_order);
         }
     }
 
-    function _afterFullFillment(Order memory _order, Signature calldata _signature) private {
+    function _afterFullFillment(Order memory _order) private {
         bytes32 orderHash = getOrderStructHash(_order);
 
         if (_order.validator != address(0)) {
-            IValidator(_order.validator).afterFullfillment(_order, _order.data);
+            IValidator(_order.validator).afterFullfillment(_order);
         }
         isOrderCancelled[orderHash] = true;
     }
@@ -309,7 +245,11 @@ contract LimitOrders is EIP712("Strike Limit Orders", "1"), ReentrancyGuard {
         return this.onERC721Received.selector;
     }
 
-    function getOrderSigner(Order memory _order, Signature memory _signature) public view returns (address) {
+    function getOrderSigner(Order memory _order, Signature memory _signature)
+        public
+        view
+        returns (address)
+    {
         return computeDigest(_order).recover(_signature.v, _signature.r, _signature.s);
     }
 
@@ -330,9 +270,4 @@ contract LimitOrders is EIP712("Strike Limit Orders", "1"), ReentrancyGuard {
             )
         );
     }
-}
-
-interface IValidator {
-    function beforeFullfillment(Order calldata _order, bytes calldata _data) external;
-    function afterFullfillment(Order calldata _order, bytes calldata _data) external;
 }

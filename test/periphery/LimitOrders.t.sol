@@ -27,13 +27,8 @@ import {IHandler} from "../../src/interfaces/IHandler.sol";
 import {ISwapper} from "../../src/interfaces/ISwapper.sol";
 import {IOptionMarket} from "../../src/interfaces/IOptionMarket.sol";
 
-import {
-    LimitOrders,
-    LimitPurchaseOrder,
-    BlockTradeOrder,
-    Order,
-    Signature
-} from "../../src/periphery/limit-orders/LimitOrders.sol";
+import {ILimitOrders} from "../../src/interfaces/ILimitOrders.sol";
+import {LimitOrders} from "../../src/periphery/limit-orders/LimitOrders.sol";
 
 contract LimitOrdersTest is Test {
     using TickMath for int24;
@@ -216,7 +211,7 @@ contract LimitOrdersTest is Test {
         uint256 callOptionId = _purchaseOption(callOptionBuyer, true);
         uint256 putOptionId = _purchaseOption(putOptionBuyer, false);
 
-        Order memory order = Order({
+        ILimitOrders.Order memory order = ILimitOrders.Order({
             createdAt: block.timestamp,
             deadline: block.timestamp + 20 minutes,
             maker: callOptionBuyer,
@@ -228,7 +223,7 @@ contract LimitOrdersTest is Test {
         bytes32 digest = limitOrders.computeDigest(order);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(callOptionBuyerPvk, digest);
 
-        Signature memory signature = Signature({r: r, s: s, v: v});
+        ILimitOrders.Signature memory signature = ILimitOrders.Signature({r: r, s: s, v: v});
 
         vm.startPrank(callOptionBuyer);
         optionMarket.updateExerciseDelegate(address(limitOrders), true);
@@ -241,7 +236,7 @@ contract LimitOrdersTest is Test {
         assertEqUint(comission, token0.balanceOf(address(this)));
         assertEq(limitOrders.isOrderCancelled(limitOrders.getOrderStructHash(order)), true);
 
-        order = Order({
+        order = ILimitOrders.Order({
             createdAt: block.timestamp,
             deadline: block.timestamp + 20 minutes,
             maker: putOptionBuyer,
@@ -252,7 +247,7 @@ contract LimitOrdersTest is Test {
 
         digest = limitOrders.computeDigest(order);
         (v, r, s) = vm.sign(putOptionBuyerPvk, digest);
-        signature = Signature({r: r, s: s, v: v});
+        signature = ILimitOrders.Signature({r: r, s: s, v: v});
 
         vm.startPrank(putOptionBuyer);
         optionMarket.updateExerciseDelegate(address(limitOrders), true);
@@ -283,7 +278,7 @@ contract LimitOrdersTest is Test {
 
         (address optionBuyer, uint256 optionBuyerPvk) = makeAddrAndKey("optionBuyer");
 
-        Order memory order = Order({
+        ILimitOrders.Order memory order = ILimitOrders.Order({
             createdAt: block.timestamp,
             deadline: block.timestamp + 20 minutes,
             maker: optionBuyer,
@@ -319,7 +314,7 @@ contract LimitOrdersTest is Test {
             liquidityToUse: liquidity
         });
 
-        assertEqUint(limitOrders.purchaseOption(order, Signature({r: r, s: s, v: v}), opTicks), 1e18);
+        assertEqUint(limitOrders.purchaseOption(order, ILimitOrders.Signature({r: r, s: s, v: v}), opTicks), 1e18);
         assertEq(optionMarket.ownerOf(1), optionBuyer);
         assertEq(limitOrders.isOrderCancelled(limitOrders.getOrderStructHash(order)), true);
         assertEq(token1.balanceOf(optionBuyer), 10e18);
@@ -352,7 +347,7 @@ contract LimitOrdersTest is Test {
             liquidityToUse: liquidity
         });
 
-        order = Order({
+        order = ILimitOrders.Order({
             createdAt: block.timestamp,
             deadline: block.timestamp + 20 minutes,
             maker: optionBuyer,
@@ -373,7 +368,7 @@ contract LimitOrdersTest is Test {
 
         (v, r, s) = vm.sign(optionBuyerPvk, limitOrders.computeDigest(order));
 
-        assertEqUint(limitOrders.purchaseOption(order, Signature({r: r, s: s, v: v}), opTicks), 0);
+        assertEqUint(limitOrders.purchaseOption(order, ILimitOrders.Signature({r: r, s: s, v: v}), opTicks), 0);
         assertEq(optionMarket.ownerOf(2), optionBuyer);
         assertEq(limitOrders.isOrderCancelled(limitOrders.getOrderStructHash(order)), true);
     }
@@ -384,7 +379,7 @@ contract LimitOrdersTest is Test {
 
         uint256 offerPrice = 1e18;
 
-        Order memory order = Order({
+        ILimitOrders.Order memory order = ILimitOrders.Order({
             createdAt: block.timestamp,
             deadline: block.timestamp + 20 minutes,
             maker: optionSeller,
@@ -408,7 +403,7 @@ contract LimitOrdersTest is Test {
         vm.startPrank(optionBuyer);
         token1.approve(address(limitOrders), offerPrice);
 
-        limitOrders.fillOffer(order, Signature({r: r, s: s, v: v}));
+        limitOrders.fillOffer(order, ILimitOrders.Signature({r: r, s: s, v: v}));
         vm.stopPrank();
     }
 
@@ -424,7 +419,7 @@ contract LimitOrdersTest is Test {
 
         uint256 offerPrice = 1e18;
 
-        Order memory makerOrder = Order({
+        ILimitOrders.Order memory makerOrder = ILimitOrders.Order({
             createdAt: block.timestamp,
             deadline: block.timestamp + 20 minutes,
             maker: maker,
@@ -433,7 +428,7 @@ contract LimitOrdersTest is Test {
             data: abi.encode(offerPrice, 1, IOptionMarket(address(optionMarket)), IERC20(address(token1)), address(0))
         });
 
-        Order memory takerOrder = Order({
+        ILimitOrders.Order memory takerOrder = ILimitOrders.Order({
             createdAt: block.timestamp,
             deadline: block.timestamp + 20 minutes,
             maker: taker,
@@ -472,8 +467,8 @@ contract LimitOrdersTest is Test {
         limitOrders.matchOrders(
             makerOrder,
             takerOrder,
-            Signature({r: rMaker, s: sMaker, v: vMaker}),
-            Signature({r: rTaker, s: sTaker, v: vTaker})
+            ILimitOrders.Signature({r: rMaker, s: sMaker, v: vMaker}),
+            ILimitOrders.Signature({r: rTaker, s: sTaker, v: vTaker})
         );
 
         assertEq(optionMarket.ownerOf(1), taker);
