@@ -18,7 +18,7 @@ import {OrderLib} from "./OrderLib.sol";
 // Contracts
 import {ReentrancyGuard} from "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 
-contract LimitOrders is EIP712("Strike Limit Orders", "1"), ReentrancyGuard, ILimitOrders {
+contract LimitOrders is EIP712("Stryke Limit Orders", "1"), ReentrancyGuard, ILimitOrders {
     using ECDSA for bytes32;
     using OrderLib for Order;
     using SafeERC20 for IERC20;
