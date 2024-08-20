@@ -31,180 +31,7 @@ import {ILimitOrders} from "../../src/interfaces/ILimitOrders.sol";
 import {LimitOrders} from "../../src/periphery/limit-orders/LimitOrders.sol";
 
 contract LimitOrdersTest is Test {
-    using TickMath for int24;
-
-    address ETH; // token1
-    address LUSD; // token0
-
-    ERC20Mock token0;
-    ERC20Mock token1;
-
-    UniswapV3TestLib uniswapV3TestLib;
-    IUniswapV3Pool pool;
-
-    OptionPricingV2 op;
-    SwapRouterSwapper srs;
-
-    uint24 fee = 500;
-
-    uint160 initSqrtPriceX96 = 1771845812700903892492222464; // 1 ETH = 2000 LUSD
-
-    int24 tickLowerCalls = -76260; // ~2050
-    int24 tickUpperCalls = -76250; // ~2048
-
-    int24 tickLowerPuts = -75770; // ~1950
-    int24 tickUpperPuts = -75760; // ~1952
-
-    uint256 premiumAmountCalls = 100;
-    uint256 premiumAmountPuts = 100;
-
-    uint256 optionIdCalls;
-    uint256 optionIdPuts;
-
-    address hook = address(0);
-    bytes hookData = new bytes(0);
-
-    address alice = makeAddr("alice"); // main LP
-    address bob = makeAddr("bob"); // protocol LP
-    address jason = makeAddr("jason"); // protocol LP
-    address trader = makeAddr("trader"); // option buyer
-    address garbage = makeAddr("garbage"); // garbage address
-    address bot = makeAddr("bot");
-    address feeToAutoExercise = makeAddr("feeToAutoExercise"); // auto exercise fee to
-    address autoExercisoor = makeAddr("autoExercisoor"); // auto exciseroor role
-
-    DopexV2PositionManager positionManager;
-    UniswapV3SingleTickLiquidityHarnessV2 positionManagerHarness;
-    DopexV2OptionMarketV2 optionMarket;
-    UniswapV3SingleTickLiquidityHandlerV2 uniV3Handler;
-    DopexV2ClammFeeStrategyV2 feeStrategy;
-    AutoExerciseTimeBased autoExercise;
-
-    LimitOrders limitOrders;
-
-    function setUp() public {
-        vm.warp(1693352493);
-
-        ETH = address(new ERC20Mock());
-        LUSD = address(new ERC20Mock());
-
-        uniswapV3TestLib = new UniswapV3TestLib();
-        pool = IUniswapV3Pool(uniswapV3TestLib.deployUniswapV3PoolAndInitializePrice(ETH, LUSD, fee, initSqrtPriceX96));
-
-        token0 = ERC20Mock(pool.token0());
-        token1 = ERC20Mock(pool.token1());
-
-        positionManager = new DopexV2PositionManager();
-
-        limitOrders = new LimitOrders();
-        uniV3Handler = new UniswapV3SingleTickLiquidityHandlerV2(
-            address(uniswapV3TestLib.factory()),
-            0xa598dd2fba360510c5a8f02f44423a4468e902df5857dbce3ca162a43a3a31ff,
-            address(uniswapV3TestLib.swapRouter())
-        );
-
-        positionManagerHarness =
-            new UniswapV3SingleTickLiquidityHarnessV2(uniswapV3TestLib, positionManager, uniV3Handler);
-
-        op = new OptionPricingV2(500, 1e8);
-        srs = new SwapRouterSwapper(address(uniswapV3TestLib.swapRouter()));
-
-        feeStrategy = new DopexV2ClammFeeStrategyV2();
-
-        optionMarket = new DopexV2OptionMarketV2(
-            address(positionManager), address(op), address(feeStrategy), ETH, LUSD, address(pool)
-        );
-
-        // Add 0.15% fee to the market
-        feeStrategy.registerOptionMarket(address(optionMarket), 350000);
-
-        uint256[] memory ttls = new uint256[](1);
-        ttls[0] = 20 minutes;
-
-        uint256[] memory IVs = new uint256[](1);
-        IVs[0] = 100;
-
-        address feeCollector = makeAddr("feeCollector");
-
-        op.updateIVs(ttls, IVs);
-        optionMarket.updateAddress(
-            feeCollector, address(0), address(feeStrategy), address(op), address(this), true, address(pool), true
-        );
-        uniswapV3TestLib.addLiquidity(
-            UniswapV3TestLib.AddLiquidityStruct({
-                user: alice,
-                pool: pool,
-                desiredTickLower: -78245, // 2500
-                desiredTickUpper: -73136, // 1500
-                desiredAmount0: 5_000_000e18,
-                desiredAmount1: 0,
-                requireMint: true
-            })
-        );
-
-        positionManager.updateWhitelistHandlerWithApp(address(uniV3Handler), address(optionMarket), true);
-
-        positionManager.updateWhitelistHandler(address(uniV3Handler), true);
-
-        uniV3Handler.updateWhitelistedApps(address(positionManager), true);
-
-        autoExercise = new AutoExerciseTimeBased();
-
-        autoExercise.updateFeeTo(feeToAutoExercise);
-
-        autoExercise.grantRole(keccak256("EXECUTOR"), autoExercisoor);
-
-        // for calls
-        positionManagerHarness.mintPosition(
-            token0,
-            token1,
-            0,
-            5e18,
-            -76260, // ~2050,
-            -76250, // ~2048,
-            pool,
-            hook,
-            bob
-        );
-
-        positionManagerHarness.mintPosition(
-            token0,
-            token1,
-            0,
-            5e18,
-            -76260, // ~2050,
-            -76250, // ~2048,
-            pool,
-            hook,
-            jason
-        );
-
-        // for puts
-        positionManagerHarness.mintPosition(
-            token0,
-            token1,
-            10_000e18,
-            0,
-            -75770, // ~1950,
-            -75760, // ~1952,
-            pool,
-            hook,
-            bob
-        );
-
-        positionManagerHarness.mintPosition(
-            token0,
-            token1,
-            10_000e18,
-            0,
-            -75770, // ~1950,
-            -75760, // ~1952,
-            pool,
-            hook,
-            jason
-        );
-    }
-
+    // Sell options back to amm aka limit exercise
     function testLimitSellMarketFill() public {
         (address callOptionBuyer, uint256 callOptionBuyerPvk) = makeAddrAndKey("callOptionBuyer");
         (address putOptionBuyer, uint256 putOptionBuyerPvk) = makeAddrAndKey("putOptionBuyer");
@@ -411,6 +238,7 @@ contract LimitOrdersTest is Test {
     uint256 takerPvk;
     address maker;
     address taker;
+    address dummy;
 
     function testLimitBuyOtc() public {
         (maker, makerPvk) = makeAddrAndKey("maker");
@@ -476,6 +304,142 @@ contract LimitOrdersTest is Test {
         assertEq(token1.balanceOf(address(this)), offerPrice / 2);
         assertEq(limitOrders.isOrderCancelled(limitOrders.getOrderStructHash(makerOrder)), true);
         assertEq(limitOrders.isOrderCancelled(limitOrders.getOrderStructHash(takerOrder)), true);
+    }
+
+    function testCancelOrder() public {
+        (maker, makerPvk) = makeAddrAndKey("maker");
+        (dummy, takerPvk) = makeAddrAndKey("dummy");
+
+        ILimitOrders.Order memory makerOrder = ILimitOrders.Order({
+            createdAt: block.timestamp,
+            deadline: block.timestamp + 20 minutes,
+            maker: maker,
+            validator: address(0),
+            flags: 0x00000001,
+            data: abi.encode(1e18, 1, IOptionMarket(address(optionMarket)), IERC20(address(token1)), address(0))
+        });
+
+        (uint8 vMaker, bytes32 rMaker, bytes32 sMaker) = vm.sign(makerPvk, limitOrders.computeDigest(makerOrder));
+
+        assertEq(limitOrders.isOrderCancelled(limitOrders.getOrderStructHash(makerOrder)), false);
+
+        vm.expectRevert(0x5e5090fb);
+        limitOrders.cancel(makerOrder, ILimitOrders.Signature({r: rMaker, s: sMaker, v: vMaker}));
+
+        vm.prank(maker);
+        limitOrders.cancel(makerOrder, ILimitOrders.Signature({r: rMaker, s: sMaker, v: vMaker}));
+
+        assertEq(limitOrders.isOrderCancelled(limitOrders.getOrderStructHash(makerOrder)), true);
+    }
+
+    function testFailDeadlinePassed() public {
+        (maker, makerPvk) = makeAddrAndKey("maker");
+
+        uint256 callOptionId = _purchaseOption(maker, true);
+
+        ILimitOrders.Order memory makerOrder = ILimitOrders.Order({
+            createdAt: block.timestamp,
+            deadline: block.timestamp + 20 minutes,
+            maker: maker,
+            validator: address(0),
+            flags: 0x00000010,
+            data: abi.encode(0.0005 ether, 1, IOptionMarket(address(optionMarket)), IERC20(address(token1)), address(0))
+        });
+
+        (uint8 vMaker, bytes32 rMaker, bytes32 sMaker) = vm.sign(makerPvk, limitOrders.computeDigest(makerOrder));
+
+        vm.startPrank(maker);
+        optionMarket.updateExerciseDelegate(address(limitOrders), true);
+
+        vm.warp(block.timestamp + 20 minutes + 1 minutes);
+
+        _updatePrice(true);
+        _updatePrice(true);
+
+        limitOrders.exerciseOption(
+            makerOrder, ILimitOrders.Signature({r: rMaker, s: sMaker, v: vMaker}), _getExerciseParams(callOptionId)
+        );
+    }
+
+    function testFailLimitSellMarketFillNotEnoughProft() public {
+        (maker, makerPvk) = makeAddrAndKey("maker");
+
+        uint256 callOptionId = _purchaseOption(maker, true);
+
+        ILimitOrders.Order memory makerOrder = ILimitOrders.Order({
+            createdAt: block.timestamp,
+            deadline: block.timestamp + 20 minutes,
+            maker: maker,
+            validator: address(0),
+            flags: 0x00000010,
+            data: abi.encode(0.0005 ether, 1, IOptionMarket(address(optionMarket)), IERC20(address(token1)), address(0))
+        });
+
+        (uint8 vMaker, bytes32 rMaker, bytes32 sMaker) = vm.sign(makerPvk, limitOrders.computeDigest(makerOrder));
+
+        vm.startPrank(maker);
+        optionMarket.updateExerciseDelegate(address(limitOrders), true);
+        vm.stopPrank();
+
+        limitOrders.exerciseOption(
+            makerOrder, ILimitOrders.Signature({r: rMaker, s: sMaker, v: vMaker}), _getExerciseParams(callOptionId)
+        );
+    }
+
+    function testFailLimitSellMarketFillNotOptionsOwner() public {
+        (maker, makerPvk) = makeAddrAndKey("maker");
+
+        uint256 callOptionId = _purchaseOption(maker, true);
+
+        ILimitOrders.Order memory makerOrder = ILimitOrders.Order({
+            createdAt: block.timestamp,
+            deadline: block.timestamp + 20 minutes,
+            maker: maker,
+            validator: address(0),
+            flags: 0x00000010,
+            data: abi.encode(0.0005 ether, 1, IOptionMarket(address(optionMarket)), IERC20(address(token1)), address(0))
+        });
+
+        (uint8 vMaker, bytes32 rMaker, bytes32 sMaker) = vm.sign(makerPvk, limitOrders.computeDigest(makerOrder));
+
+        vm.startPrank(maker);
+        optionMarket.transferFrom(maker, address(this), callOptionId);
+        optionMarket.updateExerciseDelegate(address(limitOrders), true);
+        vm.stopPrank();
+
+        limitOrders.exerciseOption(
+            makerOrder, ILimitOrders.Signature({r: rMaker, s: sMaker, v: vMaker}), _getExerciseParams(callOptionId)
+        );
+    }
+
+    function testFailLimitSellMarketFillOptionsAlreadyExercised() public {
+        (maker, makerPvk) = makeAddrAndKey("maker");
+
+        uint256 callOptionId = _purchaseOption(maker, true);
+
+        ILimitOrders.Order memory makerOrder = ILimitOrders.Order({
+            createdAt: block.timestamp,
+            deadline: block.timestamp + 20 minutes,
+            maker: maker,
+            validator: address(0),
+            flags: 0x00000010,
+            data: abi.encode(0.0005 ether, 1, IOptionMarket(address(optionMarket)), IERC20(address(token1)), address(0))
+        });
+
+        (uint8 vMaker, bytes32 rMaker, bytes32 sMaker) = vm.sign(makerPvk, limitOrders.computeDigest(makerOrder));
+
+        _updatePrice(true);
+        _updatePrice(true);
+
+        vm.startPrank(maker);
+        optionMarket.updateExerciseDelegate(address(limitOrders), true);
+
+        IOptionMarket(address(optionMarket)).exerciseOption(_getExerciseParams(callOptionId));
+        vm.stopPrank();
+
+        limitOrders.exerciseOption(
+            makerOrder, ILimitOrders.Signature({r: rMaker, s: sMaker, v: vMaker}), _getExerciseParams(callOptionId)
+        );
     }
 
     function _getExerciseParams(uint256 optionId) private view returns (IOptionMarket.ExerciseOptionParams memory) {
@@ -606,5 +570,182 @@ contract LimitOrdersTest is Test {
         tokenId = optionMarket.optionIds();
 
         vm.stopPrank();
+    }
+
+    /**
+     * CONTRACTS AND TEST SET UPS
+     */
+    using TickMath for int24;
+
+    address ETH; // token1
+    address LUSD; // token0
+
+    ERC20Mock token0;
+    ERC20Mock token1;
+
+    UniswapV3TestLib uniswapV3TestLib;
+    IUniswapV3Pool pool;
+
+    OptionPricingV2 op;
+    SwapRouterSwapper srs;
+
+    uint24 fee = 500;
+
+    uint160 initSqrtPriceX96 = 1771845812700903892492222464; // 1 ETH = 2000 LUSD
+
+    int24 tickLowerCalls = -76260; // ~2050
+    int24 tickUpperCalls = -76250; // ~2048
+
+    int24 tickLowerPuts = -75770; // ~1950
+    int24 tickUpperPuts = -75760; // ~1952
+
+    uint256 premiumAmountCalls = 100;
+    uint256 premiumAmountPuts = 100;
+
+    uint256 optionIdCalls;
+    uint256 optionIdPuts;
+
+    address hook = address(0);
+    bytes hookData = new bytes(0);
+
+    address alice = makeAddr("alice"); // main LP
+    address bob = makeAddr("bob"); // protocol LP
+    address jason = makeAddr("jason"); // protocol LP
+    address trader = makeAddr("trader"); // option buyer
+    address garbage = makeAddr("garbage"); // garbage address
+    address bot = makeAddr("bot");
+    address feeToAutoExercise = makeAddr("feeToAutoExercise"); // auto exercise fee to
+    address autoExercisoor = makeAddr("autoExercisoor"); // auto exciseroor role
+
+    DopexV2PositionManager positionManager;
+    UniswapV3SingleTickLiquidityHarnessV2 positionManagerHarness;
+    DopexV2OptionMarketV2 optionMarket;
+    UniswapV3SingleTickLiquidityHandlerV2 uniV3Handler;
+    DopexV2ClammFeeStrategyV2 feeStrategy;
+    AutoExerciseTimeBased autoExercise;
+
+    LimitOrders limitOrders;
+
+    function setUp() public {
+        vm.warp(1693352493);
+
+        ETH = address(new ERC20Mock());
+        LUSD = address(new ERC20Mock());
+
+        uniswapV3TestLib = new UniswapV3TestLib();
+        pool = IUniswapV3Pool(uniswapV3TestLib.deployUniswapV3PoolAndInitializePrice(ETH, LUSD, fee, initSqrtPriceX96));
+
+        token0 = ERC20Mock(pool.token0());
+        token1 = ERC20Mock(pool.token1());
+
+        positionManager = new DopexV2PositionManager();
+
+        limitOrders = new LimitOrders();
+        uniV3Handler = new UniswapV3SingleTickLiquidityHandlerV2(
+            address(uniswapV3TestLib.factory()),
+            0xa598dd2fba360510c5a8f02f44423a4468e902df5857dbce3ca162a43a3a31ff,
+            address(uniswapV3TestLib.swapRouter())
+        );
+
+        positionManagerHarness =
+            new UniswapV3SingleTickLiquidityHarnessV2(uniswapV3TestLib, positionManager, uniV3Handler);
+
+        op = new OptionPricingV2(500, 1e8);
+        srs = new SwapRouterSwapper(address(uniswapV3TestLib.swapRouter()));
+
+        feeStrategy = new DopexV2ClammFeeStrategyV2();
+
+        optionMarket = new DopexV2OptionMarketV2(
+            address(positionManager), address(op), address(feeStrategy), ETH, LUSD, address(pool)
+        );
+
+        // Add 0.15% fee to the market
+        feeStrategy.registerOptionMarket(address(optionMarket), 350000);
+
+        uint256[] memory ttls = new uint256[](1);
+        ttls[0] = 20 minutes;
+
+        uint256[] memory IVs = new uint256[](1);
+        IVs[0] = 100;
+
+        address feeCollector = makeAddr("feeCollector");
+
+        op.updateIVs(ttls, IVs);
+        optionMarket.updateAddress(
+            feeCollector, address(0), address(feeStrategy), address(op), address(this), true, address(pool), true
+        );
+        uniswapV3TestLib.addLiquidity(
+            UniswapV3TestLib.AddLiquidityStruct({
+                user: alice,
+                pool: pool,
+                desiredTickLower: -78245, // 2500
+                desiredTickUpper: -73136, // 1500
+                desiredAmount0: 5_000_000e18,
+                desiredAmount1: 0,
+                requireMint: true
+            })
+        );
+
+        positionManager.updateWhitelistHandlerWithApp(address(uniV3Handler), address(optionMarket), true);
+
+        positionManager.updateWhitelistHandler(address(uniV3Handler), true);
+
+        uniV3Handler.updateWhitelistedApps(address(positionManager), true);
+
+        autoExercise = new AutoExerciseTimeBased();
+
+        autoExercise.updateFeeTo(feeToAutoExercise);
+
+        autoExercise.grantRole(keccak256("EXECUTOR"), autoExercisoor);
+
+        // for calls
+        positionManagerHarness.mintPosition(
+            token0,
+            token1,
+            0,
+            5e18,
+            -76260, // ~2050,
+            -76250, // ~2048,
+            pool,
+            hook,
+            bob
+        );
+
+        positionManagerHarness.mintPosition(
+            token0,
+            token1,
+            0,
+            5e18,
+            -76260, // ~2050,
+            -76250, // ~2048,
+            pool,
+            hook,
+            jason
+        );
+
+        // for puts
+        positionManagerHarness.mintPosition(
+            token0,
+            token1,
+            10_000e18,
+            0,
+            -75770, // ~1950,
+            -75760, // ~1952,
+            pool,
+            hook,
+            bob
+        );
+
+        positionManagerHarness.mintPosition(
+            token0,
+            token1,
+            10_000e18,
+            0,
+            -75770, // ~1950,
+            -75760, // ~1952,
+            pool,
+            hook,
+            jason
+        );
     }
 }

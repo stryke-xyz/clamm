@@ -8,6 +8,7 @@ import {IERC20Permit} from "openzeppelin-contracts/contracts/token/ERC20/extensi
 import {IERC721Receiver} from "openzeppelin-contracts/contracts/token/ERC721/IERC721Receiver.sol";
 import {IValidator} from "../../interfaces/IValidator.sol";
 import {ILimitOrders} from "../../interfaces/ILimitOrders.sol";
+import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 
 // Libraries
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -18,7 +19,7 @@ import {OrderLib} from "./OrderLib.sol";
 // Contracts
 import {ReentrancyGuard} from "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 
-contract LimitOrders is EIP712("Stryke Limit Orders", "1"), ReentrancyGuard, ILimitOrders {
+contract LimitOrders is EIP712("Stryke Limit Orders", "1"), ReentrancyGuard, ILimitOrders, Multicall {
     using ECDSA for bytes32;
     using OrderLib for Order;
     using SafeERC20 for IERC20;
@@ -38,6 +39,11 @@ contract LimitOrders is EIP712("Stryke Limit Orders", "1"), ReentrancyGuard, ILi
     event LogOrderFilled(Order order, uint256 comission, address executor);
     event LogOrderCancelled(Order order);
 
+    /**
+     * @notice Fills a purchase order that has OTC flag enabled
+     * @param _order Order struct
+     * @param _signature Signature struct
+     */
     function fillOffer(Order memory _order, Signature calldata _signature)
         external
         onFullfillment(_order, _signature)
@@ -56,6 +62,14 @@ contract LimitOrders is EIP712("Stryke Limit Orders", "1"), ReentrancyGuard, ILi
         emit LogOrderFilled(_order, 0, msg.sender);
     }
 
+    /**
+     * @notice Matches two otc orders with each other
+     * @param _makerOrder Order struct
+     * @param _takerOrder Order struct
+     * @param _makerSignature Signature struct
+     * @param _takerSignature Signature struct
+     * @return comission for fullfilling suitable orders
+     */
     function matchOrders(
         Order calldata _makerOrder,
         Order calldata _takerOrder,
@@ -111,6 +125,13 @@ contract LimitOrders is EIP712("Stryke Limit Orders", "1"), ReentrancyGuard, ILi
         emit LogOrderFilled(_makerOrder, block.timestamp, msg.sender);
     }
 
+    /**
+     * @notice Fills a purchase order that has market flag enabled
+     * @param _order Order struct
+     * @param _signature Signature struct
+     * @param _opTicks OptionTicks array
+     * @return cache comission for filling the order
+     */
     function purchaseOption(
         Order memory _order,
         Signature calldata _signature,
@@ -167,6 +188,13 @@ contract LimitOrders is EIP712("Stryke Limit Orders", "1"), ReentrancyGuard, ILi
         emit LogOrderFilled(_order, cache, msg.sender);
     }
 
+    /**
+     * @notice Fills a exercise order that has market flag enabled
+     * @param _order Order struct
+     * @param _signature Signature struct
+     * @param _exerciseParams ExerciseOptionParams struct
+     * @return comission for filling the order
+     */
     function exerciseOption(
         Order memory _order,
         Signature calldata _signature,
@@ -198,6 +226,11 @@ contract LimitOrders is EIP712("Stryke Limit Orders", "1"), ReentrancyGuard, ILi
         emit LogOrderFilled(_order, comission, msg.sender);
     }
 
+    /**
+     * @notice Cancels an order
+     * @param _order Order struct
+     * @param _signature Signature struct
+     */
     function cancel(Order memory _order, Signature memory _signature) public {
         address signer = getOrderSigner(_order, _signature);
         if (msg.sender != signer) {
@@ -215,9 +248,7 @@ contract LimitOrders is EIP712("Stryke Limit Orders", "1"), ReentrancyGuard, ILi
         _afterFullFillment(_order);
     }
 
-    function _beforeFullFillment(Order memory _order, Signature calldata _signature)
-        private
-    {
+    function _beforeFullFillment(Order memory _order, Signature calldata _signature) private {
         bytes32 orderHash = getOrderStructHash(_order);
         if (_order.maker != getOrderSigner(_order, _signature)) revert LimitOrders__VerificationFailed();
         if (_order.isExpired()) revert LimitOrders__OrderExpired();
@@ -245,11 +276,7 @@ contract LimitOrders is EIP712("Stryke Limit Orders", "1"), ReentrancyGuard, ILi
         return this.onERC721Received.selector;
     }
 
-    function getOrderSigner(Order memory _order, Signature memory _signature)
-        public
-        view
-        returns (address)
-    {
+    function getOrderSigner(Order memory _order, Signature memory _signature) public view returns (address) {
         return computeDigest(_order).recover(_signature.v, _signature.r, _signature.s);
     }
 
