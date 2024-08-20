@@ -43,7 +43,7 @@ contract LimitOrdersTest is Test {
             deadline: block.timestamp + 20 minutes,
             maker: callOptionBuyer,
             validator: address(0),
-            flags: 0x00000010,
+            flags: 0x00000110,
             data: abi.encode(137046592384897080728, callOptionId, IOptionMarket(address(optionMarket)))
         });
 
@@ -68,7 +68,7 @@ contract LimitOrdersTest is Test {
             deadline: block.timestamp + 20 minutes,
             maker: putOptionBuyer,
             validator: address(0),
-            flags: 0x00000010,
+            flags: 0x00000110,
             data: abi.encode(238904731596709170, putOptionId, IOptionMarket(address(optionMarket)))
         });
 
@@ -110,7 +110,7 @@ contract LimitOrdersTest is Test {
             deadline: block.timestamp + 20 minutes,
             maker: optionBuyer,
             validator: address(0),
-            flags: 0x00000010,
+            flags: 0x00000210,
             data: abi.encode(
                 cost,
                 20 minutes,
@@ -179,7 +179,7 @@ contract LimitOrdersTest is Test {
             deadline: block.timestamp + 20 minutes,
             maker: optionBuyer,
             validator: address(0),
-            flags: 0x00000010,
+            flags: 0x00000210,
             data: abi.encode(
                 cost,
                 20 minutes,
@@ -211,7 +211,7 @@ contract LimitOrdersTest is Test {
             deadline: block.timestamp + 20 minutes,
             maker: optionSeller,
             validator: address(0),
-            flags: 0x00000001,
+            flags: 0x00000101,
             data: abi.encode(
                 offerPrice, optionId, IOptionMarket(address(optionMarket)), IERC20(address(token1)), address(0)
             )
@@ -252,7 +252,7 @@ contract LimitOrdersTest is Test {
             deadline: block.timestamp + 20 minutes,
             maker: maker,
             validator: address(0),
-            flags: 0x00000001,
+            flags: 0x00000101,
             data: abi.encode(offerPrice, 1, IOptionMarket(address(optionMarket)), IERC20(address(token1)), address(0))
         });
 
@@ -261,7 +261,7 @@ contract LimitOrdersTest is Test {
             deadline: block.timestamp + 20 minutes,
             maker: taker,
             validator: address(0),
-            flags: 0x00000001,
+            flags: 0x00000211,
             data: abi.encode(
                 offerPrice,
                 20 minutes,
@@ -342,7 +342,7 @@ contract LimitOrdersTest is Test {
             deadline: block.timestamp + 20 minutes,
             maker: maker,
             validator: address(0),
-            flags: 0x00000010,
+            flags: 0x00000110,
             data: abi.encode(0.0005 ether, 1, IOptionMarket(address(optionMarket)), IERC20(address(token1)), address(0))
         });
 
@@ -371,7 +371,7 @@ contract LimitOrdersTest is Test {
             deadline: block.timestamp + 20 minutes,
             maker: maker,
             validator: address(0),
-            flags: 0x00000010,
+            flags: 0x00000110,
             data: abi.encode(0.0005 ether, 1, IOptionMarket(address(optionMarket)), IERC20(address(token1)), address(0))
         });
 
@@ -396,7 +396,7 @@ contract LimitOrdersTest is Test {
             deadline: block.timestamp + 20 minutes,
             maker: maker,
             validator: address(0),
-            flags: 0x00000010,
+            flags: 0x00000110,
             data: abi.encode(0.0005 ether, 1, IOptionMarket(address(optionMarket)), IERC20(address(token1)), address(0))
         });
 
@@ -422,7 +422,7 @@ contract LimitOrdersTest is Test {
             deadline: block.timestamp + 20 minutes,
             maker: maker,
             validator: address(0),
-            flags: 0x00000010,
+            flags: 0x00000110,
             data: abi.encode(0.0005 ether, 1, IOptionMarket(address(optionMarket)), IERC20(address(token1)), address(0))
         });
 

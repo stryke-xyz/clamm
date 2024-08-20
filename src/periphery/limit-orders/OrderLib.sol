@@ -18,7 +18,9 @@ library OrderLib {
      */
     uint32 constant MARKET_FILL_FLAG = 0x0000010;
 
-    uint32 constant PERMIT2_FLAG = 0x10000000;
+    uint32 constant SELL_OPTIONS_FLAG = 0x0000100;
+
+    uint32 constant BUY_OPTIONS_FLAG = 0x00000200;
 
     function hasOtcFlag(ILimitOrders.Order memory order) internal view returns (bool) {
         return (order.flags & OTC_FLAG) != 0;
@@ -28,8 +30,36 @@ library OrderLib {
         return (order.flags & MARKET_FILL_FLAG) != 0;
     }
 
-    function hasPermit2Flag(ILimitOrders.Order memory order) internal returns (bool) {
-        return (order.flags & PERMIT2_FLAG) != 0;
+    function hasSellOptionsFlag(ILimitOrders.Order memory order) internal returns (bool) {
+        return (order.flags & SELL_OPTIONS_FLAG) != 0;
+    }
+
+    function hasBuyOptionsFlag(ILimitOrders.Order memory order) internal returns (bool) {
+        return (order.flags & BUY_OPTIONS_FLAG) != 0;
+    }
+
+    function hasSellOptionsWithMarketFillFlags(ILimitOrders.Order memory order) internal returns (bool) {
+        return hasSellOptionsFlag(order) && hasMarketFillFlag(order);
+    }
+
+    function hasSellOptionsWithOtcAndMarketFillFlags(ILimitOrders.Order memory order) internal returns (bool) {
+        return hasSellOptionsFlag(order) && hasOtcFlag(order) && hasMarketFillFlag(order);
+    }
+
+    function hasBuyOptionsWithMarketFillFlags(ILimitOrders.Order memory order) internal returns (bool) {
+        return hasBuyOptionsFlag(order) && hasMarketFillFlag(order);
+    }
+
+    function hasBuyOptionsWithOtcAndMarketFillFlags(ILimitOrders.Order memory order) internal returns (bool) {
+        return hasBuyOptionsFlag(order) && hasOtcFlag(order) && hasMarketFillFlag(order);
+    }
+
+    function hasSellOptionsWithOtcFlags(ILimitOrders.Order memory order) internal returns (bool) {
+        return hasSellOptionsFlag(order) && hasOtcFlag(order);
+    }
+
+    function hasBuyOptionsWithOtcFlags(ILimitOrders.Order memory order) internal returns (bool) {
+        return hasBuyOptionsFlag(order) && hasOtcFlag(order);
     }
 
     function isExpired(ILimitOrders.Order memory order) internal view returns (bool) {

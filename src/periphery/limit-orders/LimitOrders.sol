@@ -48,7 +48,7 @@ contract LimitOrders is EIP712("Stryke Limit Orders", "1"), ReentrancyGuard, ILi
         external
         onFullfillment(_order, _signature)
     {
-        if (!_order.hasOtcFlag()) revert LimitOrders__InvalidFullfillment();
+        if (!_order.hasSellOptionsWithOtcFlags()) revert LimitOrders__InvalidFullfillment();
 
         BlockTradeOrder memory blockTradeOrder = abi.decode(_order.data, (BlockTradeOrder));
 
@@ -76,7 +76,9 @@ contract LimitOrders is EIP712("Stryke Limit Orders", "1"), ReentrancyGuard, ILi
         Signature calldata _makerSignature,
         Signature calldata _takerSignature
     ) external nonReentrant returns (uint256 comission) {
-        if (!_makerOrder.hasOtcFlag() || !_takerOrder.hasOtcFlag()) revert LimitOrders__InvalidFullfillment();
+        if (!(_makerOrder.hasSellOptionsWithOtcFlags() && _takerOrder.hasBuyOptionsWithOtcFlags())) {
+            revert LimitOrders__InvalidFullfillment();
+        }
 
         _beforeFullFillment(_makerOrder, _makerSignature);
         _beforeFullFillment(_takerOrder, _takerSignature);
@@ -138,7 +140,7 @@ contract LimitOrders is EIP712("Stryke Limit Orders", "1"), ReentrancyGuard, ILi
         IOptionMarket.OptionTicks[] calldata _opTicks
     ) external onFullfillment(_order, _signature) nonReentrant returns (uint256 cache) {
         // Ensure order has market fill flag
-        if (!_order.hasMarketFillFlag()) revert LimitOrders__InvalidFullfillment();
+        if (!_order.hasBuyOptionsWithMarketFillFlags()) revert LimitOrders__InvalidFullfillment();
 
         LimitPurchaseOrder memory purchaseOrder = abi.decode(_order.data, (LimitPurchaseOrder));
 
@@ -204,7 +206,7 @@ contract LimitOrders is EIP712("Stryke Limit Orders", "1"), ReentrancyGuard, ILi
             abi.decode(_order.data, (uint256, uint256, IOptionMarket));
 
         // Ensure order has market fill flag and token id matches with the order
-        if (!_order.hasMarketFillFlag() || _exerciseParams.optionId != tokenId) {
+        if (!_order.hasSellOptionsWithMarketFillFlags() || _exerciseParams.optionId != tokenId) {
             revert LimitOrders__InvalidFullfillment();
         }
 
@@ -218,10 +220,10 @@ contract LimitOrders is EIP712("Stryke Limit Orders", "1"), ReentrancyGuard, ILi
         comission = assetsCache.totalProfit - minProfit;
 
         if (comission > 0) {
-            assetsCache.assetToGet.transfer(msg.sender, comission);
+            IERC20(address(assetsCache.assetToGet)).safeTransfer(msg.sender, comission);
         }
 
-        assetsCache.assetToGet.transfer(_order.maker, minProfit);
+        IERC20(address(assetsCache.assetToGet)).safeTransfer(_order.maker, minProfit);
 
         emit LogOrderFilled(_order, comission, msg.sender);
     }
