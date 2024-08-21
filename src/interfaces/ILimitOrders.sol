@@ -13,7 +13,7 @@ interface ILimitOrders {
         address taker;
     }
 
-    struct LimitPurchaseOrder {
+    struct PurchaseOrder {
         uint256 maxCostAllowance;
         uint256 ttl;
         IOptionMarket optionMarket;

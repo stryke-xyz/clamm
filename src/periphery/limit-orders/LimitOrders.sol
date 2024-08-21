@@ -83,7 +83,7 @@ contract LimitOrders is EIP712("Stryke Limit Orders", "1"), ReentrancyGuard, ILi
         _beforeFullFillment(_makerOrder, _makerSignature);
         _beforeFullFillment(_takerOrder, _takerSignature);
 
-        LimitPurchaseOrder memory purchaseOrder = abi.decode(_takerOrder.data, (LimitPurchaseOrder));
+        PurchaseOrder memory purchaseOrder = abi.decode(_takerOrder.data, (PurchaseOrder));
         BlockTradeOrder memory blockTradeOrder = abi.decode(_makerOrder.data, (BlockTradeOrder));
         IOptionMarket.OptionData memory opData = blockTradeOrder.optionMarket.opData(blockTradeOrder.tokenId);
 
@@ -142,7 +142,7 @@ contract LimitOrders is EIP712("Stryke Limit Orders", "1"), ReentrancyGuard, ILi
         // Ensure order has market fill flag
         if (!_order.hasBuyOptionsWithMarketFillFlags()) revert LimitOrders__InvalidFullfillment();
 
-        LimitPurchaseOrder memory purchaseOrder = abi.decode(_order.data, (LimitPurchaseOrder));
+        PurchaseOrder memory purchaseOrder = abi.decode(_order.data, (PurchaseOrder));
 
         cache = 0;
 
