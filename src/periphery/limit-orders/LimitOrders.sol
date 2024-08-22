@@ -36,7 +36,10 @@ contract LimitOrders is EIP712("Stryke Limit Orders", "1"), ReentrancyGuard, ILi
     error LimitOrders__InvalidFullfillment();
     error LimitOrders__SignerOrderMismatch();
 
-    event LogOrderFilled(Order order, uint256 comission, address executor);
+    event LogFillOffer(Order order, address executor);
+    event LogOrdersMatched(Order makerOrder, Order takerOrder, uint256 comission, address executor);
+    event LogPurchasedOrderFilled(Order order, uint256 comission, address executor);
+    event LogExerciseOrderFilled(Order order, uint256 comission, address executor);
     event LogOrderCancelled(Order order);
 
     /**
@@ -59,7 +62,7 @@ contract LimitOrders is EIP712("Stryke Limit Orders", "1"), ReentrancyGuard, ILi
         blockTradeOrder.token.safeTransferFrom(msg.sender, _order.maker, blockTradeOrder.payment);
         blockTradeOrder.optionMarket.transferFrom(_order.maker, msg.sender, blockTradeOrder.tokenId);
 
-        emit LogOrderFilled(_order, 0, msg.sender);
+        emit LogFillOffer(_order, msg.sender);
     }
 
     /**
@@ -123,8 +126,7 @@ contract LimitOrders is EIP712("Stryke Limit Orders", "1"), ReentrancyGuard, ILi
         _afterFullFillment(_makerOrder);
         _afterFullFillment(_takerOrder);
 
-        emit LogOrderFilled(_takerOrder, block.timestamp, msg.sender);
-        emit LogOrderFilled(_makerOrder, block.timestamp, msg.sender);
+        emit LogOrdersMatched(_makerOrder, _takerOrder, purchaseOrder.comission, msg.sender);
     }
 
     /**
@@ -187,7 +189,7 @@ contract LimitOrders is EIP712("Stryke Limit Orders", "1"), ReentrancyGuard, ILi
 
         cache = purchaseOrder.comission;
 
-        emit LogOrderFilled(_order, cache, msg.sender);
+        emit LogPurchasedOrderFilled(_order, cache, msg.sender);
     }
 
     /**
@@ -210,6 +212,18 @@ contract LimitOrders is EIP712("Stryke Limit Orders", "1"), ReentrancyGuard, ILi
             revert LimitOrders__InvalidFullfillment();
         }
 
+        uint256 opTickArrayLen = optionMarket.opData(tokenId).opTickArrayLen;
+
+        for (uint256 i; i < opTickArrayLen;) {
+            if (_exerciseParams.liquidityToExercise[i] != optionMarket.opTickMap(tokenId, i).liquidityToUse) {
+                revert LimitOrders__InvalidFullfillment();
+            }
+
+            unchecked {
+                ++i;
+            }
+        }
+
         // check for outdated ownership
         if (optionMarket.ownerOf(tokenId) != _order.maker) revert LimitOrders__VerificationFailed();
 
@@ -225,7 +239,7 @@ contract LimitOrders is EIP712("Stryke Limit Orders", "1"), ReentrancyGuard, ILi
 
         IERC20(address(assetsCache.assetToGet)).safeTransfer(_order.maker, minProfit);
 
-        emit LogOrderFilled(_order, comission, msg.sender);
+        emit LogExerciseOrderFilled(_order, comission, msg.sender);
     }
 
     /**
