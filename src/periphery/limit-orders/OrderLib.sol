@@ -16,9 +16,9 @@ library OrderLib {
      *         OTC/Block trade orders:
      *          - Purchases option from option market
      */
-    uint32 constant MARKET_FILL_FLAG = 0x0000010;
+    uint32 constant MARKET_FILL_FLAG = 0x00000010;
 
-    uint32 constant SELL_OPTIONS_FLAG = 0x0000100;
+    uint32 constant SELL_OPTIONS_FLAG = 0x00000100;
 
     uint32 constant BUY_OPTIONS_FLAG = 0x00000200;
 

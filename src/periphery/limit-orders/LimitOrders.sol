@@ -8,21 +8,24 @@ import {IERC20Permit} from "openzeppelin-contracts/contracts/token/ERC20/extensi
 import {IERC721Receiver} from "openzeppelin-contracts/contracts/token/ERC721/IERC721Receiver.sol";
 import {IValidator} from "../../interfaces/IValidator.sol";
 import {ILimitOrders} from "../../interfaces/ILimitOrders.sol";
-import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 
 // Libraries
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {OrderLib} from "./OrderLib.sol";
+import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
+import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 
 // Contracts
 import {ReentrancyGuard} from "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
+import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 
 contract LimitOrders is EIP712("Stryke Limit Orders", "1"), ReentrancyGuard, ILimitOrders, Multicall {
     using ECDSA for bytes32;
     using OrderLib for Order;
     using SafeERC20 for IERC20;
+    using TickMath for int24;
 
     bytes32 constant _ORDER_TYPEHASH =
         keccak256("Order(uint256 createdAt,uint256 deadline,address maker,address validator,uint32 flags,bytes data)");
@@ -196,27 +199,50 @@ contract LimitOrders is EIP712("Stryke Limit Orders", "1"), ReentrancyGuard, ILi
      * @notice Fills a exercise order that has market flag enabled
      * @param _order Order struct
      * @param _signature Signature struct
-     * @param _exerciseParams ExerciseOptionParams struct
-     * @return comission for filling the order
+     * @param _swapData  Swap route and data for exercising the options
+     * @return cache for filling the order
      */
     function exerciseOption(
         Order memory _order,
         Signature calldata _signature,
-        IOptionMarket.ExerciseOptionParams calldata _exerciseParams
-    ) external onFullfillment(_order, _signature) nonReentrant returns (uint256 comission) {
+        ExerciseOptionsSwapData calldata _swapData
+    ) external onFullfillment(_order, _signature) nonReentrant returns (uint256 cache) {
         (uint256 minProfit, uint256 tokenId, IOptionMarket optionMarket) =
             abi.decode(_order.data, (uint256, uint256, IOptionMarket));
 
         // Ensure order has market fill flag and token id matches with the order
-        if (!_order.hasSellOptionsWithMarketFillFlags() || _exerciseParams.optionId != tokenId) {
+        if (!_order.hasSellOptionsWithMarketFillFlags()) {
             revert LimitOrders__InvalidFullfillment();
         }
 
-        uint256 opTickArrayLen = optionMarket.opData(tokenId).opTickArrayLen;
+        bool isAmount0 = optionMarket.opData(tokenId).isCall
+            ? optionMarket.primePool().token0() == optionMarket.callAsset()
+            : optionMarket.primePool().token0() == optionMarket.putAsset();
 
-        for (uint256 i; i < opTickArrayLen;) {
-            if (_exerciseParams.liquidityToExercise[i] != optionMarket.opTickMap(tokenId, i).liquidityToUse) {
-                revert LimitOrders__InvalidFullfillment();
+        uint256 amountReq;
+        cache = optionMarket.opData(tokenId).opTickArrayLen;
+
+        IOptionMarket.OptionTicks memory opTicks;
+
+        uint256[] memory liquidityToExercise = new uint256[](cache);
+
+        for (uint256 i; i < cache;) {
+            opTicks = optionMarket.opTickMap(tokenId, i);
+
+            amountReq = isAmount0
+                ? LiquidityAmounts.getAmount1ForLiquidity(
+                    opTicks.tickLower.getSqrtRatioAtTick(),
+                    opTicks.tickUpper.getSqrtRatioAtTick(),
+                    uint128(opTicks.liquidityToUse)
+                )
+                : LiquidityAmounts.getAmount0ForLiquidity(
+                    opTicks.tickLower.getSqrtRatioAtTick(),
+                    opTicks.tickUpper.getSqrtRatioAtTick(),
+                    uint128(opTicks.liquidityToUse)
+                );
+
+            if (amountReq != 0) {
+                liquidityToExercise[i] = opTicks.liquidityToUse;
             }
 
             unchecked {
@@ -227,19 +253,26 @@ contract LimitOrders is EIP712("Stryke Limit Orders", "1"), ReentrancyGuard, ILi
         // check for outdated ownership
         if (optionMarket.ownerOf(tokenId) != _order.maker) revert LimitOrders__VerificationFailed();
 
-        IOptionMarket.AssetsCache memory assetsCache = IOptionMarket(optionMarket).exerciseOption(_exerciseParams);
+        IOptionMarket.AssetsCache memory assetsCache = IOptionMarket(optionMarket).exerciseOption(
+            IOptionMarket.ExerciseOptionParams({
+                optionId: tokenId,
+                swapper: _swapData.swapper,
+                swapData: _swapData.swapData,
+                liquidityToExercise: liquidityToExercise
+            })
+        );
 
         if (assetsCache.totalProfit < minProfit) revert LimitOrders__OrderRequirementsNotMet();
 
-        comission = assetsCache.totalProfit - minProfit;
+        cache = assetsCache.totalProfit - minProfit;
 
-        if (comission > 0) {
-            IERC20(address(assetsCache.assetToGet)).safeTransfer(msg.sender, comission);
+        if (cache > 0) {
+            IERC20(address(assetsCache.assetToGet)).safeTransfer(msg.sender, cache);
         }
 
         IERC20(address(assetsCache.assetToGet)).safeTransfer(_order.maker, minProfit);
 
-        emit LogExerciseOrderFilled(_order, comission, msg.sender);
+        emit LogExerciseOrderFilled(_order, cache, msg.sender);
     }
 
     /**
@@ -309,7 +342,7 @@ contract LimitOrders is EIP712("Stryke Limit Orders", "1"), ReentrancyGuard, ILi
                 _order.maker,
                 _order.validator,
                 _order.flags,
-                _order.data
+                keccak256(abi.encodePacked(_order.data))
             )
         );
     }

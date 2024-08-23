@@ -3,8 +3,15 @@ pragma solidity 0.8.15;
 
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {IOptionMarket} from "./IOptionMarket.sol";
+import {ISwapper} from "./ISwapper.sol";
 
 interface ILimitOrders {
+    function exerciseOption(
+        Order memory _order,
+        Signature calldata _signature,
+        ExerciseOptionsSwapData calldata _swapData
+    ) external returns (uint256 comission);
+
     struct BlockTradeOrder {
         uint256 payment;
         uint256 tokenId;
@@ -32,6 +39,11 @@ interface ILimitOrders {
         address validator;
         uint32 flags;
         bytes data;
+    }
+
+    struct ExerciseOptionsSwapData {
+        ISwapper[] swapper;
+        bytes[] swapData;
     }
 
     struct Signature {
