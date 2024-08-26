@@ -12,6 +12,7 @@ import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 // Libraries
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 
+// @dev A contract simulate or execute multi exercises
 contract MultiLimitOrdersExecutor is Multicall {
     using SafeERC20 for IERC20;
 
@@ -46,8 +47,9 @@ contract MultiLimitOrdersExecutor is Multicall {
         comissions = new uint256[](_params.length);
 
         for (uint256 i; i < _params.length;) {
-            try _params[i].handler.exerciseOption(_params[i].order, _params[i].signature, _params[i].swapData)
-            returns (uint256 comission) {
+            try _params[i].handler.exerciseOption(_params[i].order, _params[i].signature, _params[i].swapData) returns (
+                uint256 comission
+            ) {
                 comissions[i] = comission;
             } catch {}
             unchecked {
