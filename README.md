@@ -1,10 +1,8 @@
-# Dopex V2 CLAMM
+# CLAMM
 
-> [Learn about Dopex V2 CLAMM here.](https://learn.dopex.io/825ae0bf1c6240a79e490d0059fa6389)
+CLAMM represents an advancement in on-chain option trading, offering a sophisticated and comprehensive option market designed to elevate the option trading experience by offering an extensive range of option payoff products. By combining natively hedged strategies, partial collateralization and seam-less CLAMM LP deposits, it empowers traders to optimize their capital efficiency while mitigating downside risks.
 
-Dopex V2 CLAMM represents an advancement in on-chain option trading, offering a sophisticated and comprehensive option market designed to elevate the option trading experience by offering an extensive range of option payoff products. By combining natively hedged strategies, partial collateralization and seam-less CLAMM LP deposits, it empowers traders to optimize their capital efficiency while mitigating downside risks.
-
-With Dopex V2 traders have the freedom to explore various option strategies, close positions at any time, and set take profits all within a secure and user-friendly environment. It combines all the current offerings of Dopex into a single product while providing a base for future products and spin-offs.
+With CLAMM traders have the freedom to explore various option strategies, close positions at any time, and set take profits all within a secure and user-friendly environment.
 
 ## Audits
 
