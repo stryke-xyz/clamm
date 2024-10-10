@@ -6,14 +6,4 @@ libs = ['lib']
 optimizer = true
 optimizer_runs = 0
 
-[rpc_endpoints]
-arbitrum = "${ARBITRUM_RPC_URL}"
-mantle = "${MANTLE_RPC_URL}"
-base = "${BASE_RPC_URL}"
-
-[etherscan]
-arbitrum = { key = "${ETHERSCAN_API_KEY}" }
-mantle = { key = "${ETHERSCAN_API_KEY}" }
-base = { key = "${ETHERSCAN_API_KEY}" }
-
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config

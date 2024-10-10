@@ -11,6 +11,7 @@ out/
 /broadcast/DeployOptionPricingLinear.s.sol/
 /broadcast/DeployOptionPricingLinearV2.s.sol/
 /broadcast/DeployOptionPricingLinearV2_1.s.sol/
+/broadcast/*/80084/
 
 # Docs
 docs/
