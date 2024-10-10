@@ -6,7 +6,9 @@ import {AutoExerciseTimeBased} from "../src/periphery/AutoExerciseTimeBased.sol"
 
 contract DeployAutoExercise is Script {
     function run() public {
-        vm.startBroadcast();
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+
+        vm.startBroadcast(deployerPrivateKey);
         AutoExerciseTimeBased aetb = new AutoExerciseTimeBased();
         console.log(address(aetb));
         vm.stopBroadcast();

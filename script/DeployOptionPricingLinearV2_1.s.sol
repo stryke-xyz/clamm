@@ -55,20 +55,6 @@ contract DeployOptionPricingLinearV2_1 is Script {
 
         opl.updateVolatilityMultiplier(volatilityMultipliers, ttls);
 
-        // Set xSYK Balance requirement and discounts
-        uint256[] memory _xSykBalances = new uint256[](3);
-        uint256[] memory _discounts = new uint256[](3);
-
-        _xSykBalances[0] = 100;
-        _xSykBalances[1] = 1000;
-        _xSykBalances[2] = 10000;
-
-        _discounts[0] = 1000;
-        _discounts[1] = 2000;
-        _discounts[2] = 3000;
-
-        opl.setXSykBalancesAndDiscounts(_xSykBalances, _discounts);
-
         vm.stopBroadcast();
     }
 }

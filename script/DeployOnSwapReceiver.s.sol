@@ -6,8 +6,14 @@ import {OnSwapReceiver} from "../src/swapper/OnSwapReceiver.sol";
 
 contract DeployOnSwapReceiver is Script {
     function run() public {
-        vm.startBroadcast();
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+
+        vm.startBroadcast(deployerPrivateKey);
+
         OnSwapReceiver swapper = new OnSwapReceiver();
+
+        console.log(address(swapper));
+
         vm.stopBroadcast();
     }
 }
