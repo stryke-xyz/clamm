@@ -64,7 +64,7 @@ contract BulletXV3TestLib is Test {
         swapRouter = ISwapRouter(0x5989FB161568b9F133eDf5Cf6787f5597762797F);
     }
 
-    function deployBulletXV3PoolAndInitializePrice(address token0, address token1, uint24 fee, uint160 sqrtPriceX96)
+    function deployPoolAndInitializePrice(address token0, address token1, uint24 fee, uint160 sqrtPriceX96)
         public
         returns (address pool)
     {
