@@ -29,7 +29,7 @@ import {IOptionMarket} from "../../src/interfaces/IOptionMarket.sol";
 
 import {BoundedTTLHook_20mins} from "../../src/handlers/hooks/sample/BoundedTTLHook_20mins.sol";
 
-contract optionMarketTest is Test {
+contract DopexV2OptionMarketV2PCS_0day is Test {
     using TickMath for int24;
 
     address ETH; // token1
@@ -78,6 +78,8 @@ contract optionMarketTest is Test {
     AutoExerciseTimeBased autoExercise;
 
     function setUp() public {
+        vm.createSelectFork(vm.envString("ARBITRUM_RPC_URL"), 180385764);
+
         vm.warp(1693352493);
 
         ETH = address(new ERC20Mock());

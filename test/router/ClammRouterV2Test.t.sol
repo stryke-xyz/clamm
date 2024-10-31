@@ -14,7 +14,7 @@ import {IERC6909} from "../../src/interfaces/IERC6909.sol";
 
 import {UniswapV3SingleTickLiquidityHandlerV2} from "../../src/handlers/UniswapV3SingleTickLiquidityHandlerV2.sol";
 
-contract ClammRouterTest is Test {
+contract ClammRouterV2Test is Test {
     ClammRouterV2 router;
     IHandler handler;
 

@@ -28,7 +28,7 @@ import {IOptionMarket} from "../../src/interfaces/IOptionMarket.sol";
 
 import {BoundedTTLHook_1Week} from "../../src/handlers/hooks/BoundedTTLHook_1Week.sol";
 
-contract optionMarketTest is Test {
+contract DopexV2OptionMarketV2_1week is Test {
     using TickMath for int24;
 
     address ETH; // token1
