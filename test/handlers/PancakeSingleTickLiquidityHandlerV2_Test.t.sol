@@ -12,7 +12,7 @@ import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
 
 import {DopexV2PositionManager} from "../../src/DopexV2PositionManager.sol";
-import {PancakeV3SingleTickLiquidityHarnessV2} from "../harness/PancakeV3SingleTickLiquidityHandlerV2.harness.sol";
+import {PancakeV3SingleTickLiquidityHarnessV2} from "../harness/PancakeV3SingleTickLiquidityHarnessV2.sol";
 import {PancakeV3SingleTickLiquidityHandlerV2} from "../../src/handlers/PancakeV3SingleTickLiquidityHandlerV2.sol";
 
 contract PancakeSingleTickLiquidityHandlerV2_Test is Test {

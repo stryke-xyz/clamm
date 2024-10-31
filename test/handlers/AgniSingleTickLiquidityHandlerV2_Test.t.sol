@@ -12,7 +12,7 @@ import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
 
 import {DopexV2PositionManager} from "../../src/DopexV2PositionManager.sol";
-import {AgniSingleTickLiquidityHarnessV2} from "../harness/AgniSingleTickLiquidityHandlerV2.harness.sol";
+import {AgniSingleTickLiquidityHarnessV2} from "../harness/AgniSingleTickLiquidityHarnessV2.sol";
 import {AgniSingleTickLiquidityHandlerV2} from "../../src/handlers/AgniSingleTickLiquidityHandlerV2.sol";
 
 contract AgniSingleTickLiquidityHandlerV2_Test is Test {

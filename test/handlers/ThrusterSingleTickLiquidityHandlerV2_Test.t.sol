@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 
 import {DopexV2PositionManager} from "../../src/DopexV2PositionManager.sol";
 import {ThrusterTestLib} from "../utils/thruster-v3/ThrusterTestLib.sol";
-import {ThrusterSingleTickLiquidityHarnessV2} from "../harness/ThrusterSingleTickLiquidityHandlerV2.harness.sol";
+import {ThrusterSingleTickLiquidityHarnessV2} from "../harness/ThrusterSingleTickLiquidityHarnessV2.sol";
 import {ThrusterSingleTickLiquidityHandlerV2} from "../../src/handlers/ThrusterSingleTickLiquidityHandlerV2.sol";
 import {ERC20Mock} from "../mocks/ERC20Mock.sol";
 
