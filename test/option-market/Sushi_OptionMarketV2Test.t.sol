@@ -16,7 +16,7 @@ import {SushiV3SingleTickLiquidityHarnessV2} from "../harness/SushiV3SingleTickL
 import {SushiV3SingleTickLiquidityHandlerV2} from "../../src/handlers/SushiV3SingleTickLiquidityHandlerV2.sol";
 import {DopexV2OptionMarketV2} from "../../src/DopexV2OptionMarketV2.sol";
 
-import {OptionPricingV2} from "../pricing/OptionPricingV2.sol";
+import {OptionPricingV2} from "../../src/pricing/OptionPricingV2.sol";
 import {DopexV2ClammFeeStrategyV2} from "../../src/pricing/fees/DopexV2ClammFeeStrategyV2.sol";
 import {SwapRouterSwapper} from "../../src/swapper/SwapRouterSwapper.sol";
 import {AutoExerciseTimeBased} from "../../src/periphery/AutoExerciseTimeBased.sol";

@@ -3,7 +3,7 @@ pragma solidity ^0.8.13;
 
 // Libraries
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import {BlackScholes} from "./BlackScholes.sol";
+import {BlackScholes} from "./external/BlackScholes.sol";
 
 // Contracts
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
@@ -34,9 +34,7 @@ contract OptionPricingV2 is Ownable {
     /// @notice updates volatility cap for an option pool
     /// @param _volatilityCap the new volatility cap
     /// @return whether volatility cap was updated
-    function updateVolatilityCap(
-        uint256 _volatilityCap
-    ) external onlyOwner returns (bool) {
+    function updateVolatilityCap(uint256 _volatilityCap) external onlyOwner returns (bool) {
         volatilityCap = _volatilityCap;
 
         return true;
@@ -45,9 +43,7 @@ contract OptionPricingV2 is Ownable {
     /// @notice updates % of the price of asset which is the minimum option price possible
     /// @param _minOptionPricePercentage the new %
     /// @return whether % was updated
-    function updateMinOptionPricePercentage(
-        uint256 _minOptionPricePercentage
-    ) external onlyOwner returns (bool) {
+    function updateMinOptionPricePercentage(uint256 _minOptionPricePercentage) external onlyOwner returns (bool) {
         minOptionPricePercentage = _minOptionPricePercentage;
 
         return true;
@@ -69,10 +65,7 @@ contract OptionPricingV2 is Ownable {
      * @param _ttlIV The new IVs for the given TTLs.
      * @dev Only the IV SETTER can call this function.
      */
-    function updateIVs(
-        uint256[] calldata _ttls,
-        uint256[] calldata _ttlIV
-    ) external {
+    function updateIVs(uint256[] calldata _ttls, uint256[] calldata _ttlIV) external {
         if (!ivSetter[msg.sender]) revert NotIVSetter();
 
         for (uint256 i; i < _ttls.length; i++) {
@@ -89,30 +82,22 @@ contract OptionPricingV2 is Ownable {
      * @param strike strike price
      * @param lastPrice current price
      */
-    function getOptionPrice(
-        bool isPut,
-        uint256 expiry,
-        uint256 strike,
-        uint256 lastPrice
-    ) external view returns (uint256 optionPrice) {
+    function getOptionPrice(bool isPut, uint256 expiry, uint256 strike, uint256 lastPrice)
+        external
+        view
+        returns (uint256 optionPrice)
+    {
         uint256 timeToExpiry = expiry.sub(block.timestamp).div(864);
 
-        if(ttlToVol[expiry - block.timestamp] == 0) revert();
+        if (ttlToVol[expiry - block.timestamp] == 0) revert();
 
-        optionPrice = BlackScholes
-            .calculate(
-                isPut ? 1 : 0, // 0 - Put, 1 - Call
-                lastPrice,
-                strike,
-                timeToExpiry, // Number of days to expiry mul by 100
-                0,
-                ttlToVol[expiry - block.timestamp]
-            )
+        optionPrice = BlackScholes.calculate(
+            isPut ? 1 : 0, lastPrice, strike, timeToExpiry, 0, ttlToVol[expiry - block.timestamp]
+        ) // 0 - Put, 1 - Call
+                // Number of days to expiry mul by 100
             .div(BlackScholes.DIVISOR);
 
-        uint256 minOptionPrice = lastPrice.mul(minOptionPricePercentage).div(
-            1e10
-        );
+        uint256 minOptionPrice = lastPrice.mul(minOptionPricePercentage).div(1e10);
 
         if (minOptionPrice > optionPrice) {
             return minOptionPrice;

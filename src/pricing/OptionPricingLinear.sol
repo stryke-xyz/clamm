@@ -3,8 +3,8 @@ pragma solidity ^0.8.13;
 
 // Libraries
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import {BlackScholes} from "../../test/pricing/BlackScholes.sol";
-import {ABDKMathQuad} from "../../test/pricing/ABDKMathQuad.sol";
+import {BlackScholes} from "./external/BlackScholes.sol";
+import {ABDKMathQuad} from "./external/ABDKMathQuad.sol";
 
 // Contracts
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
@@ -24,11 +24,7 @@ contract OptionPricingLinear is Ownable {
     // The decimal precision for volatility calculation
     uint256 public constant VOLATILITY_PRECISION = 1e4;
 
-    constructor(
-        uint256 _volatilityOffset,
-        uint256 _volatilityMultiplier,
-        uint256 _minOptionPricePercentage
-    ) {
+    constructor(uint256 _volatilityOffset, uint256 _volatilityMultiplier, uint256 _minOptionPricePercentage) {
         volatilityOffset = _volatilityOffset;
         volatilityMultiplier = _volatilityMultiplier;
         minOptionPricePercentage = _minOptionPricePercentage;
@@ -39,9 +35,7 @@ contract OptionPricingLinear is Ownable {
     /// @notice updates the offset for volatility calculation
     /// @param _volatilityOffset the new offset
     /// @return whether offset was updated
-    function updateVolatilityOffset(
-        uint256 _volatilityOffset
-    ) external onlyOwner returns (bool) {
+    function updateVolatilityOffset(uint256 _volatilityOffset) external onlyOwner returns (bool) {
         volatilityOffset = _volatilityOffset;
 
         return true;
@@ -50,9 +44,7 @@ contract OptionPricingLinear is Ownable {
     /// @notice updates the multiplier for volatility calculation
     /// @param _volatilityMultiplier the new multiplier
     /// @return whether multiplier was updated
-    function updateVolatilityMultiplier(
-        uint256 _volatilityMultiplier
-    ) external onlyOwner returns (bool) {
+    function updateVolatilityMultiplier(uint256 _volatilityMultiplier) external onlyOwner returns (bool) {
         volatilityMultiplier = _volatilityMultiplier;
 
         return true;
@@ -61,9 +53,7 @@ contract OptionPricingLinear is Ownable {
     /// @notice updates % of the price of asset which is  the minimum option price possible
     /// @param _minOptionPricePercentage the new %
     /// @return whether % was updated
-    function updateMinOptionPricePercentage(
-        uint256 _minOptionPricePercentage
-    ) external onlyOwner returns (bool) {
+    function updateMinOptionPricePercentage(uint256 _minOptionPricePercentage) external onlyOwner returns (bool) {
         minOptionPricePercentage = _minOptionPricePercentage;
 
         return true;
@@ -79,30 +69,19 @@ contract OptionPricingLinear is Ownable {
      * @param lastPrice current price
      * @param volatility volatility
      */
-    function getOptionPrice(
-        bool isPut,
-        uint256 expiry,
-        uint256 strike,
-        uint256 lastPrice,
-        uint256 volatility
-    ) external view returns (uint256) {
+    function getOptionPrice(bool isPut, uint256 expiry, uint256 strike, uint256 lastPrice, uint256 volatility)
+        external
+        view
+        returns (uint256)
+    {
         uint256 timeToExpiry = expiry.sub(block.timestamp).div(864);
         volatility = getVolatility(strike, lastPrice, volatility);
 
-        uint256 optionPrice = BlackScholes
-            .calculate(
-                isPut ? 1 : 0, // 0 - Put, 1 - Call
-                lastPrice,
-                strike,
-                timeToExpiry, // Number of days to expiry mul by 100
-                0,
-                volatility
-            )
+        uint256 optionPrice = BlackScholes.calculate(isPut ? 1 : 0, lastPrice, strike, timeToExpiry, 0, volatility) // 0 - Put, 1 - Call
+                // Number of days to expiry mul by 100
             .div(BlackScholes.DIVISOR);
 
-        uint256 minOptionPrice = lastPrice.mul(minOptionPricePercentage).div(
-            1e10
-        );
+        uint256 minOptionPrice = lastPrice.mul(minOptionPricePercentage).div(1e10);
 
         if (minOptionPrice > optionPrice) {
             return minOptionPrice;
@@ -117,15 +96,8 @@ contract OptionPricingLinear is Ownable {
      * @param lastPrice current price
      * @param volatility volatility
      */
-    function getVolatility(
-        uint256 strike,
-        uint256 lastPrice,
-        uint256 volatility
-    ) public view returns (uint256) {
-        uint256 percentageDifference = strike
-            .mul(1e2)
-            .mul(VOLATILITY_PRECISION)
-            .div(lastPrice); // 1e4 in percentage precision (1e6 is 100%)
+    function getVolatility(uint256 strike, uint256 lastPrice, uint256 volatility) public view returns (uint256) {
+        uint256 percentageDifference = strike.mul(1e2).mul(VOLATILITY_PRECISION).div(lastPrice); // 1e4 in percentage precision (1e6 is 100%)
 
         if (strike > lastPrice) {
             percentageDifference = percentageDifference.sub(1e6);
@@ -133,12 +105,8 @@ contract OptionPricingLinear is Ownable {
             percentageDifference = uint256(1e6).sub(percentageDifference);
         }
 
-        uint256 scaleFactor = volatilityOffset +
-            (
-                percentageDifference.mul(volatilityMultiplier).div(
-                    VOLATILITY_PRECISION
-                )
-            );
+        uint256 scaleFactor =
+            volatilityOffset + (percentageDifference.mul(volatilityMultiplier).div(VOLATILITY_PRECISION));
 
         return (volatility.mul(scaleFactor).div(VOLATILITY_PRECISION));
     }

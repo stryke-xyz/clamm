@@ -3,8 +3,8 @@ pragma solidity ^0.8.13;
 
 // Libraries
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import {BlackScholes} from "../../test/pricing/BlackScholes.sol";
-import {ABDKMathQuad} from "../../test/pricing/ABDKMathQuad.sol";
+import {BlackScholes} from "./external/BlackScholes.sol";
+import {ABDKMathQuad} from "./external/ABDKMathQuad.sol";
 
 // Contracts
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";

@@ -13,7 +13,7 @@ import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {IOptionMarket} from "../../src/interfaces/IOptionMarket.sol";
 import {IHandler} from "../../src/interfaces/IHandler.sol";
 
-contract OptionPricingTest is Test {
+contract OptionPricingLinearV2_1_Test is Test {
     OptionPricingLinearV2_1 pricing;
     ClammRouter router;
     DopexV2OptionMarket dopexV2OptionMarket;
@@ -21,12 +21,8 @@ contract OptionPricingTest is Test {
     IHandler handler;
     IERC20 xsyk;
 
-    string internal constant ARBITRUM_RPC_URL = "https://arb1.arbitrum.io/rpc";
-    uint256 internal constant BLOCK_NUM = 204418426; // 2024/05/20
-
     function setUp() public {
-        uint256 forkId = vm.createFork(ARBITRUM_RPC_URL, BLOCK_NUM);
-        vm.selectFork(forkId);
+        vm.createSelectFork(vm.envString("ARBITRUM_RPC_URL"), 204418426);
 
         pricing = new OptionPricingLinearV2_1(10000000, 0x50E04E222Fc1be96E94E86AcF1136cB0E97E1d40);
         router = new ClammRouter();

@@ -18,12 +18,8 @@ contract ClammRouterTest is Test {
     ClammRouterV2 router;
     IHandler handler;
 
-    string internal constant ARBITRUM_RPC_URL = "https://arb1.arbitrum.io/rpc";
-    uint256 internal constant BLOCK_NUM = 204418426; // 2024/04/24
-
     function setUp() public {
-        uint256 forkId = vm.createFork(ARBITRUM_RPC_URL, BLOCK_NUM);
-        vm.selectFork(forkId);
+        vm.createSelectFork(vm.envString("ARBITRUM_RPC_URL"), 204418426);
 
         router = new ClammRouterV2();
         handler = IHandler(0x29BbF7EbB9C5146c98851e76A5529985E4052116);
