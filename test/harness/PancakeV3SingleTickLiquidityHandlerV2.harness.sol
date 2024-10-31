@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import {IPancakeV3Factory} from "../../src/pancake-v3/v3-core/contracts/interfaces/IPancakeV3Factory.sol";
 import {IPancakeV3Pool} from "../../src/pancake-v3/v3-core/contracts/interfaces/IPancakeV3Pool.sol";
 
-import {PancakeV3TestLib} from "../pancake-v3-utils/PancakeV3TestLib.sol";
+import {PancakeV3TestLib} from "../utils/pancake-v3/PancakeV3TestLib.sol";
 import {ERC20Mock} from "../mocks/ERC20Mock.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
@@ -33,24 +33,12 @@ contract PancakeV3SingleTickLiquidityHarnessV2 is Test {
         handler = IHandler(address(_pcsV3Handler));
     }
 
-    function getTokenId(
-        IPancakeV3Pool pool,
-        address hook,
-        int24 tickLower,
-        int24 tickUpper
-    ) public view returns (uint256) {
-        return
-            uint256(
-                keccak256(
-                    abi.encode(
-                        address(handler),
-                        pool,
-                        hook,
-                        tickLower,
-                        tickUpper
-                    )
-                )
-            );
+    function getTokenId(IPancakeV3Pool pool, address hook, int24 tickLower, int24 tickUpper)
+        public
+        view
+        returns (uint256)
+    {
+        return uint256(keccak256(abi.encode(address(handler), pool, hook, tickLower, tickUpper)));
     }
 
     function mintPosition(
@@ -138,7 +126,7 @@ contract PancakeV3SingleTickLiquidityHarnessV2 is Test {
             amount1
         );
         vm.startPrank(user);
-        (tokens, amounts, ) = positionManager.usePosition(
+        (tokens, amounts,) = positionManager.usePosition(
             handler,
             abi.encode(
                 PancakeV3SingleTickLiquidityHandlerV2.UsePositionParams({
@@ -165,16 +153,11 @@ contract PancakeV3SingleTickLiquidityHarnessV2 is Test {
     AmountCache amountsCache;
 
     function _getLiq() internal view returns (uint128) {
-        return
-            uint128(
-                LiquidityAmounts.getLiquidityForAmounts(
-                    amountsCache.csp,
-                    amountsCache.tl,
-                    amountsCache.tu,
-                    amountsCache.a0,
-                    amountsCache.a1
-                )
-            );
+        return uint128(
+            LiquidityAmounts.getLiquidityForAmounts(
+                amountsCache.csp, amountsCache.tl, amountsCache.tu, amountsCache.a0, amountsCache.a1
+            )
+        );
     }
 
     function unusePosition(
@@ -210,19 +193,15 @@ contract PancakeV3SingleTickLiquidityHarnessV2 is Test {
 
         vm.startPrank(user);
         {
-            if (amount0ToDonate > 0)
+            if (amount0ToDonate > 0) {
                 ERC20Mock(pool.token0()).mint(user, amount0ToDonate);
-            if (amount1ToDonate > 0)
+            }
+            if (amount1ToDonate > 0) {
                 ERC20Mock(pool.token1()).mint(user, amount1ToDonate);
+            }
 
-            ERC20Mock(pool.token0()).increaseAllowance(
-                address(positionManager),
-                amount0 + amount0ToDonate
-            );
-            ERC20Mock(pool.token1()).increaseAllowance(
-                address(positionManager),
-                amount1 + amount1ToDonate
-            );
+            ERC20Mock(pool.token0()).increaseAllowance(address(positionManager), amount0 + amount0ToDonate);
+            ERC20Mock(pool.token1()).increaseAllowance(address(positionManager), amount1 + amount1ToDonate);
         }
 
         positionManager.unusePosition(
@@ -266,16 +245,10 @@ contract PancakeV3SingleTickLiquidityHarnessV2 is Test {
         if (amount0ToDonate > 0) token0.mint(user, amount0ToDonate);
         if (amount1ToDonate > 0) token1.mint(user, amount1ToDonate);
 
-        token0.increaseAllowance(
-            address(positionManager),
-            amount0 + amount0ToDonate
-        );
-        token1.increaseAllowance(
-            address(positionManager),
-            amount1 + amount1ToDonate
-        );
+        token0.increaseAllowance(address(positionManager), amount0 + amount0ToDonate);
+        token1.increaseAllowance(address(positionManager), amount1 + amount1ToDonate);
 
-        (amounts, ) = positionManager.donateToPosition(
+        (amounts,) = positionManager.donateToPosition(
             handler,
             abi.encode(
                 PancakeV3SingleTickLiquidityHandlerV2.DonateParams({

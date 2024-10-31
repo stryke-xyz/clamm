@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import {IUniswapV3Factory} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 
-import {UniswapV3TestLib} from "../uniswap-v3-utils/UniswapV3TestLib.sol";
+import {UniswapV3TestLib} from "../utils/uniswap-v3/UniswapV3TestLib.sol";
 import {ERC20Mock} from "../mocks/ERC20Mock.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
@@ -33,17 +33,8 @@ contract UniswapV3SingleTickLiquidityHarness is Test {
         handler = IHandler(address(_uniV3Handler));
     }
 
-    function getTokenId(
-        IUniswapV3Pool pool,
-        int24 tickLower,
-        int24 tickUpper
-    ) public view returns (uint256) {
-        return
-            uint256(
-                keccak256(
-                    abi.encode(address(handler), pool, tickLower, tickUpper)
-                )
-            );
+    function getTokenId(IUniswapV3Pool pool, int24 tickLower, int24 tickUpper) public view returns (uint256) {
+        return uint256(keccak256(abi.encode(address(handler), pool, tickLower, tickUpper)));
     }
 
     function mintPosition(
@@ -85,13 +76,10 @@ contract UniswapV3SingleTickLiquidityHarness is Test {
         vm.stopPrank();
     }
 
-    function burnPosition(
-        uint256 shares,
-        int24 tickLower,
-        int24 tickUpper,
-        IUniswapV3Pool pool,
-        address user
-    ) public returns (uint256 lb) {
+    function burnPosition(uint256 shares, int24 tickLower, int24 tickUpper, IUniswapV3Pool pool, address user)
+        public
+        returns (uint256 lb)
+    {
         vm.startPrank(user);
 
         (lb) = positionManager.burnPosition(
@@ -125,7 +113,7 @@ contract UniswapV3SingleTickLiquidityHarness is Test {
             amount1
         );
         vm.startPrank(user);
-        (tokens, amounts, ) = positionManager.usePosition(
+        (tokens, amounts,) = positionManager.usePosition(
             handler,
             abi.encode(
                 UniswapV3SingleTickLiquidityHandler.UsePositionParams({
@@ -163,16 +151,10 @@ contract UniswapV3SingleTickLiquidityHarness is Test {
         if (amount0ToDonate > 0) token0.mint(user, amount0ToDonate);
         if (amount1ToDonate > 0) token1.mint(user, amount1ToDonate);
 
-        token0.increaseAllowance(
-            address(positionManager),
-            amount0 + amount0ToDonate
-        );
-        token1.increaseAllowance(
-            address(positionManager),
-            amount1 + amount1ToDonate
-        );
+        token0.increaseAllowance(address(positionManager), amount0 + amount0ToDonate);
+        token1.increaseAllowance(address(positionManager), amount1 + amount1ToDonate);
 
-        (amounts, ) = positionManager.unusePosition(
+        (amounts,) = positionManager.unusePosition(
             handler,
             abi.encode(
                 UniswapV3SingleTickLiquidityHandler.UnusePositionParams({
@@ -210,16 +192,10 @@ contract UniswapV3SingleTickLiquidityHarness is Test {
         if (amount0ToDonate > 0) token0.mint(user, amount0ToDonate);
         if (amount1ToDonate > 0) token1.mint(user, amount1ToDonate);
 
-        token0.increaseAllowance(
-            address(positionManager),
-            amount0 + amount0ToDonate
-        );
-        token1.increaseAllowance(
-            address(positionManager),
-            amount1 + amount1ToDonate
-        );
+        token0.increaseAllowance(address(positionManager), amount0 + amount0ToDonate);
+        token1.increaseAllowance(address(positionManager), amount1 + amount1ToDonate);
 
-        (amounts, ) = positionManager.donateToPosition(
+        (amounts,) = positionManager.donateToPosition(
             handler,
             abi.encode(
                 UniswapV3SingleTickLiquidityHandler.DonateParams({

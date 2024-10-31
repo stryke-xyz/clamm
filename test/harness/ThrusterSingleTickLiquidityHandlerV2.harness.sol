@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import {IThrusterPoolFactory} from "../../src/thruster-v3/v3-core/contracts/interfaces/IThrusterPoolFactory.sol";
 import {IThrusterPool} from "../../src/thruster-v3/v3-core/contracts/interfaces/IThrusterPool.sol";
 
-import {ThrusterTestLib} from "../thruster-v3-utils/ThrusterTestLib.sol";
+import {ThrusterTestLib} from "../utils/thruster-v3/ThrusterTestLib.sol";
 import {ERC20Mock} from "../mocks/ERC20Mock.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";

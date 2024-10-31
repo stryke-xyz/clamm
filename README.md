@@ -6,7 +6,13 @@ With CLAMM traders have the freedom to explore various option strategies, close 
 
 ## Audits
 
+### V1
+
 - [yAudit](audits/yaudit/Dopex_CLAMM_yAudit_report.pdf)
+
+### V2
+
+- [yAudit](audits/yaudit/Dopex_CLAMM_V2_yAudit_report.pdf)
 
 ## Getting started
 
@@ -21,6 +27,10 @@ Please have these installed on your machine:
 ```
 forge install
 ```
+
+### Setup environment variables
+
+Setup a `.env` file as per the [`.env.sample`](/.env.sample) file.
 
 ### Commands
 

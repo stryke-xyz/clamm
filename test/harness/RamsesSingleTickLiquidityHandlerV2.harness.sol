@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import {IClPoolFactory} from "../../src/ramses-v3/v3-core/contracts/interfaces/IClPoolFactory.sol";
 import {IClPool} from "../../src/ramses-v3/v3-core/contracts/interfaces/IClPool.sol";
 
-import {ClTestLib} from "../ramses-v3-utils/ClTestLib.sol";
+import {ClTestLib} from "../utils/ramses-v3/ClTestLib.sol";
 import {ERC20Mock} from "../mocks/ERC20Mock.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
