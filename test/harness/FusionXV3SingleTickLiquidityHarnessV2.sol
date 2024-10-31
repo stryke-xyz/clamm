@@ -17,20 +17,18 @@ import {IHandler} from "../../src/interfaces/IHandler.sol";
 contract FusionXV3SingleTickLiquidityHarnessV2 is Test {
     using TickMath for int24;
 
-    FusionXV3TestLib fusionXV3TestLib;
+    FusionXV3TestLib testLib;
     DopexV2PositionManager positionManager;
-    FusionXV3SingleTickLiquidityHandlerV2 pcsV3Handler;
-    IHandler handler;
+    FusionXV3SingleTickLiquidityHandlerV2 handler;
 
     constructor(
-        FusionXV3TestLib _fusionXV3TestLib,
+        FusionXV3TestLib _testLib,
         DopexV2PositionManager _positionManager,
-        FusionXV3SingleTickLiquidityHandlerV2 _pcsV3Handler
+        FusionXV3SingleTickLiquidityHandlerV2 _handler
     ) {
-        fusionXV3TestLib = _fusionXV3TestLib;
+        testLib = _testLib;
         positionManager = _positionManager;
-        pcsV3Handler = _pcsV3Handler;
-        handler = IHandler(address(_pcsV3Handler));
+        handler = _handler;
     }
 
     function getTokenId(IFusionXV3Pool pool, address hook, int24 tickLower, int24 tickUpper)
@@ -53,7 +51,7 @@ contract FusionXV3SingleTickLiquidityHarnessV2 is Test {
         address user
     ) public returns (uint256 lm) {
         uint128 liquidityToMint = LiquidityAmounts.getLiquidityForAmounts(
-            fusionXV3TestLib.getCurrentSqrtPriceX96(pool),
+            testLib.getCurrentSqrtPriceX96(pool),
             tickLower.getSqrtRatioAtTick(),
             tickUpper.getSqrtRatioAtTick(),
             amount0,
@@ -68,7 +66,7 @@ contract FusionXV3SingleTickLiquidityHarnessV2 is Test {
         token1.increaseAllowance(address(positionManager), amount1);
 
         (lm) = positionManager.mintPosition(
-            handler,
+            IHandler(address(handler)),
             abi.encode(
                 FusionXV3SingleTickLiquidityHandlerV2.MintPositionParams({
                     pool: pool,
@@ -93,7 +91,7 @@ contract FusionXV3SingleTickLiquidityHarnessV2 is Test {
         vm.startPrank(user);
 
         (lb) = positionManager.burnPosition(
-            handler,
+            IHandler(address(handler)),
             abi.encode(
                 FusionXV3SingleTickLiquidityHandlerV2.BurnPositionParams({
                     pool: pool,
@@ -119,7 +117,7 @@ contract FusionXV3SingleTickLiquidityHarnessV2 is Test {
         address user
     ) public returns (address[] memory tokens, uint256[] memory amounts) {
         uint128 liquidityToUse = LiquidityAmounts.getLiquidityForAmounts(
-            fusionXV3TestLib.getCurrentSqrtPriceX96(pool),
+            testLib.getCurrentSqrtPriceX96(pool),
             tickLower.getSqrtRatioAtTick(),
             tickUpper.getSqrtRatioAtTick(),
             amount0,
@@ -127,7 +125,7 @@ contract FusionXV3SingleTickLiquidityHarnessV2 is Test {
         );
         vm.startPrank(user);
         (tokens, amounts,) = positionManager.usePosition(
-            handler,
+            IHandler(address(handler)),
             abi.encode(
                 FusionXV3SingleTickLiquidityHandlerV2.UsePositionParams({
                     pool: pool,
@@ -172,21 +170,10 @@ contract FusionXV3SingleTickLiquidityHarnessV2 is Test {
         bytes calldata hookData,
         address user
     ) public {
-        // uint256 liquidityToUnuse;
-        // {
-        //     liquidityToUnuse = LiquidityAmounts.getLiquidityForAmounts(
-        //         fusionXV3TestLib.getCurrentSqrtPriceX96(pool),
-        //         tickLower.getSqrtRatioAtTick(),
-        //         tickUpper.getSqrtRatioAtTick(),
-        //         amount0 + amount0ToDonate,
-        //         amount1 + amount1ToDonate
-        //     );
-        // }
-
         amountsCache = AmountCache({
             a0: amount0 + amount0ToDonate,
             a1: amount1 + amount1ToDonate,
-            csp: fusionXV3TestLib.getCurrentSqrtPriceX96(pool),
+            csp: testLib.getCurrentSqrtPriceX96(pool),
             tl: tickLower.getSqrtRatioAtTick(),
             tu: tickUpper.getSqrtRatioAtTick()
         });
@@ -205,7 +192,7 @@ contract FusionXV3SingleTickLiquidityHarnessV2 is Test {
         }
 
         positionManager.unusePosition(
-            handler,
+            IHandler(address(handler)),
             abi.encode(
                 FusionXV3SingleTickLiquidityHandlerV2.UnusePositionParams({
                     pool: pool,
@@ -234,7 +221,7 @@ contract FusionXV3SingleTickLiquidityHarnessV2 is Test {
         address user
     ) public returns (uint256[] memory amounts, uint256 liquidityToDonate) {
         liquidityToDonate = LiquidityAmounts.getLiquidityForAmounts(
-            fusionXV3TestLib.getCurrentSqrtPriceX96(pool),
+            testLib.getCurrentSqrtPriceX96(pool),
             tickLower.getSqrtRatioAtTick(),
             tickUpper.getSqrtRatioAtTick(),
             amount0 + amount0ToDonate,
@@ -249,7 +236,7 @@ contract FusionXV3SingleTickLiquidityHarnessV2 is Test {
         token1.increaseAllowance(address(positionManager), amount1 + amount1ToDonate);
 
         (amounts,) = positionManager.donateToPosition(
-            handler,
+            IHandler(address(handler)),
             abi.encode(
                 FusionXV3SingleTickLiquidityHandlerV2.DonateParams({
                     pool: pool,
