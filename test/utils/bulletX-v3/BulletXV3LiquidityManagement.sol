@@ -3,14 +3,14 @@ pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
 
-import {IBulletXV3Factory} from "../../src/bulletX-v3/v3-core/contracts/interfaces/IBulletXV3Factory.sol";
-import {IBulletXV3Pool} from "../../src/bulletX-v3/v3-core/contracts/interfaces/IBulletXV3Pool.sol";
+import {IBulletXV3Factory} from "../../../src/bulletX-v3/v3-core/contracts/interfaces/IBulletXV3Factory.sol";
+import {IBulletXV3Pool} from "../../../src/bulletX-v3/v3-core/contracts/interfaces/IBulletXV3Pool.sol";
 import {IBulletXV3MintCallback} from
-    "../../src/bulletX-v3/v3-core/contracts/interfaces/callback/IBulletXV3MintCallback.sol";
+    "../../../src/bulletX-v3/v3-core/contracts/interfaces/callback/IBulletXV3MintCallback.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 
-import "../../src/bulletX-v3/v3-periphery/libraries/PoolAddress.sol";
-import "../../src/bulletX-v3/v3-periphery/libraries/CallbackValidation.sol";
+import "../../../src/bulletX-v3/v3-periphery/libraries/PoolAddress.sol";
+import "../../../src/bulletX-v3/v3-periphery/libraries/CallbackValidation.sol";
 import "v3-periphery/libraries/LiquidityAmounts.sol";
 
 import "openzeppelin/token/ERC20/utils/SafeERC20.sol";

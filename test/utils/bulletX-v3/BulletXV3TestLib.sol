@@ -3,8 +3,8 @@ pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
 
-import {IBulletXV3Pool} from "../../src/bulletX-v3/v3-core/contracts/interfaces/IBulletXV3Pool.sol";
-import {IBulletXV3Factory} from "../../src/bulletX-v3/v3-core/contracts/interfaces/IBulletXV3Factory.sol";
+import {IBulletXV3Pool} from "../../../src/bulletX-v3/v3-core/contracts/interfaces/IBulletXV3Pool.sol";
+import {IBulletXV3Factory} from "../../../src/bulletX-v3/v3-core/contracts/interfaces/IBulletXV3Factory.sol";
 import {SwapRouter, ISwapRouter} from "v3-periphery/SwapRouter.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {FixedPoint96} from "@uniswap/v3-core/contracts/libraries/FixedPoint96.sol";
@@ -15,7 +15,7 @@ import {FullMath} from "@uniswap/v3-core/contracts/libraries/FullMath.sol";
 import {SwapMath} from "@uniswap/v3-core/contracts/libraries/SwapMath.sol";
 
 import {BulletXV3LiquidityManagement} from "./BulletXV3LiquidityManagement.sol";
-import {ERC20Mock} from "../mocks/ERC20Mock.sol";
+import {ERC20Mock} from "../../mocks/ERC20Mock.sol";
 
 contract BulletXV3TestLib is Test {
     IBulletXV3Factory public immutable factory;

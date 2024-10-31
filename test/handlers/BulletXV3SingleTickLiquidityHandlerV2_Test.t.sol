@@ -3,13 +3,13 @@ pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
 
-import {DopexV2PositionManager} from "../src/DopexV2PositionManager.sol";
-import {BulletXV3TestLib} from "./utils/bulletX-v3/BulletXV3TestLib.sol";
-import {BulletXV3SingleTickLiquidityHarnessV2} from "./harness/BulletXV3SingleTickLiquidityHarnessV2.sol";
-import {BulletXV3SingleTickLiquidityHandlerV2} from "../src/handlers/BulletXV3SingleTickLiquidityHandlerV2.sol";
-import {ERC20Mock} from "./mocks/ERC20Mock.sol";
+import {DopexV2PositionManager} from "../../src/DopexV2PositionManager.sol";
+import {BulletXV3TestLib} from "../utils/bulletX-v3/BulletXV3TestLib.sol";
+import {BulletXV3SingleTickLiquidityHarnessV2} from "../harness/BulletXV3SingleTickLiquidityHarnessV2.sol";
+import {BulletXV3SingleTickLiquidityHandlerV2} from "../../src/handlers/BulletXV3SingleTickLiquidityHandlerV2.sol";
+import {ERC20Mock} from "../mocks/ERC20Mock.sol";
 
-import {IUniswapV3Pool} from "../src/bulletX-v3/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import {IBulletXV3Pool} from "../../src/bulletX-v3/v3-core/contracts/interfaces/IBulletXV3Pool.sol";
 
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
@@ -24,7 +24,7 @@ contract BulletXV3SingleTickLiquidityHandlerV2_Test is Test {
     ERC20Mock token1;
 
     BulletXV3TestLib testLib;
-    IUniswapV3Pool pool;
+    IBulletXV3Pool pool;
 
     uint24 fee = 500;
 
@@ -52,7 +52,7 @@ contract BulletXV3SingleTickLiquidityHandlerV2_Test is Test {
         LUSD = address(new ERC20Mock());
 
         testLib = new BulletXV3TestLib();
-        pool = IUniswapV3Pool(testLib.deployPoolAndInitializePrice(ETH, LUSD, fee, initSqrtPriceX96));
+        pool = IBulletXV3Pool(testLib.deployPoolAndInitializePrice(ETH, LUSD, fee, initSqrtPriceX96));
 
         token0 = ERC20Mock(pool.token0());
         token1 = ERC20Mock(pool.token1());
