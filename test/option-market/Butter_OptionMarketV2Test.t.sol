@@ -3,17 +3,18 @@ pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
 
-import {IUniswapV3Factory} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+import {IButterFactory} from "../../src/butter-v3/v3-core/contracts/interfaces/IButterFactory.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import {IButterPool} from "../../src/butter-v3/v3-core/contracts/interfaces/IButterPool.sol";
 
-import {UniswapV3TestLib} from "../utils/uniswap-v3/UniswapV3TestLib.sol";
+import {ButterTestLib} from "../utils/butter-v3/ButterTestLib.sol";
 import {ERC20Mock} from "../mocks/ERC20Mock.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
 
 import {DopexV2PositionManager} from "../../src/DopexV2PositionManager.sol";
-import {UniswapV3SingleTickLiquidityHarnessV2} from "../harness/UniswapV3SingleTickLiquidityHandlerV2.harness.sol";
-import {UniswapV3SingleTickLiquidityHandlerV2} from "../../src/handlers/UniswapV3SingleTickLiquidityHandlerV2.sol";
+import {ButterSingleTickLiquidityHarnessV2} from "../harness/ButterSingleTickLiquidityHandlerV2.harness.sol";
+import {ButterSingleTickLiquidityHandlerV2} from "../../src/handlers/ButterSingleTickLiquidityHandlerV2.sol";
 import {DopexV2OptionMarketV2} from "../../src/DopexV2OptionMarketV2.sol";
 
 import {OptionPricingV2} from "../pricing/OptionPricingV2.sol";
@@ -26,9 +27,7 @@ import {IHandler} from "../../src/interfaces/IHandler.sol";
 import {ISwapper} from "../../src/interfaces/ISwapper.sol";
 import {IOptionMarket} from "../../src/interfaces/IOptionMarket.sol";
 
-import {BoundedTTLHook_20mins} from "../../src/handlers/hooks/sample/BoundedTTLHook_20mins.sol";
-
-contract optionMarketTest is Test {
+contract Butter_OptionMarketV2Test is Test {
     using TickMath for int24;
 
     address ETH; // token1
@@ -37,7 +36,7 @@ contract optionMarketTest is Test {
     ERC20Mock token0;
     ERC20Mock token1;
 
-    UniswapV3TestLib uniswapV3TestLib;
+    ButterTestLib butterTestLib;
     IUniswapV3Pool pool;
 
     OptionPricingV2 op;
@@ -59,6 +58,9 @@ contract optionMarketTest is Test {
     uint256 optionIdCalls;
     uint256 optionIdPuts;
 
+    address hook = address(0);
+    bytes hookData = new bytes(0);
+
     address alice = makeAddr("alice"); // main LP
     address bob = makeAddr("bob"); // protocol LP
     address jason = makeAddr("jason"); // protocol LP
@@ -68,38 +70,38 @@ contract optionMarketTest is Test {
     address autoExercisoor = makeAddr("autoExercisoor"); // auto exciseroor role
 
     DopexV2PositionManager positionManager;
-    UniswapV3SingleTickLiquidityHarnessV2 positionManagerHarness;
+    ButterSingleTickLiquidityHarnessV2 positionManagerHarness;
     DopexV2OptionMarketV2 optionMarket;
-    UniswapV3SingleTickLiquidityHandlerV2 uniV3Handler;
+    ButterSingleTickLiquidityHandlerV2 pcsV3Handler;
     DopexV2ClammFeeStrategyV2 feeStrategy;
     AutoExerciseTimeBased autoExercise;
-    address hook;
 
     function setUp() public {
+        vm.createSelectFork(vm.envString("MANTLE_RPC_URL"), 59249000);
+
         vm.warp(1693352493);
 
         ETH = address(new ERC20Mock());
         LUSD = address(new ERC20Mock());
 
-        uniswapV3TestLib = new UniswapV3TestLib();
-        pool = IUniswapV3Pool(uniswapV3TestLib.deployUniswapV3PoolAndInitializePrice(ETH, LUSD, fee, initSqrtPriceX96));
+        butterTestLib = new ButterTestLib();
+        pool = IUniswapV3Pool(butterTestLib.deployButterPoolAndInitializePrice(ETH, LUSD, fee, initSqrtPriceX96));
 
         token0 = ERC20Mock(pool.token0());
         token1 = ERC20Mock(pool.token1());
 
         positionManager = new DopexV2PositionManager();
 
-        uniV3Handler = new UniswapV3SingleTickLiquidityHandlerV2(
-            address(uniswapV3TestLib.factory()),
-            0xa598dd2fba360510c5a8f02f44423a4468e902df5857dbce3ca162a43a3a31ff,
-            address(uniswapV3TestLib.swapRouter())
+        pcsV3Handler = new ButterSingleTickLiquidityHandlerV2(
+            address(butterTestLib.factory()),
+            0xc7d06444331e4f63b0764bb53c88788882395aa31961eed3c2768cc9568323ee,
+            address(butterTestLib.swapRouter())
         );
 
-        positionManagerHarness =
-            new UniswapV3SingleTickLiquidityHarnessV2(uniswapV3TestLib, positionManager, uniV3Handler);
+        positionManagerHarness = new ButterSingleTickLiquidityHarnessV2(butterTestLib, positionManager, pcsV3Handler);
 
         op = new OptionPricingV2(500, 1e8);
-        srs = new SwapRouterSwapper(address(uniswapV3TestLib.swapRouter()));
+        srs = new SwapRouterSwapper(address(butterTestLib.swapRouter()));
 
         feeStrategy = new DopexV2ClammFeeStrategyV2();
 
@@ -110,13 +112,11 @@ contract optionMarketTest is Test {
         // Add 0.15% fee to the market
         feeStrategy.registerOptionMarket(address(optionMarket), 350000);
 
-        uint256[] memory ttls = new uint256[](2);
+        uint256[] memory ttls = new uint256[](1);
         ttls[0] = 20 minutes;
-        ttls[1] = 1 hours;
 
-        uint256[] memory IVs = new uint256[](2);
+        uint256[] memory IVs = new uint256[](1);
         IVs[0] = 100;
-        IVs[1] = 200;
 
         address feeCollector = makeAddr("feeCollector");
 
@@ -124,10 +124,10 @@ contract optionMarketTest is Test {
         optionMarket.updateAddress(
             feeCollector, address(0), address(feeStrategy), address(op), address(this), true, address(pool), true
         );
-        uniswapV3TestLib.addLiquidity(
-            UniswapV3TestLib.AddLiquidityStruct({
+        butterTestLib.addLiquidity(
+            ButterTestLib.AddLiquidityStruct({
                 user: alice,
-                pool: pool,
+                pool: IButterPool(address(pool)),
                 desiredTickLower: -78245, // 2500
                 desiredTickUpper: -73136, // 1500
                 desiredAmount0: 5_000_000e18,
@@ -136,19 +136,17 @@ contract optionMarketTest is Test {
             })
         );
 
-        positionManager.updateWhitelistHandlerWithApp(address(uniV3Handler), address(optionMarket), true);
+        positionManager.updateWhitelistHandlerWithApp(address(pcsV3Handler), address(optionMarket), true);
 
-        positionManager.updateWhitelistHandler(address(uniV3Handler), true);
+        positionManager.updateWhitelistHandler(address(pcsV3Handler), true);
 
-        uniV3Handler.updateWhitelistedApps(address(positionManager), true);
+        pcsV3Handler.updateWhitelistedApps(address(positionManager), true);
 
         autoExercise = new AutoExerciseTimeBased();
 
         autoExercise.updateFeeTo(feeToAutoExercise);
 
         autoExercise.grantRole(keccak256("EXECUTOR"), autoExercisoor);
-
-        hook = address(new BoundedTTLHook_20mins());
 
         // for calls
         positionManagerHarness.mintPosition(
@@ -158,7 +156,7 @@ contract optionMarketTest is Test {
             5e18,
             -76260, // ~2050,
             -76250, // ~2048,
-            pool,
+            IButterPool(address(pool)),
             hook,
             bob
         );
@@ -170,7 +168,7 @@ contract optionMarketTest is Test {
             5e18,
             -76260, // ~2050,
             -76250, // ~2048,
-            pool,
+            IButterPool(address(pool)),
             hook,
             jason
         );
@@ -183,7 +181,7 @@ contract optionMarketTest is Test {
             0,
             -75770, // ~1950,
             -75760, // ~1952,
-            pool,
+            IButterPool(address(pool)),
             hook,
             bob
         );
@@ -195,7 +193,7 @@ contract optionMarketTest is Test {
             0,
             -75770, // ~1950,
             -75760, // ~1952,
-            pool,
+            IButterPool(address(pool)),
             hook,
             jason
         );
@@ -223,7 +221,7 @@ contract optionMarketTest is Test {
         DopexV2OptionMarketV2.OptionTicks[] memory opTicks = new DopexV2OptionMarketV2.OptionTicks[](1);
 
         opTicks[0] = DopexV2OptionMarketV2.OptionTicks({
-            _handler: uniV3Handler,
+            _handler: pcsV3Handler,
             pool: pool,
             hook: hook,
             tickLower: tickLowerCalls,
@@ -277,7 +275,7 @@ contract optionMarketTest is Test {
         DopexV2OptionMarketV2.OptionTicks[] memory opTicks = new DopexV2OptionMarketV2.OptionTicks[](1);
 
         opTicks[0] = DopexV2OptionMarketV2.OptionTicks({
-            _handler: uniV3Handler,
+            _handler: pcsV3Handler,
             pool: pool,
             hook: hook,
             tickLower: tickLowerPuts,
@@ -308,122 +306,15 @@ contract optionMarketTest is Test {
         vm.stopPrank();
     }
 
-    function testFail_BuyCallOption() public {
-        vm.startPrank(trader);
-        uint256 l = LiquidityAmounts.getLiquidityForAmount1(
-            tickLowerCalls.getSqrtRatioAtTick(), tickUpperCalls.getSqrtRatioAtTick(), 5e18
-        );
-
-        uint256 _premiumAmountCalls = optionMarket.getPremiumAmount(
-            false,
-            block.timestamp + 1 hours,
-            optionMarket.getPricePerCallAssetViaTick(pool, tickUpperCalls),
-            optionMarket.getCurrentPricePerCallAsset(pool),
-            5e18
-        );
-
-        uint256 _fee = optionMarket.getFee(0, _premiumAmountCalls);
-        uint256 cost = _premiumAmountCalls + _fee;
-        token1.mint(trader, cost);
-        token1.approve(address(optionMarket), cost);
-
-        DopexV2OptionMarketV2.OptionTicks[] memory opTicks = new DopexV2OptionMarketV2.OptionTicks[](1);
-
-        opTicks[0] = DopexV2OptionMarketV2.OptionTicks({
-            _handler: uniV3Handler,
-            pool: pool,
-            hook: hook,
-            tickLower: tickLowerCalls,
-            tickUpper: tickUpperCalls,
-            liquidityToUse: l
-        });
-
-        optionMarket.mintOption(
-            DopexV2OptionMarketV2.OptionParams({
-                optionTicks: opTicks,
-                tickLower: tickLowerCalls,
-                tickUpper: tickUpperCalls,
-                ttl: 1 hours,
-                isCall: true,
-                maxCostAllowance: cost
-            })
-        );
-
-        (
-            IHandler _handler,
-            IUniswapV3Pool _pool,
-            address _hook,
-            int24 tickLower,
-            int24 tickUpper,
-            uint256 liquidityToUse
-        ) = optionMarket.opTickMap(1, 0);
-
-        vm.stopPrank();
-    }
-
-    function testFail_BuyPutOption() public {
-        vm.startPrank(trader);
-
-        uint256 l = LiquidityAmounts.getLiquidityForAmount0(
-            tickLowerPuts.getSqrtRatioAtTick(), tickUpperPuts.getSqrtRatioAtTick(), 10_000e18
-        );
-
-        uint256 _premiumAmountPuts = optionMarket.getPremiumAmount(
-            true,
-            block.timestamp + 1 hours,
-            optionMarket.getPricePerCallAssetViaTick(pool, tickLowerPuts),
-            optionMarket.getCurrentPricePerCallAsset(pool),
-            (10_000e18 * 1e18) / optionMarket.getPricePerCallAssetViaTick(pool, tickLowerPuts)
-        );
-
-        uint256 _fee = optionMarket.getFee(0, _premiumAmountPuts);
-        uint256 cost = _premiumAmountPuts + _fee;
-        token0.mint(trader, cost);
-        token0.approve(address(optionMarket), cost);
-
-        DopexV2OptionMarketV2.OptionTicks[] memory opTicks = new DopexV2OptionMarketV2.OptionTicks[](1);
-
-        opTicks[0] = DopexV2OptionMarketV2.OptionTicks({
-            _handler: uniV3Handler,
-            pool: pool,
-            hook: hook,
-            tickLower: tickLowerPuts,
-            tickUpper: tickUpperPuts,
-            liquidityToUse: l
-        });
-
-        optionMarket.mintOption(
-            DopexV2OptionMarketV2.OptionParams({
-                optionTicks: opTicks,
-                tickLower: tickLowerPuts,
-                tickUpper: tickUpperPuts,
-                ttl: 1 hours,
-                isCall: false,
-                maxCostAllowance: cost
-            })
-        );
-
-        (
-            IHandler _handler,
-            IUniswapV3Pool _pool,
-            address _hook,
-            int24 tickLower,
-            int24 tickUpper,
-            uint256 liquidityToUse
-        ) = optionMarket.opTickMap(1, 0);
-
-        vm.stopPrank();
-    }
-
     function testExerciseCallOption() public {
         testBuyCallOption();
 
         uint256 optionId = 1;
 
-        uniswapV3TestLib.performSwap(
-            UniswapV3TestLib.SwapParamsStruct({
+        butterTestLib.performSwap(
+            ButterTestLib.SwapParamsStruct({
                 user: garbage,
-                pool: pool,
+                pool: IButterPool(address(pool)),
                 amountIn: 400000e18, // pushes to 2078
                 zeroForOne: true,
                 requireMint: true
@@ -471,10 +362,10 @@ contract optionMarketTest is Test {
 
         uint256 optionId = 1;
 
-        uniswapV3TestLib.performSwap(
-            UniswapV3TestLib.SwapParamsStruct({
+        butterTestLib.performSwap(
+            ButterTestLib.SwapParamsStruct({
                 user: garbage,
-                pool: pool,
+                pool: IButterPool(address(pool)),
                 amountIn: 250e18,
                 zeroForOne: false,
                 requireMint: true
@@ -595,10 +486,10 @@ contract optionMarketTest is Test {
         uint256 prevTime = block.timestamp + 20 minutes;
         vm.warp(block.timestamp + 1201 seconds);
 
-        uniswapV3TestLib.performSwap(
-            UniswapV3TestLib.SwapParamsStruct({
+        butterTestLib.performSwap(
+            ButterTestLib.SwapParamsStruct({
                 user: garbage,
-                pool: pool,
+                pool: IButterPool(address(pool)),
                 amountIn: 400000e18, // pushes to 2078
                 zeroForOne: true,
                 requireMint: true
@@ -645,10 +536,10 @@ contract optionMarketTest is Test {
 
         vm.warp(block.timestamp + 1201 seconds);
 
-        uniswapV3TestLib.performSwap(
-            UniswapV3TestLib.SwapParamsStruct({
+        butterTestLib.performSwap(
+            ButterTestLib.SwapParamsStruct({
                 user: garbage,
-                pool: pool,
+                pool: IButterPool(address(pool)),
                 amountIn: 250e18, // pushes to 1921
                 zeroForOne: false,
                 requireMint: true
@@ -693,27 +584,27 @@ contract optionMarketTest is Test {
         uint256 prevTime = block.timestamp + 20 minutes;
         vm.warp(block.timestamp + 1201 seconds);
 
-        uniswapV3TestLib.performSwap(
-            UniswapV3TestLib.SwapParamsStruct({
+        butterTestLib.performSwap(
+            ButterTestLib.SwapParamsStruct({
                 user: garbage,
-                pool: pool,
+                pool: IButterPool(address(pool)),
                 amountIn: 400000e18, // pushes to 2078
                 zeroForOne: true,
                 requireMint: true
             })
         );
 
-        uniswapV3TestLib.performSwap(
-            UniswapV3TestLib.SwapParamsStruct({
+        butterTestLib.performSwap(
+            ButterTestLib.SwapParamsStruct({
                 user: garbage,
-                pool: pool,
+                pool: IButterPool(address(pool)),
                 amountIn: 70e18, // pushes to 2078
                 zeroForOne: false,
                 requireMint: true
             })
         );
 
-        console.logInt(uniswapV3TestLib.getCurrentTick(pool));
+        console.logInt(butterTestLib.getCurrentTick(IButterPool(address(pool))));
 
         uint256 optionId = 1;
         (uint256 len,,,,) = optionMarket.opData(optionId);
@@ -738,7 +629,7 @@ contract optionMarketTest is Test {
         swappers[0] = srs;
 
         (uint256 a0,) = LiquidityAmounts.getAmountsForLiquidity(
-            uniswapV3TestLib.getCurrentTick(pool).getSqrtRatioAtTick(),
+            butterTestLib.getCurrentTick(IButterPool(address(pool))).getSqrtRatioAtTick(),
             tickLowerCalls.getSqrtRatioAtTick(),
             tickUpperCalls.getSqrtRatioAtTick(),
             uint128(liquidityToUse)
@@ -763,27 +654,27 @@ contract optionMarketTest is Test {
 
         vm.warp(block.timestamp + 1201 seconds);
 
-        uniswapV3TestLib.performSwap(
-            UniswapV3TestLib.SwapParamsStruct({
+        butterTestLib.performSwap(
+            ButterTestLib.SwapParamsStruct({
                 user: garbage,
-                pool: pool,
+                pool: IButterPool(address(pool)),
                 amountIn: 250e18, // pushes to 1921
                 zeroForOne: false,
                 requireMint: true
             })
         );
 
-        uniswapV3TestLib.performSwap(
-            UniswapV3TestLib.SwapParamsStruct({
+        butterTestLib.performSwap(
+            ButterTestLib.SwapParamsStruct({
                 user: garbage,
-                pool: pool,
+                pool: IButterPool(address(pool)),
                 amountIn: 235000e18, // pushes to 1921
                 zeroForOne: true,
                 requireMint: true
             })
         );
 
-        console.logInt(uniswapV3TestLib.getCurrentTick(pool));
+        console.logInt(butterTestLib.getCurrentTick(IButterPool(address(pool))));
 
         uint256 optionId = 1;
         (uint256 len,,,,) = optionMarket.opData(optionId);
@@ -808,7 +699,7 @@ contract optionMarketTest is Test {
         swappers[0] = srs;
 
         (, uint256 a1) = LiquidityAmounts.getAmountsForLiquidity(
-            uniswapV3TestLib.getCurrentTick(pool).getSqrtRatioAtTick(),
+            butterTestLib.getCurrentTick(IButterPool(address(pool))).getSqrtRatioAtTick(),
             tickLowerCalls.getSqrtRatioAtTick(),
             tickUpperCalls.getSqrtRatioAtTick(),
             uint128(liquidityToUse)
@@ -877,10 +768,10 @@ contract optionMarketTest is Test {
 
         uint256 optionId = 1;
 
-        uniswapV3TestLib.performSwap(
-            UniswapV3TestLib.SwapParamsStruct({
+        butterTestLib.performSwap(
+            ButterTestLib.SwapParamsStruct({
                 user: garbage,
-                pool: pool,
+                pool: IButterPool(address(pool)),
                 amountIn: 400000e18, // pushes to 2078
                 zeroForOne: true,
                 requireMint: true

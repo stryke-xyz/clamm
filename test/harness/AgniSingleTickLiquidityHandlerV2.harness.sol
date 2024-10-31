@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import {IAgniFactory} from "../../src/agni-v3/v3-core/contracts/interfaces/IAgniFactory.sol";
 import {IAgniPool} from "../../src/agni-v3/v3-core/contracts/interfaces/IAgniPool.sol";
 
-import {AgniTestLib} from "../agni-v3-utils/AgniTestLib.sol";
+import {AgniTestLib} from "../utils/agni-v3/AgniTestLib.sol";
 import {ERC20Mock} from "../mocks/ERC20Mock.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";

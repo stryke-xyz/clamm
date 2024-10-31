@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import {IFusionXV3Factory} from "../../src/fusionX-v3/v3-core/contracts/interfaces/IFusionXV3Factory.sol";
 import {IFusionXV3Pool} from "../../src/fusionX-v3/v3-core/contracts/interfaces/IFusionXV3Pool.sol";
 
-import {FusionXV3TestLib} from "../fusionX-v3-utils/FusionXV3TestLib.sol";
+import {FusionXV3TestLib} from "../utils/fusionX-v3/FusionXV3TestLib.sol";
 import {ERC20Mock} from "../mocks/ERC20Mock.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
