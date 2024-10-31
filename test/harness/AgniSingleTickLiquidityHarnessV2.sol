@@ -17,20 +17,18 @@ import {IHandler} from "../../src/interfaces/IHandler.sol";
 contract AgniSingleTickLiquidityHarnessV2 is Test {
     using TickMath for int24;
 
-    AgniTestLib agniTestLib;
+    AgniTestLib testLib;
     DopexV2PositionManager positionManager;
-    AgniSingleTickLiquidityHandlerV2 pcsV3Handler;
-    IHandler handler;
+    AgniSingleTickLiquidityHandlerV2 handler;
 
     constructor(
-        AgniTestLib _agniTestLib,
+        AgniTestLib _testLib,
         DopexV2PositionManager _positionManager,
-        AgniSingleTickLiquidityHandlerV2 _pcsV3Handler
+        AgniSingleTickLiquidityHandlerV2 _handler
     ) {
-        agniTestLib = _agniTestLib;
+        testLib = _testLib;
         positionManager = _positionManager;
-        pcsV3Handler = _pcsV3Handler;
-        handler = IHandler(address(_pcsV3Handler));
+        handler = _handler;
     }
 
     function getTokenId(IAgniPool pool, address hook, int24 tickLower, int24 tickUpper) public view returns (uint256) {
@@ -49,7 +47,7 @@ contract AgniSingleTickLiquidityHarnessV2 is Test {
         address user
     ) public returns (uint256 lm) {
         uint128 liquidityToMint = LiquidityAmounts.getLiquidityForAmounts(
-            agniTestLib.getCurrentSqrtPriceX96(pool),
+            testLib.getCurrentSqrtPriceX96(pool),
             tickLower.getSqrtRatioAtTick(),
             tickUpper.getSqrtRatioAtTick(),
             amount0,
@@ -64,7 +62,7 @@ contract AgniSingleTickLiquidityHarnessV2 is Test {
         token1.increaseAllowance(address(positionManager), amount1);
 
         (lm) = positionManager.mintPosition(
-            handler,
+            IHandler(address(handler)),
             abi.encode(
                 AgniSingleTickLiquidityHandlerV2.MintPositionParams({
                     pool: pool,
@@ -85,7 +83,7 @@ contract AgniSingleTickLiquidityHarnessV2 is Test {
         vm.startPrank(user);
 
         (lb) = positionManager.burnPosition(
-            handler,
+            IHandler(address(handler)),
             abi.encode(
                 AgniSingleTickLiquidityHandlerV2.BurnPositionParams({
                     pool: pool,
@@ -111,7 +109,7 @@ contract AgniSingleTickLiquidityHarnessV2 is Test {
         address user
     ) public returns (address[] memory tokens, uint256[] memory amounts) {
         uint128 liquidityToUse = LiquidityAmounts.getLiquidityForAmounts(
-            agniTestLib.getCurrentSqrtPriceX96(pool),
+            testLib.getCurrentSqrtPriceX96(pool),
             tickLower.getSqrtRatioAtTick(),
             tickUpper.getSqrtRatioAtTick(),
             amount0,
@@ -119,7 +117,7 @@ contract AgniSingleTickLiquidityHarnessV2 is Test {
         );
         vm.startPrank(user);
         (tokens, amounts,) = positionManager.usePosition(
-            handler,
+            IHandler(address(handler)),
             abi.encode(
                 AgniSingleTickLiquidityHandlerV2.UsePositionParams({
                     pool: pool,
@@ -164,21 +162,10 @@ contract AgniSingleTickLiquidityHarnessV2 is Test {
         bytes calldata hookData,
         address user
     ) public {
-        // uint256 liquidityToUnuse;
-        // {
-        //     liquidityToUnuse = LiquidityAmounts.getLiquidityForAmounts(
-        //         agniTestLib.getCurrentSqrtPriceX96(pool),
-        //         tickLower.getSqrtRatioAtTick(),
-        //         tickUpper.getSqrtRatioAtTick(),
-        //         amount0 + amount0ToDonate,
-        //         amount1 + amount1ToDonate
-        //     );
-        // }
-
         amountsCache = AmountCache({
             a0: amount0 + amount0ToDonate,
             a1: amount1 + amount1ToDonate,
-            csp: agniTestLib.getCurrentSqrtPriceX96(pool),
+            csp: testLib.getCurrentSqrtPriceX96(pool),
             tl: tickLower.getSqrtRatioAtTick(),
             tu: tickUpper.getSqrtRatioAtTick()
         });
@@ -197,7 +184,7 @@ contract AgniSingleTickLiquidityHarnessV2 is Test {
         }
 
         positionManager.unusePosition(
-            handler,
+            IHandler(address(handler)),
             abi.encode(
                 AgniSingleTickLiquidityHandlerV2.UnusePositionParams({
                     pool: pool,
@@ -226,7 +213,7 @@ contract AgniSingleTickLiquidityHarnessV2 is Test {
         address user
     ) public returns (uint256[] memory amounts, uint256 liquidityToDonate) {
         liquidityToDonate = LiquidityAmounts.getLiquidityForAmounts(
-            agniTestLib.getCurrentSqrtPriceX96(pool),
+            testLib.getCurrentSqrtPriceX96(pool),
             tickLower.getSqrtRatioAtTick(),
             tickUpper.getSqrtRatioAtTick(),
             amount0 + amount0ToDonate,
@@ -241,7 +228,7 @@ contract AgniSingleTickLiquidityHarnessV2 is Test {
         token1.increaseAllowance(address(positionManager), amount1 + amount1ToDonate);
 
         (amounts,) = positionManager.donateToPosition(
-            handler,
+            IHandler(address(handler)),
             abi.encode(
                 AgniSingleTickLiquidityHandlerV2.DonateParams({
                     pool: pool,

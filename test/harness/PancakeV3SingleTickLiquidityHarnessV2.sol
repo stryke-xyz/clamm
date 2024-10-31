@@ -172,17 +172,6 @@ contract PancakeV3SingleTickLiquidityHarnessV2 is Test {
         bytes calldata hookData,
         address user
     ) public {
-        // uint256 liquidityToUnuse;
-        // {
-        //     liquidityToUnuse = LiquidityAmounts.getLiquidityForAmounts(
-        //         pancakeV3TestLib.getCurrentSqrtPriceX96(pool),
-        //         tickLower.getSqrtRatioAtTick(),
-        //         tickUpper.getSqrtRatioAtTick(),
-        //         amount0 + amount0ToDonate,
-        //         amount1 + amount1ToDonate
-        //     );
-        // }
-
         amountsCache = AmountCache({
             a0: amount0 + amount0ToDonate,
             a1: amount1 + amount1ToDonate,

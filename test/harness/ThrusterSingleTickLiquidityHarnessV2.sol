@@ -19,18 +19,18 @@ contract ThrusterSingleTickLiquidityHarnessV2 is Test {
 
     ThrusterTestLib thrusterTestLib;
     DopexV2PositionManager positionManager;
-    ThrusterSingleTickLiquidityHandlerV2 pcsV3Handler;
+    ThrusterSingleTickLiquidityHandlerV2 thrusterV3Handler;
     IHandler handler;
 
     constructor(
         ThrusterTestLib _thrusterTestLib,
         DopexV2PositionManager _positionManager,
-        ThrusterSingleTickLiquidityHandlerV2 _pcsV3Handler
+        ThrusterSingleTickLiquidityHandlerV2 _thrusterV3Handler
     ) {
         thrusterTestLib = _thrusterTestLib;
         positionManager = _positionManager;
-        pcsV3Handler = _pcsV3Handler;
-        handler = IHandler(address(_pcsV3Handler));
+        thrusterV3Handler = _thrusterV3Handler;
+        handler = IHandler(address(_thrusterV3Handler));
     }
 
     function getTokenId(IThrusterPool pool, address hook, int24 tickLower, int24 tickUpper)
@@ -172,17 +172,6 @@ contract ThrusterSingleTickLiquidityHarnessV2 is Test {
         bytes calldata hookData,
         address user
     ) public {
-        // uint256 liquidityToUnuse;
-        // {
-        //     liquidityToUnuse = LiquidityAmounts.getLiquidityForAmounts(
-        //         thrusterTestLib.getCurrentSqrtPriceX96(pool),
-        //         tickLower.getSqrtRatioAtTick(),
-        //         tickUpper.getSqrtRatioAtTick(),
-        //         amount0 + amount0ToDonate,
-        //         amount1 + amount1ToDonate
-        //     );
-        // }
-
         amountsCache = AmountCache({
             a0: amount0 + amount0ToDonate,
             a1: amount1 + amount1ToDonate,
