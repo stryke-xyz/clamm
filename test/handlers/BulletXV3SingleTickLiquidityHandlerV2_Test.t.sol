@@ -46,8 +46,7 @@ contract BulletXV3SingleTickLiquidityHandlerV2_Test is Test {
     bytes hookData = new bytes(0);
 
     function setUp() public {
-        // TODO: FIX
-        // vm.createSelectFork(vm.envString("SUPERSEED_RPC_URL"), 5417066);
+        vm.createSelectFork(vm.envString("SUPERSEED_RPC_URL"), 1200000);
         ETH = address(new ERC20Mock());
         LUSD = address(new ERC20Mock());
 
@@ -72,8 +71,8 @@ contract BulletXV3SingleTickLiquidityHandlerV2_Test is Test {
         positionManager = new DopexV2PositionManager();
 
         handler = new BulletXV3SingleTickLiquidityHandlerV2(
-            0x217Cd80795EfCa5025d47023da5c03a24fA95356,
-            0x945f1441b8ff07828f05880b3d67ebdd0962e5fb81cb8d7c32e9610e866ff219,
+            0xCA9a86fca5B9E1731E8Acd3E32C0D02ecaf1426b,
+            0x65609fec4811790942ae1574d32d950d042613f45b596cb225e92a7a89cb6220,
             address(testLib.swapRouter())
         );
 

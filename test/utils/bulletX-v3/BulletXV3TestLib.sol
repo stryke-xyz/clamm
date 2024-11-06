@@ -57,11 +57,11 @@ contract BulletXV3TestLib is Test {
     }
 
     constructor() {
-        factory = IBulletXV3Factory(0x530d2766D1988CC1c000C8b7d00334c14B69AD71);
+        factory = IBulletXV3Factory(0xbC519C08F148Eff25d8040B72e19b4f879bcdB32);
 
-        bulletXV3LiquidityManagement = new BulletXV3LiquidityManagement(0x8790c2C3BA67223D83C8FCF2a5E3C650059987b4);
+        bulletXV3LiquidityManagement = new BulletXV3LiquidityManagement(0xCA9a86fca5B9E1731E8Acd3E32C0D02ecaf1426b);
 
-        swapRouter = ISwapRouter(0x5989FB161568b9F133eDf5Cf6787f5597762797F);
+        swapRouter = ISwapRouter(0x9c6dE4a0F698Cfd7e7b1643966Ada55838096ABa);
     }
 
     function deployPoolAndInitializePrice(address token0, address token1, uint24 fee, uint160 sqrtPriceX96)

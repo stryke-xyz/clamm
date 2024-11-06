@@ -19,18 +19,18 @@ contract BulletXV3SingleTickLiquidityHarnessV2 is Test {
 
     BulletXV3TestLib bulletXV3TestLib;
     DopexV2PositionManager positionManager;
-    BulletXV3SingleTickLiquidityHandlerV2 pcsV3Handler;
+    BulletXV3SingleTickLiquidityHandlerV2 bulletXV3Handler;
     IHandler handler;
 
     constructor(
         BulletXV3TestLib _bulletXV3TestLib,
         DopexV2PositionManager _positionManager,
-        BulletXV3SingleTickLiquidityHandlerV2 _pcsV3Handler
+        BulletXV3SingleTickLiquidityHandlerV2 _bulletXV3Handler
     ) {
         bulletXV3TestLib = _bulletXV3TestLib;
         positionManager = _positionManager;
-        pcsV3Handler = _pcsV3Handler;
-        handler = IHandler(address(_pcsV3Handler));
+        bulletXV3Handler = _bulletXV3Handler;
+        handler = IHandler(address(_bulletXV3Handler));
     }
 
     function getTokenId(IBulletXV3Pool pool, address hook, int24 tickLower, int24 tickUpper)

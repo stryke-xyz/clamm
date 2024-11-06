@@ -9,7 +9,7 @@ import {IBulletXV3MintCallback} from
     "../../../src/bulletX-v3/v3-core/contracts/interfaces/callback/IBulletXV3MintCallback.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 
-import "../../../src/bulletX-v3/v3-periphery/libraries/PoolAddress.sol";
+import {PoolAddress} from "../../../src/bulletX-v3/v3-periphery/libraries/PoolAddress.sol";
 import "../../../src/bulletX-v3/v3-periphery/libraries/CallbackValidation.sol";
 import "v3-periphery/libraries/LiquidityAmounts.sol";
 
