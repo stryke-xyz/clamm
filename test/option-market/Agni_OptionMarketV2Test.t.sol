@@ -72,7 +72,7 @@ contract Agni_OptionMarketV2Test is Test {
     DopexV2PositionManager positionManager;
     AgniSingleTickLiquidityHarnessV2 positionManagerHarness;
     DopexV2OptionMarketV2 optionMarket;
-    AgniSingleTickLiquidityHandlerV2 pcsV3Handler;
+    AgniSingleTickLiquidityHandlerV2 handler;
     DopexV2ClammFeeStrategyV2 feeStrategy;
     AutoExerciseTimeBased autoExercise;
 
@@ -92,13 +92,13 @@ contract Agni_OptionMarketV2Test is Test {
 
         positionManager = new DopexV2PositionManager();
 
-        pcsV3Handler = new AgniSingleTickLiquidityHandlerV2(
+        handler = new AgniSingleTickLiquidityHandlerV2(
             0xe9827B4EBeB9AE41FC57efDdDd79EDddC2EA4d03,
             0xaf9bd540c3449b723624376f906d8d3a0e6441ff18b847f05f4f85789ab64d9a,
             address(agniTestLib.swapRouter())
         );
 
-        positionManagerHarness = new AgniSingleTickLiquidityHarnessV2(agniTestLib, positionManager, pcsV3Handler);
+        positionManagerHarness = new AgniSingleTickLiquidityHarnessV2(agniTestLib, positionManager, handler);
 
         op = new OptionPricingV2(500, 1e8);
         srs = new SwapRouterSwapper(address(agniTestLib.swapRouter()));
@@ -136,11 +136,11 @@ contract Agni_OptionMarketV2Test is Test {
             })
         );
 
-        positionManager.updateWhitelistHandlerWithApp(address(pcsV3Handler), address(optionMarket), true);
+        positionManager.updateWhitelistHandlerWithApp(address(handler), address(optionMarket), true);
 
-        positionManager.updateWhitelistHandler(address(pcsV3Handler), true);
+        positionManager.updateWhitelistHandler(address(handler), true);
 
-        pcsV3Handler.updateWhitelistedApps(address(positionManager), true);
+        handler.updateWhitelistedApps(address(positionManager), true);
 
         autoExercise = new AutoExerciseTimeBased();
 
@@ -221,7 +221,7 @@ contract Agni_OptionMarketV2Test is Test {
         DopexV2OptionMarketV2.OptionTicks[] memory opTicks = new DopexV2OptionMarketV2.OptionTicks[](1);
 
         opTicks[0] = DopexV2OptionMarketV2.OptionTicks({
-            _handler: pcsV3Handler,
+            _handler: handler,
             pool: pool,
             hook: hook,
             tickLower: tickLowerCalls,
@@ -275,7 +275,7 @@ contract Agni_OptionMarketV2Test is Test {
         DopexV2OptionMarketV2.OptionTicks[] memory opTicks = new DopexV2OptionMarketV2.OptionTicks[](1);
 
         opTicks[0] = DopexV2OptionMarketV2.OptionTicks({
-            _handler: pcsV3Handler,
+            _handler: handler,
             pool: pool,
             hook: hook,
             tickLower: tickLowerPuts,

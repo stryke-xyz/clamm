@@ -72,7 +72,7 @@ contract FusionX_OptionMarketV2Test is Test {
     DopexV2PositionManager positionManager;
     FusionXV3SingleTickLiquidityHarnessV2 positionManagerHarness;
     DopexV2OptionMarketV2 optionMarket;
-    FusionXV3SingleTickLiquidityHandlerV2 pcsV3Handler;
+    FusionXV3SingleTickLiquidityHandlerV2 handler;
     DopexV2ClammFeeStrategyV2 feeStrategy;
     AutoExerciseTimeBased autoExercise;
 
@@ -92,14 +92,13 @@ contract FusionX_OptionMarketV2Test is Test {
 
         positionManager = new DopexV2PositionManager();
 
-        pcsV3Handler = new FusionXV3SingleTickLiquidityHandlerV2(
+        handler = new FusionXV3SingleTickLiquidityHandlerV2(
             0x8790c2C3BA67223D83C8FCF2a5E3C650059987b4,
             0x1bce652aaa6528355d7a339037433a20cd28410e3967635ba8d2ddb037440dbf,
             address(fusionXV3TestLib.swapRouter())
         );
 
-        positionManagerHarness =
-            new FusionXV3SingleTickLiquidityHarnessV2(fusionXV3TestLib, positionManager, pcsV3Handler);
+        positionManagerHarness = new FusionXV3SingleTickLiquidityHarnessV2(fusionXV3TestLib, positionManager, handler);
 
         op = new OptionPricingV2(500, 1e8);
         srs = new SwapRouterSwapper(address(fusionXV3TestLib.swapRouter()));
@@ -137,11 +136,11 @@ contract FusionX_OptionMarketV2Test is Test {
             })
         );
 
-        positionManager.updateWhitelistHandlerWithApp(address(pcsV3Handler), address(optionMarket), true);
+        positionManager.updateWhitelistHandlerWithApp(address(handler), address(optionMarket), true);
 
-        positionManager.updateWhitelistHandler(address(pcsV3Handler), true);
+        positionManager.updateWhitelistHandler(address(handler), true);
 
-        pcsV3Handler.updateWhitelistedApps(address(positionManager), true);
+        handler.updateWhitelistedApps(address(positionManager), true);
 
         autoExercise = new AutoExerciseTimeBased();
 
@@ -222,7 +221,7 @@ contract FusionX_OptionMarketV2Test is Test {
         DopexV2OptionMarketV2.OptionTicks[] memory opTicks = new DopexV2OptionMarketV2.OptionTicks[](1);
 
         opTicks[0] = DopexV2OptionMarketV2.OptionTicks({
-            _handler: pcsV3Handler,
+            _handler: handler,
             pool: pool,
             hook: hook,
             tickLower: tickLowerCalls,
@@ -276,7 +275,7 @@ contract FusionX_OptionMarketV2Test is Test {
         DopexV2OptionMarketV2.OptionTicks[] memory opTicks = new DopexV2OptionMarketV2.OptionTicks[](1);
 
         opTicks[0] = DopexV2OptionMarketV2.OptionTicks({
-            _handler: pcsV3Handler,
+            _handler: handler,
             pool: pool,
             hook: hook,
             tickLower: tickLowerPuts,

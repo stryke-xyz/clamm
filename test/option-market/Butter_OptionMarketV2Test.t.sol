@@ -72,7 +72,7 @@ contract Butter_OptionMarketV2Test is Test {
     DopexV2PositionManager positionManager;
     ButterSingleTickLiquidityHarnessV2 positionManagerHarness;
     DopexV2OptionMarketV2 optionMarket;
-    ButterSingleTickLiquidityHandlerV2 pcsV3Handler;
+    ButterSingleTickLiquidityHandlerV2 handler;
     DopexV2ClammFeeStrategyV2 feeStrategy;
     AutoExerciseTimeBased autoExercise;
 
@@ -92,13 +92,13 @@ contract Butter_OptionMarketV2Test is Test {
 
         positionManager = new DopexV2PositionManager();
 
-        pcsV3Handler = new ButterSingleTickLiquidityHandlerV2(
+        handler = new ButterSingleTickLiquidityHandlerV2(
             address(butterTestLib.factory()),
             0xc7d06444331e4f63b0764bb53c88788882395aa31961eed3c2768cc9568323ee,
             address(butterTestLib.swapRouter())
         );
 
-        positionManagerHarness = new ButterSingleTickLiquidityHarnessV2(butterTestLib, positionManager, pcsV3Handler);
+        positionManagerHarness = new ButterSingleTickLiquidityHarnessV2(butterTestLib, positionManager, handler);
 
         op = new OptionPricingV2(500, 1e8);
         srs = new SwapRouterSwapper(address(butterTestLib.swapRouter()));
@@ -136,11 +136,11 @@ contract Butter_OptionMarketV2Test is Test {
             })
         );
 
-        positionManager.updateWhitelistHandlerWithApp(address(pcsV3Handler), address(optionMarket), true);
+        positionManager.updateWhitelistHandlerWithApp(address(handler), address(optionMarket), true);
 
-        positionManager.updateWhitelistHandler(address(pcsV3Handler), true);
+        positionManager.updateWhitelistHandler(address(handler), true);
 
-        pcsV3Handler.updateWhitelistedApps(address(positionManager), true);
+        handler.updateWhitelistedApps(address(positionManager), true);
 
         autoExercise = new AutoExerciseTimeBased();
 
@@ -221,7 +221,7 @@ contract Butter_OptionMarketV2Test is Test {
         DopexV2OptionMarketV2.OptionTicks[] memory opTicks = new DopexV2OptionMarketV2.OptionTicks[](1);
 
         opTicks[0] = DopexV2OptionMarketV2.OptionTicks({
-            _handler: pcsV3Handler,
+            _handler: handler,
             pool: pool,
             hook: hook,
             tickLower: tickLowerCalls,
@@ -275,7 +275,7 @@ contract Butter_OptionMarketV2Test is Test {
         DopexV2OptionMarketV2.OptionTicks[] memory opTicks = new DopexV2OptionMarketV2.OptionTicks[](1);
 
         opTicks[0] = DopexV2OptionMarketV2.OptionTicks({
-            _handler: pcsV3Handler,
+            _handler: handler,
             pool: pool,
             hook: hook,
             tickLower: tickLowerPuts,

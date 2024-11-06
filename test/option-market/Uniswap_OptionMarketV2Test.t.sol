@@ -71,7 +71,7 @@ contract Uniswap_OptionMarketV2Test is Test {
     DopexV2PositionManager positionManager;
     UniswapV3SingleTickLiquidityHarnessV2 positionManagerHarness;
     DopexV2OptionMarketV2 optionMarket;
-    UniswapV3SingleTickLiquidityHandlerV2 uniV3Handler;
+    UniswapV3SingleTickLiquidityHandlerV2 handler;
     DopexV2ClammFeeStrategyV2 feeStrategy;
     AutoExerciseTimeBased autoExercise;
 
@@ -89,14 +89,13 @@ contract Uniswap_OptionMarketV2Test is Test {
 
         positionManager = new DopexV2PositionManager();
 
-        uniV3Handler = new UniswapV3SingleTickLiquidityHandlerV2(
+        handler = new UniswapV3SingleTickLiquidityHandlerV2(
             address(uniswapV3TestLib.factory()),
             0xa598dd2fba360510c5a8f02f44423a4468e902df5857dbce3ca162a43a3a31ff,
             address(uniswapV3TestLib.swapRouter())
         );
 
-        positionManagerHarness =
-            new UniswapV3SingleTickLiquidityHarnessV2(uniswapV3TestLib, positionManager, uniV3Handler);
+        positionManagerHarness = new UniswapV3SingleTickLiquidityHarnessV2(uniswapV3TestLib, positionManager, handler);
 
         op = new OptionPricingV2(500, 1e8);
         srs = new SwapRouterSwapper(address(uniswapV3TestLib.swapRouter()));
@@ -134,11 +133,11 @@ contract Uniswap_OptionMarketV2Test is Test {
             })
         );
 
-        positionManager.updateWhitelistHandlerWithApp(address(uniV3Handler), address(optionMarket), true);
+        positionManager.updateWhitelistHandlerWithApp(address(handler), address(optionMarket), true);
 
-        positionManager.updateWhitelistHandler(address(uniV3Handler), true);
+        positionManager.updateWhitelistHandler(address(handler), true);
 
-        uniV3Handler.updateWhitelistedApps(address(positionManager), true);
+        handler.updateWhitelistedApps(address(positionManager), true);
 
         autoExercise = new AutoExerciseTimeBased();
 
@@ -219,7 +218,7 @@ contract Uniswap_OptionMarketV2Test is Test {
         DopexV2OptionMarketV2.OptionTicks[] memory opTicks = new DopexV2OptionMarketV2.OptionTicks[](1);
 
         opTicks[0] = DopexV2OptionMarketV2.OptionTicks({
-            _handler: uniV3Handler,
+            _handler: handler,
             pool: pool,
             hook: hook,
             tickLower: tickLowerCalls,
@@ -273,7 +272,7 @@ contract Uniswap_OptionMarketV2Test is Test {
         DopexV2OptionMarketV2.OptionTicks[] memory opTicks = new DopexV2OptionMarketV2.OptionTicks[](1);
 
         opTicks[0] = DopexV2OptionMarketV2.OptionTicks({
-            _handler: uniV3Handler,
+            _handler: handler,
             pool: pool,
             hook: hook,
             tickLower: tickLowerPuts,
@@ -331,7 +330,7 @@ contract Uniswap_OptionMarketV2Test is Test {
         DopexV2OptionMarketV2.OptionTicks[] memory opTicks = new DopexV2OptionMarketV2.OptionTicks[](2);
 
         opTicks[0] = DopexV2OptionMarketV2.OptionTicks({
-            _handler: uniV3Handler,
+            _handler: handler,
             pool: pool,
             hook: hook,
             tickLower: tickLowerCalls,
@@ -340,7 +339,7 @@ contract Uniswap_OptionMarketV2Test is Test {
         });
 
         opTicks[1] = DopexV2OptionMarketV2.OptionTicks({
-            _handler: uniV3Handler,
+            _handler: handler,
             pool: pool,
             hook: hook,
             tickLower: tickLowerCalls,
@@ -431,7 +430,7 @@ contract Uniswap_OptionMarketV2Test is Test {
         DopexV2OptionMarketV2.OptionTicks[] memory opTicks = new DopexV2OptionMarketV2.OptionTicks[](2);
 
         opTicks[0] = DopexV2OptionMarketV2.OptionTicks({
-            _handler: uniV3Handler,
+            _handler: handler,
             pool: pool,
             hook: hook,
             tickLower: tickLowerCalls,
@@ -440,7 +439,7 @@ contract Uniswap_OptionMarketV2Test is Test {
         });
 
         opTicks[1] = DopexV2OptionMarketV2.OptionTicks({
-            _handler: uniV3Handler,
+            _handler: handler,
             pool: pool,
             hook: hook,
             tickLower: tickLowerCalls,
