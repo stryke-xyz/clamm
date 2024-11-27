@@ -4,7 +4,8 @@ pragma solidity ^0.8.13;
 import "forge-std/Test.sol";
 
 import {IEqualizerV3Factory} from "../../../src/equalizer-v3/v3-core/contracts/interfaces/IEqualizerV3Factory.sol";
-import {IEqualizerV3MintCallback} from "../../../src/equalizer-v3/v3-core/contracts/interfaces/callback/IEqualizerV3MintCallback.sol";
+import {IEqualizerV3MintCallback} from
+    "../../../src/equalizer-v3/v3-core/contracts/interfaces/callback/IEqualizerV3MintCallback.sol";
 import "../../../src/equalizer-v3/v3-core/contracts/interfaces/IEqualizerV3Pool.sol";
 
 import "openzeppelin/token/ERC20/utils/SafeERC20.sol";
@@ -12,7 +13,6 @@ import "v3-periphery/libraries/LiquidityAmounts.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {PoolAddress} from "../../../src/equalizer-v3/v3-periphery/libraries/PoolAddress.sol";
 import {CallbackValidation} from "../../../src/equalizer-v3/v3-periphery/libraries/CallbackValidation.sol";
-
 
 /// @title Liquidity management functions
 /// @notice Internal functions for safely managing liquidity in Uniswap V3

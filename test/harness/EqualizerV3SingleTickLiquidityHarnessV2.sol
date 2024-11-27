@@ -3,8 +3,8 @@ pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
 
-import {IEqualizerV3Pool} from '../../src/equalizer-v3/v3-core/contracts/interfaces/IEqualizerV3Pool.sol';
-import {IEqualizerV3Factory} from '../../src/equalizer-v3/v3-core/contracts/interfaces/IEqualizerV3Factory.sol';
+import {IEqualizerV3Pool} from "../../src/equalizer-v3/v3-core/contracts/interfaces/IEqualizerV3Pool.sol";
+import {IEqualizerV3Factory} from "../../src/equalizer-v3/v3-core/contracts/interfaces/IEqualizerV3Factory.sol";
 
 import {EqualizerV3TestLib} from "../utils/equalizer-v3/EqualizerV3TestLib.sol";
 import {ERC20Mock} from "../mocks/ERC20Mock.sol";
@@ -17,6 +17,8 @@ import {IHandler} from "../../src/interfaces/IHandler.sol";
 
 contract EqualizerV3SingleTickLiquidityHarnessV2 is Test {
     using TickMath for int24;
+
+    uint256 counter = 0;
 
     EqualizerV3TestLib equalizerV3TestLib;
     DopexV2PositionManager positionManager;
@@ -61,12 +63,13 @@ contract EqualizerV3SingleTickLiquidityHarnessV2 is Test {
             amount1
         );
 
-        deal(address(token0), user, amount0);
-        deal(address(token1), user, amount1);
+        token0.mint(user, amount0);
+        token1.mint(user, amount1);
 
         vm.startPrank(user);
         token0.increaseAllowance(address(positionManager), amount0);
         token1.increaseAllowance(address(positionManager), amount1);
+
 
         (lm) = positionManager.mintPosition(
             handler,
@@ -80,6 +83,7 @@ contract EqualizerV3SingleTickLiquidityHarnessV2 is Test {
                 })
             )
         );
+
         vm.stopPrank();
     }
 
@@ -184,12 +188,10 @@ contract EqualizerV3SingleTickLiquidityHarnessV2 is Test {
         vm.startPrank(user);
         {
             if (amount0ToDonate > 0) {
-                deal(pool.token0(), user, amount0ToDonate);
-                // ERC20Mock(pool.token0()).mint(user, amount0ToDonate);
+                ERC20Mock(pool.token0()).mint(user, amount0ToDonate);
             }
             if (amount1ToDonate > 0) {
-                deal(pool.token1(), user, amount1ToDonate);
-                // ERC20Mock(pool.token1()).mint(user, amount1ToDonate);
+                ERC20Mock(pool.token1()).mint(user, amount1ToDonate);
             }
 
             ERC20Mock(pool.token0()).increaseAllowance(address(positionManager), amount0 + amount0ToDonate);
@@ -235,10 +237,8 @@ contract EqualizerV3SingleTickLiquidityHarnessV2 is Test {
 
         vm.startPrank(user);
 
-        if (amount0ToDonate > 0)  deal(address(token0), user, amount0ToDonate) ;
-        if (amount1ToDonate > 0) deal(address(token1), user, amount1ToDonate);
-        // if (amount0ToDonate > 0) token0.mint(user, amount0ToDonate);
-        // if (amount1ToDonate > 0) token1.mint(user, amount1ToDonate);
+        if (amount0ToDonate > 0) token0.mint(user, amount0ToDonate);
+        if (amount1ToDonate > 0) token1.mint(user, amount1ToDonate);
 
         token0.increaseAllowance(address(positionManager), amount0 + amount0ToDonate);
         token1.increaseAllowance(address(positionManager), amount1 + amount1ToDonate);

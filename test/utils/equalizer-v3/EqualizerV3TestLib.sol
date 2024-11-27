@@ -17,6 +17,20 @@ import {SwapMath} from "@uniswap/v3-core/contracts/libraries/SwapMath.sol";
 import {EqualizerV3LiquidityManagement} from "./EqualizerV3LiquidityManagement.sol";
 import {ERC20Mock} from "../../mocks/ERC20Mock.sol";
 
+// interface ISwapRouter {
+//     struct ExactInputSingleParams {
+//         address tokenIn;
+//         address tokenOut;
+//         uint24 fee;
+//         address recipient;
+//         uint256 amountIn;
+//         uint256 amountOutMinimum;
+//         uint160 sqrtPriceLimitX96;
+//     }
+
+//     function exactInputSingle(ExactInputSingleParams calldata params) external payable returns (uint256 amountOut);
+// }
+
 contract EqualizerV3TestLib is Test {
     IEqualizerV3Factory public immutable factory;
     EqualizerV3LiquidityManagement public immutable equalizerV3LiquidityManagement;
@@ -56,10 +70,10 @@ contract EqualizerV3TestLib is Test {
         bool zeroForOne;
     }
 
-    constructor() {
-        factory = IEqualizerV3Factory(0xE6dA85feb3B4E0d6AEd95c41a125fba859bB9d24);
+    constructor(address _factory, address _swapRouter) {
+        factory = IEqualizerV3Factory(_factory);
         equalizerV3LiquidityManagement = new EqualizerV3LiquidityManagement(address(factory));
-        swapRouter = ISwapRouter(0x1F7A12B40bFc8e8561008Bc2ca1FBdc71A36d0e8);
+        swapRouter = ISwapRouter(_swapRouter);
     }
 
     function deployEqualizerV3PoolAndInitializePrice(address token0, address token1, uint24 fee, uint160 sqrtPriceX96)
@@ -123,8 +137,8 @@ contract EqualizerV3TestLib is Test {
         }
 
         if (_params.requireMint) {
-            if (amount0 > 0) deal(address(token0), _params.user, amount0);
-            if (amount1 > 0) deal(address(token1), _params.user, amount1);
+            if (amount0 > 0) token0.mint(_params.user, amount0);
+            if (amount1 > 0) token1.mint(_params.user, amount1);
         }
 
         vm.startPrank(_params.user);
@@ -188,11 +202,9 @@ contract EqualizerV3TestLib is Test {
 
         if (_params.requireMint) {
             if (_params.zeroForOne) {
-                deal(address(token0), _params.user, _params.amountIn);
-                // token0.mint(_params.user, _params.amountIn);
+                token0.mint(_params.user, _params.amountIn);
             } else {
-                deal(address(token1), _params.user, _params.amountIn);
-                // token1.mint(_params.user, _params.amountIn);
+                token1.mint(_params.user, _params.amountIn);
             }
         }
 
@@ -202,7 +214,7 @@ contract EqualizerV3TestLib is Test {
                 tokenOut: _params.zeroForOne ? _params.pool.token1() : _params.pool.token0(),
                 fee: _params.pool.fee(),
                 recipient: _params.user,
-                deadline: UINT256_MAX,
+                deadline: block.timestamp + 5 days,
                 amountIn: _params.amountIn,
                 amountOutMinimum: 0,
                 sqrtPriceLimitX96: 0
@@ -225,12 +237,10 @@ contract EqualizerV3TestLib is Test {
         vm.startPrank(_params.user);
 
         if (_params.zeroForOne) {
-            deal(address(token0), _params.user, type(uint256).max);
-            // token0.mint(_params.user, amountIn);
+            token0.mint(_params.user, amountIn);
             token0.approve(address(swapRouter), type(uint256).max);
         } else {
-            deal(address(token1), _params.user, type(uint256).max);
-            // token1.mint(_params.user, amountIn);
+            token1.mint(_params.user, amountIn);
             token1.approve(address(swapRouter), type(uint256).max);
         }
 
