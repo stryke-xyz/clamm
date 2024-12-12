@@ -16,6 +16,7 @@ import {PoolAddress} from "../../../src/aerodrome/v3-periphery/libraries/PoolAdd
 
 import {AerodromeLiquidityManagement} from "./AerodromeLiquidityManagement.sol";
 import {ERC20Mock} from "../../mocks/ERC20Mock.sol";
+// import {ICLFactory as ICLFactoryV2} from 'slipstream/contracts/core/interfaces/ICLFactory.sol';
 
 contract AerodromeTestLib is Test {
     ICLFactory public immutable factory;
@@ -57,9 +58,23 @@ contract AerodromeTestLib is Test {
     }
 
     constructor() {
-        factory = ICLFactory(0xAAA32926fcE6bE95ea2c51cB4Fcb60836D320C42);
+        factory = ICLFactory(0x5e7BB104d84c7CB9B682AaC2F3d509f5F406809A);
         aerodromeLiquidityManagement = new AerodromeLiquidityManagement(address(factory));
-        swapRouter = ISwapRouter(0xAAAE99091Fbb28D400029052821653C1C752483B);
+        swapRouter = ISwapRouter(0xBE6D8f0d05cC4be24d5167a3eF062215bE6D18a5);
+    }
+
+    function deployPoolAndInitializePrice(address token0, address token1, int24 tickSpacing, uint160 sqrtPriceX96)
+        public
+        returns (address pool)
+    {
+        if (token0 >= token1) {
+            (token0, token1) = (token1, token0);
+        }
+
+        pool = factory.createPool(token0, token1, tickSpacing, sqrtPriceX96);
+
+        // pool is already initialized when it is created
+        // ICLPool(pool).initialize(address(factory), token0, token1, tickSpacing, address(0), sqrtPriceX96);
     }
 
     function getCurrentSqrtPriceX96(ICLPool pool) public view returns (uint160 sqrtPriceX96) {
@@ -118,19 +133,6 @@ contract AerodromeTestLib is Test {
 
         token0.approve(address(aerodromeLiquidityManagement), type(uint256).max);
         token1.approve(address(aerodromeLiquidityManagement), type(uint256).max);
-
-        // AerodromeLiquidityManagement.AddLiquidityParams memory addLiquidityParams = AerodromeLiquidityManagement
-        //     .AddLiquidityParams({
-        //     poolAddress: address(_params.pool),
-        //     poolKey: PoolAddress.PoolKey(_params.pool.token0(), _params.pool.token1(), _params.pool.tickSpacing()),
-        //     recipient: _params.user,
-        //     tickLower: (_params.desiredTickLower / int24(100)) * 100 + 100,
-        //     tickUpper: (_params.desiredTickUpper / int24(100)) * 100,
-        //     amount0Desired: amount0,
-        //     amount1Desired: amount1,
-        //     amount0Min: 0,
-        //     amount1Min: 0
-        // });
 
         (liquidity,,) = aerodromeLiquidityManagement.addLiquidity(
             AerodromeLiquidityManagement.AddLiquidityParams({

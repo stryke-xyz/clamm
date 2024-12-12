@@ -15,14 +15,13 @@ import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {FullMath} from "@uniswap/v3-core/contracts/libraries/FullMath.sol";
 import {FixedPoint128} from "@uniswap/v3-core/contracts/libraries/FixedPoint128.sol";
+import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 
 // Contracts
 import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
 import {Pausable} from "openzeppelin-contracts/contracts/security/Pausable.sol";
 import {ERC6909} from "../../libraries/tokens/ERC6909.sol";
 import {LiquidityManager} from "../../aerodrome/LiquidityManager.sol";
-
-import "forge-std/Test.sol";
 
 /**
  * @title AerodromeSingleTickLiquidityHandlerV3
@@ -31,7 +30,14 @@ import "forge-std/Test.sol";
  * for Aerodrome Style AMMs. The V2 version supports reserved liquidity and hooks.
  * Do NOT deploy on zkSync, verifyCallback code needs to be updated for zkSync.
  */
-contract AerodromeSingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, AccessControl, LiquidityManager, Test {
+contract AerodromeSingleTickLiquidityHandlerV3 is
+    ERC6909,
+    IHandler,
+    Pausable,
+    AccessControl,
+    LiquidityManager,
+    Multicall
+{
     using Math for uint128;
     using TickMath for int24;
     using SafeERC20 for IERC20;
@@ -406,7 +412,6 @@ contract AerodromeSingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, A
      * @return The number of shares burned.
      */
     function reserveLiquidity(bytes calldata _reserveLiquidityParam) external whenNotPaused returns (uint256) {
-        console.log(msg.sender);
         BurnPositionParams memory _params = abi.decode(_reserveLiquidityParam, (BurnPositionParams));
 
         uint256 tokenId = uint256(
@@ -554,9 +559,6 @@ contract AerodromeSingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, A
         if (_params.hook != address(0)) {
             IHook(_params.hook).onPositionUse(hookData);
         }
-
-        console.log(tki.totalLiquidity - tki.liquidityUsed,_params.liquidityToUse);
-
 
         if ((tki.totalLiquidity - tki.liquidityUsed) < _params.liquidityToUse) {
             revert AerodromeSingleTickLiquidityHandlerV2__InsufficientLiquidity();
