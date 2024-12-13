@@ -2,11 +2,11 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 // Interfaces
-import {ICLPool} from "../../aerodrome/v3-core/contracts/interfaces/ICLPool.sol";
+import {ICLPool} from "../aerodrome/v3-core/contracts/interfaces/ICLPool.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import {ISwapRouter} from "../../aerodrome/v3-core/contracts/interfaces/ISwapRouter.sol";
-import {IHandler} from "../../interfaces/IHandler.sol";
-import {IHook} from "../../interfaces/IHook.sol";
+import {ISwapRouter} from "../aerodrome/v3-core/contracts/interfaces/ISwapRouter.sol";
+import {IHandler} from "../interfaces/IHandler.sol";
+import {IHook} from "../interfaces/IHook.sol";
 
 // Libraries
 import {Math} from "openzeppelin-contracts/contracts/utils/math/Math.sol";
@@ -20,17 +20,17 @@ import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 // Contracts
 import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
 import {Pausable} from "openzeppelin-contracts/contracts/security/Pausable.sol";
-import {ERC6909} from "../../libraries/tokens/ERC6909.sol";
-import {LiquidityManager} from "../../aerodrome/LiquidityManager.sol";
+import {ERC6909} from "../libraries/tokens/ERC6909.sol";
+import {LiquidityManager} from "../aerodrome/LiquidityManager.sol";
 
 /**
- * @title AerodromeSingleTickLiquidityHandlerV3
+ * @title AerodromeSingleTickLiquidityHandlerV2
  * @author Aercwardeth
  * @dev This is a handler contract for providing liquidity
  * for Aerodrome Style AMMs. The V2 version supports reserved liquidity and hooks.
  * Do NOT deploy on zkSync, verifyCallback code needs to be updated for zkSync.
  */
-contract AerodromeSingleTickLiquidityHandlerV3 is
+contract AerodromeSingleTickLiquidityHandlerV2 is
     ERC6909,
     IHandler,
     Pausable,
@@ -283,7 +283,7 @@ contract AerodromeSingleTickLiquidityHandlerV3 is
                         );
                     }
 
-                    (uint128 liquidityFee,,,) = AerodromeSingleTickLiquidityHandlerV3(address(this)).addLiquidity(
+                    (uint128 liquidityFee,,,) = AerodromeSingleTickLiquidityHandlerV2(address(this)).addLiquidity(
                         LiquidityManager.AddLiquidityParams({
                             token0: tki.token0,
                             token1: tki.token1,

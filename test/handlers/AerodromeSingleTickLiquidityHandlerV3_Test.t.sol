@@ -14,7 +14,7 @@ import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
 
 import {DopexV2PositionManager} from "../../src/DopexV2PositionManager.sol";
 import {AerodromeSingleTickLiquidityHarnessV2} from "../harness/AerodromeSingleTickLiquidityHarnessV2.sol";
-import {AerodromeSingleTickLiquidityHandlerV3} from "../../src/handlers/v3/AerodromeSingleTickLiquidityHandlerV3.sol";
+import {AerodromeSingleTickLiquidityHandlerV2} from "../../src/handlers/AerodromeSingleTickLiquidityHandlerV2.sol";
 
 contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
     using TickMath for int24;
@@ -47,7 +47,7 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
 
     DopexV2PositionManager positionManager;
     AerodromeSingleTickLiquidityHarnessV2 positionManagerHarness;
-    AerodromeSingleTickLiquidityHandlerV3 handler;
+    AerodromeSingleTickLiquidityHandlerV2 handler;
 
     address hook = address(0);
     bytes hookData = new bytes(0);
@@ -76,7 +76,7 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
             })
         );
 
-        handler = new AerodromeSingleTickLiquidityHandlerV3(clFactory, address(swapRouter));
+        handler = new AerodromeSingleTickLiquidityHandlerV2(clFactory, address(swapRouter));
         positionManager = new DopexV2PositionManager();
 
         positionManagerHarness = new AerodromeSingleTickLiquidityHarnessV2(testLib, positionManager, handler);
@@ -216,8 +216,7 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
 
         testMintPositionWithSwaps();
 
-        uint256 bobBalance =
-            handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+        uint256 bobBalance = handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         uint256 jasonBalance =
             handler.balanceOf(jason, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
@@ -252,8 +251,7 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
 
         positionManagerHarness.mintPosition(token0, token1, 2, 0, tickLower, tickUpper, pool, hook, jason);
 
-        uint256 bobBalance =
-            handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+        uint256 bobBalance = handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         uint256 jasonBalance =
             handler.balanceOf(jason, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
@@ -315,8 +313,7 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
             amount0, amount1, 0, 1e18, tickLower, tickUpper, pool, hook, hookData, garbage
         );
 
-        uint256 bobBalance =
-            handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+        uint256 bobBalance = handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         uint256 jasonBalance =
             handler.balanceOf(jason, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
@@ -356,8 +353,7 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
 
         vm.roll(block.number + 10);
 
-        uint256 bobBalance =
-            handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+        uint256 bobBalance = handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         uint256 jasonBalance =
             handler.balanceOf(jason, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
@@ -397,9 +393,8 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
 
         // console.log("Total Token 0 Borrowed", token0.balanceOf(garbage));
 
-        AerodromeSingleTickLiquidityHandlerV3.TokenIdInfo memory tki = handler.getTokenIdData(
-            uint256(keccak256(abi.encode(address(handler), pool, hook, tickLower, tickUpper)))
-        );
+        AerodromeSingleTickLiquidityHandlerV2.TokenIdInfo memory tki =
+            handler.getTokenIdData(uint256(keccak256(abi.encode(address(handler), pool, hook, tickLower, tickUpper))));
         // console.log(tl, ts, lu);
 
         testLib.performSwap(
@@ -472,9 +467,8 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
 
         // console.log("Total Token 1 Borrowed", token1.balanceOf(garbage));
 
-        AerodromeSingleTickLiquidityHandlerV3.TokenIdInfo memory tki = handler.getTokenIdData(
-            uint256(keccak256(abi.encode(address(handler), pool, hook, tickLower, tickUpper)))
-        );
+        AerodromeSingleTickLiquidityHandlerV2.TokenIdInfo memory tki =
+            handler.getTokenIdData(uint256(keccak256(abi.encode(address(handler), pool, hook, tickLower, tickUpper))));
         // console.log(tl, ts, lu);
 
         testLib.performSwap(
@@ -540,12 +534,11 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
         positionManagerHarness.usePosition(amount0, 10e18 - 3, tickLower, tickUpper, pool, hook, hookData, garbage);
 
         vm.startPrank(bob);
-        uint256 bobBalance =
-            handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+        uint256 bobBalance = handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         handler.reserveLiquidity(
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV3.BurnPositionParams({
+                AerodromeSingleTickLiquidityHandlerV2.BurnPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -569,7 +562,7 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
 
         handler.withdrawReserveLiquidity(
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV3.BurnPositionParams({
+                AerodromeSingleTickLiquidityHandlerV2.BurnPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -585,7 +578,7 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
 
         positionManagerHarness.burnPosition(jasonBalance - 1, tickLower, tickUpper, pool, hook, jason);
 
-        // AerodromeSingleTickLiquidityHandlerV3.TokenIdInfo memory tki = handler
+        // AerodromeSingleTickLiquidityHandlerV2.TokenIdInfo memory tki = handler
         //     .getTokenIdData(
         //         uint256(
         //             keccak256(
@@ -640,12 +633,11 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
         positionManagerHarness.usePosition(amount0, amount1, tickLower, tickUpper, pool, hook, hookData, garbage);
 
         vm.startPrank(bob);
-        uint256 bobBalance =
-            handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+        uint256 bobBalance = handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         handler.reserveLiquidity(
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV3.BurnPositionParams({
+                AerodromeSingleTickLiquidityHandlerV2.BurnPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -709,7 +701,7 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
 
         handler.withdrawReserveLiquidity(
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV3.BurnPositionParams({
+                AerodromeSingleTickLiquidityHandlerV2.BurnPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -740,12 +732,11 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
         positionManagerHarness.mintPosition(token0, token1, amount0, amount1, tickLower, tickUpper, pool, hook, jason);
 
         vm.startPrank(bob);
-        uint256 bobBalance =
-            handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+        uint256 bobBalance = handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         handler.reserveLiquidity(
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV3.BurnPositionParams({
+                AerodromeSingleTickLiquidityHandlerV2.BurnPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -764,7 +755,7 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
 
         handler.withdrawReserveLiquidity(
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV3.BurnPositionParams({
+                AerodromeSingleTickLiquidityHandlerV2.BurnPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -795,12 +786,11 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
         positionManagerHarness.usePosition(amount0, 10e18 - 3, tickLower, tickUpper, pool, hook, hookData, garbage);
 
         vm.startPrank(bob);
-        uint256 bobBalance =
-            handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+        uint256 bobBalance = handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         handler.reserveLiquidity(
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV3.BurnPositionParams({
+                AerodromeSingleTickLiquidityHandlerV2.BurnPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -822,7 +812,7 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
 
         handler.withdrawReserveLiquidity(
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV3.BurnPositionParams({
+                AerodromeSingleTickLiquidityHandlerV2.BurnPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -850,12 +840,11 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
         positionManagerHarness.usePosition(amount0, amount1 - 3, tickLower, tickUpper, pool, hook, hookData, garbage);
 
         vm.startPrank(bob);
-        uint256 bobBalance =
-            handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+        uint256 bobBalance = handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         handler.reserveLiquidity(
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV3.BurnPositionParams({
+                AerodromeSingleTickLiquidityHandlerV2.BurnPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -890,12 +879,11 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
         positionManagerHarness.usePosition(amount0, 10e18 - 3, tickLower, tickUpper, pool, hook, hookData, garbage);
 
         vm.startPrank(bob);
-        uint256 bobBalance =
-            handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+        uint256 bobBalance = handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         handler.reserveLiquidity(
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV3.BurnPositionParams({
+                AerodromeSingleTickLiquidityHandlerV2.BurnPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,

@@ -11,7 +11,7 @@ import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
 
 import {DopexV2PositionManager} from "../../src/DopexV2PositionManager.sol";
-import {AerodromeSingleTickLiquidityHandlerV3} from "../../src/handlers/v3/AerodromeSingleTickLiquidityHandlerV3.sol";
+import {AerodromeSingleTickLiquidityHandlerV2} from "../../src/handlers/AerodromeSingleTickLiquidityHandlerV2.sol";
 import {IHandler} from "../../src/interfaces/IHandler.sol";
 
 contract AerodromeSingleTickLiquidityHarnessV2 is Test {
@@ -19,12 +19,12 @@ contract AerodromeSingleTickLiquidityHarnessV2 is Test {
 
     AerodromeTestLib testLib;
     DopexV2PositionManager positionManager;
-    AerodromeSingleTickLiquidityHandlerV3 handler;
+    AerodromeSingleTickLiquidityHandlerV2 handler;
 
     constructor(
         AerodromeTestLib _testLib,
         DopexV2PositionManager _positionManager,
-        AerodromeSingleTickLiquidityHandlerV3 _handler
+        AerodromeSingleTickLiquidityHandlerV2 _handler
     ) {
         testLib = _testLib;
         positionManager = _positionManager;
@@ -64,7 +64,7 @@ contract AerodromeSingleTickLiquidityHarnessV2 is Test {
         (lm) = positionManager.mintPosition(
             IHandler(address(handler)),
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV3.MintPositionParams({
+                AerodromeSingleTickLiquidityHandlerV2.MintPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -85,7 +85,7 @@ contract AerodromeSingleTickLiquidityHarnessV2 is Test {
         (lb) = positionManager.burnPosition(
             IHandler(address(handler)),
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV3.BurnPositionParams({
+                AerodromeSingleTickLiquidityHandlerV2.BurnPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -119,7 +119,7 @@ contract AerodromeSingleTickLiquidityHarnessV2 is Test {
         (tokens, amounts,) = positionManager.usePosition(
             IHandler(address(handler)),
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV3.UsePositionParams({
+                AerodromeSingleTickLiquidityHandlerV2.UsePositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -186,7 +186,7 @@ contract AerodromeSingleTickLiquidityHarnessV2 is Test {
         positionManager.unusePosition(
             IHandler(address(handler)),
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV3.UnusePositionParams({
+                AerodromeSingleTickLiquidityHandlerV2.UnusePositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -230,7 +230,7 @@ contract AerodromeSingleTickLiquidityHarnessV2 is Test {
         (amounts,) = positionManager.donateToPosition(
             IHandler(address(handler)),
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV3.DonateParams({
+                AerodromeSingleTickLiquidityHandlerV2.DonateParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,

@@ -14,7 +14,7 @@ import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
 
 import {DopexV2PositionManager} from "../../src/DopexV2PositionManager.sol";
 import {AerodromeSingleTickLiquidityHarnessV2} from "../harness/AerodromeSingleTickLiquidityHarnessV2.sol";
-import {AerodromeSingleTickLiquidityHandlerV3} from "../../src/handlers/v3/AerodromeSingleTickLiquidityHandlerV3.sol";
+import {AerodromeSingleTickLiquidityHandlerV2} from "../../src/handlers/AerodromeSingleTickLiquidityHandlerV2.sol";
 import {SwapRouterSwapper} from "../../src/aerodrome/SwapRouterSwapper.sol";
 import {DopexV2OptionMarketV2} from "../../src/DopexV2OptionMarketV2.sol";
 
@@ -72,7 +72,7 @@ contract Aerodrome_OptionMarketV2Test is Test {
     DopexV2PositionManager positionManager;
     AerodromeSingleTickLiquidityHarnessV2 positionManagerHarness;
     DopexV2OptionMarketV2 optionMarket;
-    AerodromeSingleTickLiquidityHandlerV3 handler;
+    AerodromeSingleTickLiquidityHandlerV2 handler;
     DopexV2ClammFeeStrategyV2 feeStrategy;
     AutoExerciseTimeBased autoExercise;
 
@@ -90,7 +90,7 @@ contract Aerodrome_OptionMarketV2Test is Test {
 
         positionManager = new DopexV2PositionManager();
 
-        handler = new AerodromeSingleTickLiquidityHandlerV3(
+        handler = new AerodromeSingleTickLiquidityHandlerV2(
             0x5e7BB104d84c7CB9B682AaC2F3d509f5F406809A, 0xBE6D8f0d05cC4be24d5167a3eF062215bE6D18a5
         );
 
@@ -145,53 +145,19 @@ contract Aerodrome_OptionMarketV2Test is Test {
         autoExercise.grantRole(keccak256("EXECUTOR"), autoExercisoor);
 
         // for calls
-        positionManagerHarness.mintPosition(
-            token0,
-            token1,
-            0,
-            5e18,
-            -76300,
-            -76200, 
-            ICLPool(address(pool)),
-            hook,
-            bob
-        );
+        positionManagerHarness.mintPosition(token0, token1, 0, 5e18, -76300, -76200, ICLPool(address(pool)), hook, bob);
 
         positionManagerHarness.mintPosition(
-            token0,
-            token1,
-            0,
-            5e18,
-            -76300,
-            -76200, 
-            ICLPool(address(pool)),
-            hook,
-            jason
+            token0, token1, 0, 5e18, -76300, -76200, ICLPool(address(pool)), hook, jason
         );
 
         // for puts
         positionManagerHarness.mintPosition(
-            token0,
-            token1,
-            10_000e18,
-            0,
-            -75800, 
-            -75700, 
-            ICLPool(address(pool)),
-            hook,
-            bob
+            token0, token1, 10_000e18, 0, -75800, -75700, ICLPool(address(pool)), hook, bob
         );
 
         positionManagerHarness.mintPosition(
-            token0,
-            token1,
-            10_000e18,
-            0,
-            -75800, 
-            -75700, 
-            ICLPool(address(pool)),
-            hook,
-            jason
+            token0, token1, 10_000e18, 0, -75800, -75700, ICLPool(address(pool)), hook, jason
         );
     }
 
