@@ -15,13 +15,13 @@ import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {FullMath} from "@uniswap/v3-core/contracts/libraries/FullMath.sol";
 import {FixedPoint128} from "@uniswap/v3-core/contracts/libraries/FixedPoint128.sol";
-import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 
 // Contracts
 import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
 import {Pausable} from "openzeppelin-contracts/contracts/security/Pausable.sol";
 import {ERC6909} from "../libraries/tokens/ERC6909.sol";
 import {LiquidityManager} from "../aerodrome/LiquidityManager.sol";
+
 
 /**
  * @title AerodromeSingleTickLiquidityHandlerV2
@@ -35,8 +35,7 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
     IHandler,
     Pausable,
     AccessControl,
-    LiquidityManager,
-    Multicall
+    LiquidityManager
 {
     using Math for uint128;
     using TickMath for int24;
