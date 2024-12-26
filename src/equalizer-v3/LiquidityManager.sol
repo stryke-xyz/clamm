@@ -2,8 +2,9 @@
 pragma solidity ^0.8.13;
 
 // Interfaces
-import {IEqualizerV3MintCallback} from "./v3-core/contracts/interfaces/callback/IEqualizerV3MintCallback.sol";
-import {IEqualizerV3Pool} from "./v3-core/contracts/interfaces/IEqualizerV3Pool.sol";
+import {IUniswapV3MintCallback} from "./v3-core/contracts/interfaces/callback/IUniswapV3MintCallback.sol";
+import {IUniswapV3Pool} from "./v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import {IUniswapV3Factory} from "./v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
 
 // Libraries
@@ -13,19 +14,17 @@ import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 
 /// @title Liquidity management functions
 /// @notice Internal functions for safely managing liquidity in Uniswap V3
-abstract contract LiquidityManager is IEqualizerV3MintCallback {
+abstract contract LiquidityManager is IUniswapV3MintCallback {
     address public immutable factory;
-    bytes32 public immutable POOL_INIT_CODE_HASH;
 
     struct PoolKey {
         address token0;
         address token1;
-        uint24 fee;
+        int24 tickSpacing;
     }
 
-    constructor(address _factory, bytes32 _pool_init_code_hash) {
+    constructor(address _factory) {
         factory = _factory;
-        POOL_INIT_CODE_HASH = _pool_init_code_hash;
     }
 
     struct MintCallbackData {
@@ -33,7 +32,7 @@ abstract contract LiquidityManager is IEqualizerV3MintCallback {
         address payer;
     }
 
-    /// @inheritdoc IEqualizerV3MintCallback
+    /// @inheritdoc IUniswapV3MintCallback
     function uniswapV3MintCallback(uint256 amount0Owed, uint256 amount1Owed, bytes calldata data) external override {
         MintCallbackData memory decoded = abi.decode(data, (MintCallbackData));
         verifyCallback(factory, decoded.poolKey);
@@ -49,7 +48,7 @@ abstract contract LiquidityManager is IEqualizerV3MintCallback {
     struct AddLiquidityParams {
         address token0;
         address token1;
-        uint24 fee;
+        int24 tickSpacing;
         address recipient;
         int24 tickLower;
         int24 tickUpper;
@@ -62,11 +61,12 @@ abstract contract LiquidityManager is IEqualizerV3MintCallback {
     /// @notice Add liquidity to an initialized pool
     function addLiquidity(AddLiquidityParams memory params)
         public
-        returns (uint128 liquidity, uint256 amount0, uint256 amount1, IEqualizerV3Pool pool)
+        returns (uint128 liquidity, uint256 amount0, uint256 amount1, IUniswapV3Pool pool)
     {
-        PoolKey memory poolKey = PoolKey({token0: params.token0, token1: params.token1, fee: params.fee});
+        PoolKey memory poolKey =
+            PoolKey({token0: params.token0, token1: params.token1, tickSpacing: params.tickSpacing});
 
-        pool = IEqualizerV3Pool(computeAddress(factory, poolKey));
+        pool = IUniswapV3Pool(computeAddress(factory, poolKey));
 
         // compute the liquidity amount
         {
@@ -101,9 +101,9 @@ abstract contract LiquidityManager is IEqualizerV3MintCallback {
         }
     }
 
-    function getPoolKey(address tokenA, address tokenB, uint24 fee) internal pure returns (PoolKey memory) {
+    function getPoolKey(address tokenA, address tokenB, int24 tickSpacing) internal pure returns (PoolKey memory) {
         if (tokenA > tokenB) (tokenA, tokenB) = (tokenB, tokenA);
-        return PoolKey({token0: tokenA, token1: tokenB, fee: fee});
+        return PoolKey({token0: tokenA, token1: tokenB, tickSpacing: tickSpacing});
     }
 
     function computeAddress(address _factory, PoolKey memory key) internal view returns (address pool) {
@@ -114,9 +114,9 @@ abstract contract LiquidityManager is IEqualizerV3MintCallback {
                     keccak256(
                         abi.encodePacked(
                             hex"ff",
-                            _factory,
-                            keccak256(abi.encode(key.token0, key.token1, key.fee)),
-                            POOL_INIT_CODE_HASH
+                            factory,
+                            keccak256(abi.encode(key.token0, key.token1, key.tickSpacing)),
+                            IUniswapV3Factory(factory).POOL_INIT_CODE_HASH()
                         )
                     )
                 )
@@ -124,16 +124,16 @@ abstract contract LiquidityManager is IEqualizerV3MintCallback {
         );
     }
 
-    function verifyCallback(address _factory, address tokenA, address tokenB, uint24 fee)
+    function verifyCallback(address _factory, address tokenA, address tokenB, int24 tickSpacing)
         internal
         view
-        returns (IEqualizerV3Pool pool)
+        returns (IUniswapV3Pool pool)
     {
-        return verifyCallback(_factory, getPoolKey(tokenA, tokenB, fee));
+        return verifyCallback(_factory, getPoolKey(tokenA, tokenB, tickSpacing));
     }
 
-    function verifyCallback(address _factory, PoolKey memory poolKey) internal view returns (IEqualizerV3Pool pool) {
-        pool = IEqualizerV3Pool(computeAddress(_factory, poolKey));
+    function verifyCallback(address _factory, PoolKey memory poolKey) internal view returns (IUniswapV3Pool pool) {
+        pool = IUniswapV3Pool(computeAddress(_factory, poolKey));
         require(msg.sender == address(pool));
     }
 }

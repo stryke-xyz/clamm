@@ -2,9 +2,9 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 // Interfaces
-import {IEqualizerV3Pool} from "../equalizer-v3/v3-core/contracts/interfaces/IEqualizerV3Pool.sol";
+import {IUniswapV3Pool} from "../equalizer-v3/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import {ISwapRouter} from "v3-periphery/SwapRouter.sol";
+import {ISwapRouter02} from "../equalizer-v3/v3-periphery/interfaces/ISwapRouter02.sol";
 import {IHandler} from "../interfaces/IHandler.sol";
 import {IHook} from "../interfaces/IHook.sol";
 
@@ -29,13 +29,7 @@ import {LiquidityManager} from "../equalizer-v3/LiquidityManager.sol";
  * for Uniswap V3 Style AMMs. The V2 version supports reserved liquidity and hooks.
  * Do NOT deploy on zkSync, verifyCallback code needs to be updated for zkSync.
  */
-contract EqualizerV3SingleTickLiquidityHandlerV2 is
-    ERC6909,
-    IHandler,
-    Pausable,
-    AccessControl,
-    LiquidityManager
-{
+contract EqualizerV3SingleTickLiquidityHandlerV2 is ERC6909, IHandler, Pausable, AccessControl, LiquidityManager {
     using Math for uint128;
     using TickMath for int24;
     using SafeERC20 for IERC20;
@@ -52,12 +46,12 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
         uint128 donatedLiquidity;
         address token0;
         address token1;
-        uint24 fee;
+        int24 tickSpacing;
         uint128 reservedLiquidity;
     }
 
     struct MintPositionParams {
-        IEqualizerV3Pool pool;
+        IUniswapV3Pool pool;
         address hook;
         int24 tickLower;
         int24 tickUpper;
@@ -65,7 +59,7 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
     }
 
     struct BurnPositionParams {
-        IEqualizerV3Pool pool;
+        IUniswapV3Pool pool;
         address hook;
         int24 tickLower;
         int24 tickUpper;
@@ -78,7 +72,7 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
     }
 
     struct UsePositionParams {
-        IEqualizerV3Pool pool;
+        IUniswapV3Pool pool;
         address hook;
         int24 tickLower;
         int24 tickUpper;
@@ -86,7 +80,7 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
     }
 
     struct UnusePositionParams {
-        IEqualizerV3Pool pool;
+        IUniswapV3Pool pool;
         address hook;
         int24 tickLower;
         int24 tickUpper;
@@ -94,7 +88,7 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
     }
 
     struct DonateParams {
-        IEqualizerV3Pool pool;
+        IUniswapV3Pool pool;
         address hook;
         int24 tickLower;
         int24 tickUpper;
@@ -138,44 +132,27 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
     );
 
     event LogFeeCompound(
-        address handler,
-        IEqualizerV3Pool pool,
-        uint256 tokenId,
-        int24 tickLower,
-        int24 tickUpper,
-        uint128 liquidity
+        address handler, IUniswapV3Pool pool, uint256 tokenId, int24 tickLower, int24 tickUpper, uint128 liquidity
     );
     event LogUsePosition(uint256 tokenId, uint128 liquidityUsed);
     event LogUnusePosition(uint256 tokenId, uint128 liquidityUnused);
     event LogDonation(uint256 tokenId, uint128 liquidityDonated);
     event LogUpdateWhitelistedApp(address _app, bool _status);
-    event LogUpdatedLockBlockAndReserveCooldownDuration(
-        uint64 _newLockedBlockDuration,
-        uint64 _newReserveCooldown
-    );
-    event LogReservedLiquidity(
-        uint256 tokenId,
-        uint128 liquidityReserved,
-        address user
-    );
-    event LogWithdrawReservedLiquidity(
-        uint256 tokenId,
-        uint128 liquidityWithdrawn,
-        address user
-    );
+    event LogUpdatedLockBlockAndReserveCooldownDuration(uint64 _newLockedBlockDuration, uint64 _newReserveCooldown);
+    event LogReservedLiquidity(uint256 tokenId, uint128 liquidityReserved, address user);
+    event LogWithdrawReservedLiquidity(uint256 tokenId, uint128 liquidityWithdrawn, address user);
 
     // errors
-    error UniswapV3SingleTickLiquidityHandlerV2__NotWhitelisted();
-    error UniswapV3SingleTickLiquidityHandlerV2__InRangeLP();
-    error UniswapV3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
-    error UniswapV3SingleTickLiquidityHandlerV2__BeforeReserveCooldown();
+    error EqualizerV3SingleTickLiquidityHandlerV2__NotWhitelisted();
+    error EqualizerV3SingleTickLiquidityHandlerV2__InRangeLP();
+    error Equalizer3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
+    error EqualizerV3SingleTickLiquidityHandlerV2__BeforeReserveCooldown();
 
     mapping(uint256 => TokenIdInfo) public tokenIds;
     mapping(address => bool) public whitelistedApps;
-    mapping(uint256 => mapping(address => ReserveLiquidityData))
-        public reservedLiquidityPerUser;
+    mapping(uint256 => mapping(address => ReserveLiquidityData)) public reservedLiquidityPerUser;
 
-    ISwapRouter swapRouter;
+    ISwapRouter02 swapRouter;
 
     uint64 public reserveCooldown = 6 hours;
     uint64 public lockedBlockDuration = 100;
@@ -184,12 +161,8 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
     bytes32 constant PAUSER_ROLE = keccak256("P");
     bytes32 constant SOS_ROLE = keccak256("SOS");
 
-    constructor(
-        address _factory,
-        bytes32 _pool_init_code_hash,
-        address _swapRouter
-    ) LiquidityManager(_factory, _pool_init_code_hash) {
-        swapRouter = ISwapRouter(_swapRouter);
+    constructor(address _factory, address _swapRouter) LiquidityManager(_factory) {
+        swapRouter = ISwapRouter02(_swapRouter);
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
@@ -202,27 +175,17 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
      * on a single ticks only.
      * @return sharesMinted The number of shares minted.
      */
-    function mintPositionHandler(
-        address context,
-        bytes calldata _mintPositionData
-    ) external whenNotPaused returns (uint256 sharesMinted) {
+    function mintPositionHandler(address context, bytes calldata _mintPositionData)
+        external
+        whenNotPaused
+        returns (uint256 sharesMinted)
+    {
         onlyWhitelisted();
 
-        MintPositionParams memory _params = abi.decode(
-            _mintPositionData,
-            (MintPositionParams)
-        );
+        MintPositionParams memory _params = abi.decode(_mintPositionData, (MintPositionParams));
 
         uint256 tokenId = uint256(
-            keccak256(
-                abi.encode(
-                    address(this),
-                    _params.pool,
-                    _params.hook,
-                    _params.tickLower,
-                    _params.tickUpper
-                )
-            )
+            keccak256(abi.encode(address(this), _params.pool, _params.hook, _params.tickLower, _params.tickUpper))
         );
 
         TokenIdInfo storage tki = tokenIds[tokenId];
@@ -230,7 +193,7 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
         if (tki.token0 == address(0)) {
             tki.token0 = _params.pool.token0();
             tki.token1 = _params.pool.token1();
-            tki.fee = _params.pool.fee();
+            tki.tickSpacing = _params.pool.tickSpacing();
         }
 
         MintPositionCache memory posCache = MintPositionCache({
@@ -243,22 +206,22 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
             amount1: 0
         });
 
-        (posCache.amount0, posCache.amount1) = LiquidityAmounts
-            .getAmountsForLiquidity(
-                _getCurrentSqrtPriceX96(_params.pool),
-                posCache.sqrtRatioTickLower,
-                posCache.sqrtRatioTickUpper,
-                uint128(_params.liquidity)
-            );
+        (posCache.amount0, posCache.amount1) = LiquidityAmounts.getAmountsForLiquidity(
+            _getCurrentSqrtPriceX96(_params.pool),
+            posCache.sqrtRatioTickLower,
+            posCache.sqrtRatioTickUpper,
+            uint128(_params.liquidity)
+        );
 
-        if (posCache.amount0 > 0 && posCache.amount1 > 0)
-            revert UniswapV3SingleTickLiquidityHandlerV2__InRangeLP();
+        if (posCache.amount0 > 0 && posCache.amount1 > 0) {
+            revert EqualizerV3SingleTickLiquidityHandlerV2__InRangeLP();
+        }
 
-        (posCache.liquidity, , , ) = addLiquidity(
+        (posCache.liquidity,,,) = addLiquidity(
             LiquidityManager.AddLiquidityParams({
                 token0: tki.token0,
                 token1: tki.token1,
-                fee: tki.fee,
+                tickSpacing: tki.tickSpacing,
                 recipient: address(this),
                 tickLower: posCache.tickLower,
                 tickUpper: posCache.tickUpper,
@@ -269,34 +232,18 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
             })
         );
 
-        _feeCalculation(
-            tki,
-            _params.pool,
-            posCache.tickLower,
-            posCache.tickUpper
-        );
+        _feeCalculation(tki, _params.pool, posCache.tickLower, posCache.tickUpper);
 
         if (tki.totalSupply > 0) {
             // compound fees
             if (tki.tokensOwed0 > 1_000 || tki.tokensOwed1 > 1_000) {
-                uint256 expectedAmountForLiquidity0 = LiquidityAmounts
-                    .getAmount0ForLiquidity(
-                        posCache.sqrtRatioTickLower,
-                        posCache.sqrtRatioTickUpper,
-                        2
-                    );
+                uint256 expectedAmountForLiquidity0 =
+                    LiquidityAmounts.getAmount0ForLiquidity(posCache.sqrtRatioTickLower, posCache.sqrtRatioTickUpper, 2);
 
-                uint256 expectedAmountForLiquidity1 = LiquidityAmounts
-                    .getAmount1ForLiquidity(
-                        posCache.sqrtRatioTickLower,
-                        posCache.sqrtRatioTickUpper,
-                        2
-                    );
+                uint256 expectedAmountForLiquidity1 =
+                    LiquidityAmounts.getAmount1ForLiquidity(posCache.sqrtRatioTickLower, posCache.sqrtRatioTickUpper, 2);
 
-                if (
-                    expectedAmountForLiquidity0 > tki.tokensOwed0 ||
-                    expectedAmountForLiquidity1 > tki.tokensOwed1
-                ) {
+                if (expectedAmountForLiquidity0 > tki.tokensOwed0 || expectedAmountForLiquidity1 > tki.tokensOwed1) {
                     bool isAmount0 = posCache.amount0 > 0;
                     (uint256 a0, uint256 a1) = _params.pool.collect(
                         address(this),
@@ -310,19 +257,16 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
 
                     uint256 amountOut;
                     if (isAmount0 ? a1 > 0 : a0 > 0) {
-                        IERC20(isAmount0 ? tki.token1 : tki.token0)
-                            .safeIncreaseAllowance(
-                                address(swapRouter),
-                                isAmount0 ? a1 : a0
-                            );
+                        IERC20(isAmount0 ? tki.token1 : tki.token0).safeIncreaseAllowance(
+                            address(swapRouter), isAmount0 ? a1 : a0
+                        );
 
                         amountOut = swapRouter.exactInputSingle(
-                            ISwapRouter.ExactInputSingleParams({
+                            ISwapRouter02.ExactInputSingleParams({
                                 tokenIn: isAmount0 ? tki.token1 : tki.token0,
                                 tokenOut: isAmount0 ? tki.token0 : tki.token1,
-                                fee: tki.fee,
+                                tickSpacing: tki.tickSpacing,
                                 recipient: address(this),
-                                deadline: block.timestamp,
                                 amountIn: isAmount0 ? a1 : a0,
                                 amountOutMinimum: 0,
                                 sqrtPriceLimitX96: 0
@@ -330,38 +274,24 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
                         );
                     }
 
-                    (
-                        uint128 liquidityFee,
-                        ,
-                        ,
-
-                    ) = EqualizerV3SingleTickLiquidityHandlerV2(address(this))
-                            .addLiquidity(
-                                LiquidityManager.AddLiquidityParams({
-                                    token0: tki.token0,
-                                    token1: tki.token1,
-                                    fee: tki.fee,
-                                    recipient: address(this),
-                                    tickLower: _params.tickLower,
-                                    tickUpper: _params.tickUpper,
-                                    amount0Desired: a0 +
-                                        (isAmount0 ? amountOut : 0),
-                                    amount1Desired: a1 +
-                                        (isAmount0 ? 0 : amountOut),
-                                    amount0Min: a0 +
-                                        (isAmount0 ? amountOut : 0),
-                                    amount1Min: a1 + (isAmount0 ? 0 : amountOut)
-                                })
-                            );
+                    (uint128 liquidityFee,,,) = EqualizerV3SingleTickLiquidityHandlerV2(address(this)).addLiquidity(
+                        LiquidityManager.AddLiquidityParams({
+                            token0: tki.token0,
+                            token1: tki.token1,
+                            tickSpacing: tki.tickSpacing,
+                            recipient: address(this),
+                            tickLower: _params.tickLower,
+                            tickUpper: _params.tickUpper,
+                            amount0Desired: a0 + (isAmount0 ? amountOut : 0),
+                            amount1Desired: a1 + (isAmount0 ? 0 : amountOut),
+                            amount0Min: a0 + (isAmount0 ? amountOut : 0),
+                            amount1Min: a1 + (isAmount0 ? 0 : amountOut)
+                        })
+                    );
                     tki.totalLiquidity += liquidityFee;
 
                     emit LogFeeCompound(
-                        address(this),
-                        _params.pool,
-                        tokenId,
-                        posCache.tickLower,
-                        posCache.tickUpper,
-                        liquidityFee
+                        address(this), _params.pool, tokenId, posCache.tickLower, posCache.tickUpper, liquidityFee
                     );
                 }
             }
@@ -400,54 +330,36 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
      * in either token0 or token1 or both based on the fee collection.
      * @return The number of shares burned.
      */
-    function burnPositionHandler(
-        address context,
-        bytes calldata _burnPositionData
-    ) external whenNotPaused returns (uint256) {
+    function burnPositionHandler(address context, bytes calldata _burnPositionData)
+        external
+        whenNotPaused
+        returns (uint256)
+    {
         onlyWhitelisted();
 
-        BurnPositionParams memory _params = abi.decode(
-            _burnPositionData,
-            (BurnPositionParams)
-        );
+        BurnPositionParams memory _params = abi.decode(_burnPositionData, (BurnPositionParams));
 
         uint256 tokenId = uint256(
-            keccak256(
-                abi.encode(
-                    address(this),
-                    _params.pool,
-                    _params.hook,
-                    _params.tickLower,
-                    _params.tickUpper
-                )
-            )
+            keccak256(abi.encode(address(this), _params.pool, _params.hook, _params.tickLower, _params.tickUpper))
         );
 
         TokenIdInfo storage tki = tokenIds[tokenId];
 
-        BurnPositionCache memory posCache = BurnPositionCache({
-            liquidityToBurn: 0,
-            amount0: 0,
-            amount1: 0
-        });
+        BurnPositionCache memory posCache = BurnPositionCache({liquidityToBurn: 0, amount0: 0, amount1: 0});
+
+        // console.log(tki.totalLiquidity, posCache.liquidityToBurn);
+        // console.log(tki.totalSupply, posCache.shares);
 
         posCache.liquidityToBurn = _convertToAssets(_params.shares, tokenId);
 
-        if ((tki.totalLiquidity - tki.liquidityUsed) < posCache.liquidityToBurn)
-            revert UniswapV3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
+        if ((tki.totalLiquidity - tki.liquidityUsed) < posCache.liquidityToBurn) {
+            revert Equalizer3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
+        }
 
-        (posCache.amount0, posCache.amount1) = _params.pool.burn(
-            _params.tickLower,
-            _params.tickUpper,
-            posCache.liquidityToBurn
-        );
+        (posCache.amount0, posCache.amount1) =
+            _params.pool.burn(_params.tickLower, _params.tickUpper, posCache.liquidityToBurn);
 
-        _feeCalculation(
-            tki,
-            _params.pool,
-            _params.tickLower,
-            _params.tickUpper
-        );
+        _feeCalculation(tki, _params.pool, _params.tickLower, _params.tickUpper);
 
         (uint128 feesOwedToken0, uint128 feesOwedToken1) = _feesTokenOwed(
             _params.tickLower,
@@ -494,24 +406,11 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
      * be burned and they will receive Uniswap V3 fees upto this point.
      * @return The number of shares burned.
      */
-    function reserveLiquidity(
-        bytes calldata _reserveLiquidityParam
-    ) external whenNotPaused returns (uint256) {
-        BurnPositionParams memory _params = abi.decode(
-            _reserveLiquidityParam,
-            (BurnPositionParams)
-        );
+    function reserveLiquidity(bytes calldata _reserveLiquidityParam) external whenNotPaused returns (uint256) {
+        BurnPositionParams memory _params = abi.decode(_reserveLiquidityParam, (BurnPositionParams));
 
         uint256 tokenId = uint256(
-            keccak256(
-                abi.encode(
-                    address(this),
-                    _params.pool,
-                    _params.hook,
-                    _params.tickLower,
-                    _params.tickUpper
-                )
-            )
+            keccak256(abi.encode(address(this), _params.pool, _params.hook, _params.tickLower, _params.tickUpper))
         );
 
         TokenIdInfo storage tki = tokenIds[tokenId];
@@ -520,36 +419,20 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
 
         _params.pool.burn(_params.tickLower, _params.tickUpper, 0);
 
-        _feeCalculation(
-            tki,
-            _params.pool,
-            _params.tickLower,
-            _params.tickUpper
-        );
+        _feeCalculation(tki, _params.pool, _params.tickLower, _params.tickUpper);
 
         (uint128 feesOwedToken0, uint128 feesOwedToken1) = _feesTokenOwed(
-            _params.tickLower,
-            _params.tickUpper,
-            liquidityToBurn,
-            tki.totalLiquidity,
-            tki.tokensOwed0,
-            tki.tokensOwed1
+            _params.tickLower, _params.tickUpper, liquidityToBurn, tki.totalLiquidity, tki.tokensOwed0, tki.tokensOwed1
         );
 
         tki.tokensOwed0 -= feesOwedToken0;
         tki.tokensOwed1 -= feesOwedToken1;
 
         _params.pool.collect(
-            msg.sender,
-            _params.tickLower,
-            _params.tickUpper,
-            uint128(feesOwedToken0),
-            uint128(feesOwedToken1)
+            msg.sender, _params.tickLower, _params.tickUpper, uint128(feesOwedToken0), uint128(feesOwedToken1)
         );
 
-        ReserveLiquidityData storage rld = reservedLiquidityPerUser[tokenId][
-            msg.sender
-        ];
+        ReserveLiquidityData storage rld = reservedLiquidityPerUser[tokenId][msg.sender];
 
         rld.liquidity += liquidityToBurn;
         rld.lastReserve = uint64(block.timestamp);
@@ -585,38 +468,26 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
         uint128 tokensOwed1
     ) private view returns (uint128 feesOwedToken0, uint128 feesOwedToken1) {
         uint256 userLiquidity0 = LiquidityAmounts.getAmount0ForLiquidity(
-            tickLower.getSqrtRatioAtTick(),
-            tickUpper.getSqrtRatioAtTick(),
-            liquidityToBurn
+            tickLower.getSqrtRatioAtTick(), tickUpper.getSqrtRatioAtTick(), liquidityToBurn
         );
 
         uint256 userLiquidity1 = LiquidityAmounts.getAmount1ForLiquidity(
-            tickLower.getSqrtRatioAtTick(),
-            tickUpper.getSqrtRatioAtTick(),
-            liquidityToBurn
+            tickLower.getSqrtRatioAtTick(), tickUpper.getSqrtRatioAtTick(), liquidityToBurn
         );
 
         uint256 totalLiquidity0 = LiquidityAmounts.getAmount0ForLiquidity(
-            tickLower.getSqrtRatioAtTick(),
-            tickUpper.getSqrtRatioAtTick(),
-            totalLiquidity
+            tickLower.getSqrtRatioAtTick(), tickUpper.getSqrtRatioAtTick(), totalLiquidity
         );
 
         uint256 totalLiquidity1 = LiquidityAmounts.getAmount1ForLiquidity(
-            tickLower.getSqrtRatioAtTick(),
-            tickUpper.getSqrtRatioAtTick(),
-            totalLiquidity
+            tickLower.getSqrtRatioAtTick(), tickUpper.getSqrtRatioAtTick(), totalLiquidity
         );
 
         if (totalLiquidity0 > 0) {
-            feesOwedToken0 = uint128(
-                (tokensOwed0 * userLiquidity0) / totalLiquidity0
-            );
+            feesOwedToken0 = uint128((tokensOwed0 * userLiquidity0) / totalLiquidity0);
         }
         if (totalLiquidity1 > 0) {
-            feesOwedToken1 = uint128(
-                (tokensOwed1 * userLiquidity1) / totalLiquidity1
-            );
+            feesOwedToken1 = uint128((tokensOwed1 * userLiquidity1) / totalLiquidity1);
         }
     }
 
@@ -626,59 +497,29 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
      * @dev This can be called by the user directly, it uses msg.sender context. Users can withdraw
      * liquidity if it is available and their cooldown is over.
      */
-    function withdrawReserveLiquidity(
-        bytes calldata _reserveLiquidityParam
-    ) external whenNotPaused {
-        BurnPositionParams memory _params = abi.decode(
-            _reserveLiquidityParam,
-            (BurnPositionParams)
-        );
+    function withdrawReserveLiquidity(bytes calldata _reserveLiquidityParam) external whenNotPaused {
+        BurnPositionParams memory _params = abi.decode(_reserveLiquidityParam, (BurnPositionParams));
 
         uint256 tokenId = uint256(
-            keccak256(
-                abi.encode(
-                    address(this),
-                    _params.pool,
-                    _params.hook,
-                    _params.tickLower,
-                    _params.tickUpper
-                )
-            )
+            keccak256(abi.encode(address(this), _params.pool, _params.hook, _params.tickLower, _params.tickUpper))
         );
 
         TokenIdInfo storage tki = tokenIds[tokenId];
-        ReserveLiquidityData storage rld = reservedLiquidityPerUser[tokenId][
-            msg.sender
-        ];
+        ReserveLiquidityData storage rld = reservedLiquidityPerUser[tokenId][msg.sender];
 
-        if (rld.lastReserve + reserveCooldown > block.timestamp)
-            revert UniswapV3SingleTickLiquidityHandlerV2__BeforeReserveCooldown();
+        if (rld.lastReserve + reserveCooldown > block.timestamp) {
+            revert EqualizerV3SingleTickLiquidityHandlerV2__BeforeReserveCooldown();
+        }
 
-        if (
-            ((tki.totalLiquidity + tki.reservedLiquidity) - tki.liquidityUsed) <
-            _params.shares
-        ) revert UniswapV3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
+        if (((tki.totalLiquidity + tki.reservedLiquidity) - tki.liquidityUsed) < _params.shares) {
+            revert Equalizer3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
+        }
 
-        (uint256 amount0, uint256 amount1) = _params.pool.burn(
-            _params.tickLower,
-            _params.tickUpper,
-            _params.shares
-        );
+        (uint256 amount0, uint256 amount1) = _params.pool.burn(_params.tickLower, _params.tickUpper, _params.shares);
 
-        _params.pool.collect(
-            msg.sender,
-            _params.tickLower,
-            _params.tickUpper,
-            uint128(amount0),
-            uint128(amount1)
-        );
+        _params.pool.collect(msg.sender, _params.tickLower, _params.tickUpper, uint128(amount0), uint128(amount1));
 
-        _feeCalculation(
-            tki,
-            _params.pool,
-            _params.tickLower,
-            _params.tickUpper
-        );
+        _feeCalculation(tki, _params.pool, _params.tickLower, _params.tickUpper);
 
         tki.reservedLiquidity -= _params.shares;
         rld.liquidity -= _params.shares;
@@ -694,60 +535,36 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
      * @return amounts The amounts of the tokens that were unwrapped.
      * @return liquidityUsed The amount of liquidity that was used.
      */
-    function usePositionHandler(
-        bytes calldata _usePositionHandler
-    )
+    function usePositionHandler(bytes calldata _usePositionHandler)
         external
         whenNotPaused
         returns (address[] memory, uint256[] memory, uint256)
     {
         onlyWhitelisted();
 
-        (UsePositionParams memory _params, bytes memory hookData) = abi.decode(
-            _usePositionHandler,
-            (UsePositionParams, bytes)
-        );
+        (UsePositionParams memory _params, bytes memory hookData) =
+            abi.decode(_usePositionHandler, (UsePositionParams, bytes));
 
         uint256 tokenId = uint256(
-            keccak256(
-                abi.encode(
-                    address(this),
-                    _params.pool,
-                    _params.hook,
-                    _params.tickLower,
-                    _params.tickUpper
-                )
-            )
+            keccak256(abi.encode(address(this), _params.pool, _params.hook, _params.tickLower, _params.tickUpper))
         );
 
         TokenIdInfo storage tki = tokenIds[tokenId];
 
-        if (_params.hook != address(0))
+        if (_params.hook != address(0)) {
             IHook(_params.hook).onPositionUse(hookData);
+        }
 
-        if ((tki.totalLiquidity - tki.liquidityUsed) < _params.liquidityToUse)
-            revert UniswapV3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
+        if ((tki.totalLiquidity - tki.liquidityUsed) < _params.liquidityToUse) {
+            revert Equalizer3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
+        }
 
-        (uint256 amount0, uint256 amount1) = _params.pool.burn(
-            _params.tickLower,
-            _params.tickUpper,
-            uint128(_params.liquidityToUse)
-        );
+        (uint256 amount0, uint256 amount1) =
+            _params.pool.burn(_params.tickLower, _params.tickUpper, uint128(_params.liquidityToUse));
 
-        _params.pool.collect(
-            msg.sender,
-            _params.tickLower,
-            _params.tickUpper,
-            uint128(amount0),
-            uint128(amount1)
-        );
+        _params.pool.collect(msg.sender, _params.tickLower, _params.tickUpper, uint128(amount0), uint128(amount1));
 
-        _feeCalculation(
-            tki,
-            _params.pool,
-            _params.tickLower,
-            _params.tickUpper
-        );
+        _feeCalculation(tki, _params.pool, _params.tickLower, _params.tickUpper);
 
         tki.liquidityUsed += _params.liquidityToUse;
 
@@ -770,44 +587,38 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
      * @return amounts The amounts of the tokens that were wrapped.
      * @return liquidityUnused The amount of liquidity that was unused.
      */
-    function unusePositionHandler(
-        bytes calldata _unusePositionData
-    ) external whenNotPaused returns (uint256[] memory, uint256) {
+    function unusePositionHandler(bytes calldata _unusePositionData)
+        external
+        whenNotPaused
+        returns (uint256[] memory, uint256)
+    {
         onlyWhitelisted();
 
-        (UnusePositionParams memory _params, bytes memory hookData) = abi
-            .decode(_unusePositionData, (UnusePositionParams, bytes));
+        (UnusePositionParams memory _params, bytes memory hookData) =
+            abi.decode(_unusePositionData, (UnusePositionParams, bytes));
 
         uint256 tokenId = uint256(
-            keccak256(
-                abi.encode(
-                    address(this),
-                    _params.pool,
-                    _params.hook,
-                    _params.tickLower,
-                    _params.tickUpper
-                )
-            )
+            keccak256(abi.encode(address(this), _params.pool, _params.hook, _params.tickLower, _params.tickUpper))
         );
 
         TokenIdInfo storage tki = tokenIds[tokenId];
 
-        if (_params.hook != address(0))
+        if (_params.hook != address(0)) {
             IHook(_params.hook).onPositionUnUse(hookData);
+        }
 
-        (uint256 amount0, uint256 amount1) = LiquidityAmounts
-            .getAmountsForLiquidity(
-                _getCurrentSqrtPriceX96(_params.pool),
-                _params.tickLower.getSqrtRatioAtTick(),
-                _params.tickUpper.getSqrtRatioAtTick(),
-                uint128(_params.liquidityToUnuse)
-            );
+        (uint256 amount0, uint256 amount1) = LiquidityAmounts.getAmountsForLiquidity(
+            _getCurrentSqrtPriceX96(_params.pool),
+            _params.tickLower.getSqrtRatioAtTick(),
+            _params.tickUpper.getSqrtRatioAtTick(),
+            uint128(_params.liquidityToUnuse)
+        );
 
-        (uint128 liquidity, , , ) = addLiquidity(
+        (uint128 liquidity,,,) = addLiquidity(
             LiquidityManager.AddLiquidityParams({
                 token0: tki.token0,
                 token1: tki.token1,
-                fee: tki.fee,
+                tickSpacing: tki.tickSpacing,
                 recipient: address(this),
                 tickLower: _params.tickLower,
                 tickUpper: _params.tickUpper,
@@ -818,12 +629,7 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
             })
         );
 
-        _feeCalculation(
-            tki,
-            _params.pool,
-            _params.tickLower,
-            _params.tickUpper
-        );
+        _feeCalculation(tki, _params.pool, _params.tickLower, _params.tickUpper);
 
         if (tki.liquidityUsed >= liquidity) {
             tki.liquidityUsed -= liquidity;
@@ -847,40 +653,29 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
      * @return amounts The amounts of the tokens that were donated.
      * @return liquidityDonated The amount of liquidity that was donated.
      */
-    function donateToPosition(
-        bytes calldata _donateData
-    ) external whenNotPaused returns (uint256[] memory, uint256) {
+    function donateToPosition(bytes calldata _donateData) external whenNotPaused returns (uint256[] memory, uint256) {
         onlyWhitelisted();
 
         DonateParams memory _params = abi.decode(_donateData, (DonateParams));
 
         uint256 tokenId = uint256(
-            keccak256(
-                abi.encode(
-                    address(this),
-                    _params.pool,
-                    _params.hook,
-                    _params.tickLower,
-                    _params.tickUpper
-                )
-            )
+            keccak256(abi.encode(address(this), _params.pool, _params.hook, _params.tickLower, _params.tickUpper))
         );
 
         TokenIdInfo storage tki = tokenIds[tokenId];
 
-        (uint256 amount0, uint256 amount1) = LiquidityAmounts
-            .getAmountsForLiquidity(
-                _getCurrentSqrtPriceX96(_params.pool),
-                _params.tickLower.getSqrtRatioAtTick(),
-                _params.tickUpper.getSqrtRatioAtTick(),
-                uint128(_params.liquidityToDonate)
-            );
+        (uint256 amount0, uint256 amount1) = LiquidityAmounts.getAmountsForLiquidity(
+            _getCurrentSqrtPriceX96(_params.pool),
+            _params.tickLower.getSqrtRatioAtTick(),
+            _params.tickUpper.getSqrtRatioAtTick(),
+            uint128(_params.liquidityToDonate)
+        );
 
-        (uint128 liquidity, , , ) = addLiquidity(
+        (uint128 liquidity,,,) = addLiquidity(
             LiquidityManager.AddLiquidityParams({
                 token0: tki.token0,
                 token1: tki.token1,
-                fee: tki.fee,
+                tickSpacing: tki.tickSpacing,
                 recipient: address(this),
                 tickLower: _params.tickLower,
                 tickUpper: _params.tickUpper,
@@ -891,12 +686,7 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
             })
         );
 
-        _feeCalculation(
-            tki,
-            _params.pool,
-            _params.tickLower,
-            _params.tickUpper
-        );
+        _feeCalculation(tki, _params.pool, _params.tickLower, _params.tickUpper);
 
         tki.totalLiquidity += liquidity;
 
@@ -924,40 +714,23 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
      * @param _tickLower The lower tick of the position.
      * @param _tickUpper The upper tick of the position.
      */
-    function _feeCalculation(
-        TokenIdInfo storage _tki,
-        IEqualizerV3Pool _pool,
-        int24 _tickLower,
-        int24 _tickUpper
-    ) internal {
-        bytes32 positionKey = _computePositionKey(
-            address(this),
-            _tickLower,
-            _tickUpper
-        );
-        (
-            ,
-            uint256 feeGrowthInside0LastX128,
-            uint256 feeGrowthInside1LastX128,
-            ,
-
-        ) = _pool.positions(positionKey);
+    function _feeCalculation(TokenIdInfo storage _tki, IUniswapV3Pool _pool, int24 _tickLower, int24 _tickUpper)
+        internal
+    {
+        bytes32 positionKey = _computePositionKey(address(this), _tickLower, _tickUpper);
+        (, uint256 feeGrowthInside0LastX128, uint256 feeGrowthInside1LastX128,,) = _pool.positions(positionKey);
         unchecked {
             _tki.tokensOwed0 += uint128(
                 FullMath.mulDiv(
                     feeGrowthInside0LastX128 - _tki.feeGrowthInside0LastX128,
-                    _tki.totalLiquidity +
-                        _tki.reservedLiquidity -
-                        _tki.liquidityUsed,
+                    _tki.totalLiquidity + _tki.reservedLiquidity - _tki.liquidityUsed,
                     FixedPoint128.Q128
                 )
             );
             _tki.tokensOwed1 += uint128(
                 FullMath.mulDiv(
                     feeGrowthInside1LastX128 - _tki.feeGrowthInside1LastX128,
-                    _tki.totalLiquidity +
-                        _tki.reservedLiquidity -
-                        _tki.liquidityUsed,
+                    _tki.totalLiquidity + _tki.reservedLiquidity - _tki.liquidityUsed,
                     FixedPoint128.Q128
                 )
             );
@@ -972,22 +745,11 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
      * @param _data The encoded position data.
      * @return handlerIdentifierId The handler identifier for the position.
      */
-    function getHandlerIdentifier(
-        bytes calldata _data
-    ) external view returns (uint256 handlerIdentifierId) {
-        (
-            IEqualizerV3Pool pool,
-            address hook,
-            int24 tickLower,
-            int24 tickUpper
-        ) = abi.decode(_data, (IEqualizerV3Pool, address, int24, int24));
+    function getHandlerIdentifier(bytes calldata _data) external view returns (uint256 handlerIdentifierId) {
+        (IUniswapV3Pool pool, address hook, int24 tickLower, int24 tickUpper) =
+            abi.decode(_data, (IUniswapV3Pool, address, int24, int24));
 
-        return
-            uint256(
-                keccak256(
-                    abi.encode(address(this), pool, hook, tickLower, tickUpper)
-                )
-            );
+        return uint256(keccak256(abi.encode(address(this), pool, hook, tickLower, tickUpper)));
     }
 
     /**
@@ -996,9 +758,11 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
      * @return tokens The tokens that need to be pulled.
      * @return amounts The amount of each token that needs to be pulled.
      */
-    function tokensToPullForMint(
-        bytes calldata _mintPositionData
-    ) external view returns (address[] memory, uint256[] memory) {
+    function tokensToPullForMint(bytes calldata _mintPositionData)
+        external
+        view
+        returns (address[] memory, uint256[] memory)
+    {
         return _tokensToPull(_mintPositionData);
     }
 
@@ -1008,9 +772,11 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
      * @return tokens The tokens that need to be pulled.
      * @return amounts The amount of each token that needs to be pulled.
      */
-    function tokensToPullForUnUse(
-        bytes calldata _unusePositionData
-    ) external view returns (address[] memory, uint256[] memory) {
+    function tokensToPullForUnUse(bytes calldata _unusePositionData)
+        external
+        view
+        returns (address[] memory, uint256[] memory)
+    {
         return _tokensToPull(_unusePositionData);
     }
 
@@ -1019,27 +785,23 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
      * @param _donatePosition The encoded donate position data.
      * @return tokens The tokens that need *
      */
-    function tokensToPullForDonate(
-        bytes calldata _donatePosition
-    ) external view returns (address[] memory, uint256[] memory) {
+    function tokensToPullForDonate(bytes calldata _donatePosition)
+        external
+        view
+        returns (address[] memory, uint256[] memory)
+    {
         return _tokensToPull(_donatePosition);
     }
 
-    function _tokensToPull(
-        bytes calldata _positionData
-    ) private view returns (address[] memory, uint256[] memory) {
-        MintPositionParams memory _params = abi.decode(
-            _positionData,
-            (MintPositionParams)
-        );
+    function _tokensToPull(bytes calldata _positionData) private view returns (address[] memory, uint256[] memory) {
+        MintPositionParams memory _params = abi.decode(_positionData, (MintPositionParams));
 
-        (uint256 amount0, uint256 amount1) = LiquidityAmounts
-            .getAmountsForLiquidity(
-                _getCurrentSqrtPriceX96(_params.pool),
-                _params.tickLower.getSqrtRatioAtTick(),
-                _params.tickUpper.getSqrtRatioAtTick(),
-                uint128(_params.liquidity)
-            );
+        (uint256 amount0, uint256 amount1) = LiquidityAmounts.getAmountsForLiquidity(
+            _getCurrentSqrtPriceX96(_params.pool),
+            _params.tickLower.getSqrtRatioAtTick(),
+            _params.tickUpper.getSqrtRatioAtTick(),
+            uint128(_params.liquidity)
+        );
 
         address[] memory tokens = new address[](2);
         tokens[0] = _params.pool.token0();
@@ -1062,9 +824,8 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
 
         if (block.number >= tki.lastDonation + lockedBlockDuration) return 0;
 
-        uint128 donationLocked = tki.donatedLiquidity -
-            (tki.donatedLiquidity * (uint64(block.number) - tki.lastDonation)) /
-            lockedBlockDuration;
+        uint128 donationLocked = tki.donatedLiquidity
+            - (tki.donatedLiquidity * (uint64(block.number) - tki.lastDonation)) / lockedBlockDuration;
 
         return donationLocked;
     }
@@ -1075,10 +836,7 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
      * @param tokenId The tokenId of the position.
      * @return shares The number of shares.
      */
-    function convertToShares(
-        uint128 assets,
-        uint256 tokenId
-    ) external view returns (uint128) {
+    function convertToShares(uint128 assets, uint256 tokenId) external view returns (uint128) {
         return _convertToShares(assets, tokenId);
     }
 
@@ -1088,10 +846,7 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
      * @param tokenId The tokenId of the position.
      * @return assets The amount of assets.
      */
-    function convertToAssets(
-        uint128 shares,
-        uint256 tokenId
-    ) external view returns (uint128) {
+    function convertToAssets(uint128 shares, uint256 tokenId) external view returns (uint128) {
         return _convertToAssets(shares, tokenId);
     }
 
@@ -1101,19 +856,14 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
      * @param tokenId The tokenId of the position.
      * @return shares The number of shares.
      */
-    function _convertToShares(
-        uint128 assets,
-        uint256 tokenId
-    ) internal view returns (uint128) {
-        return
-            uint128(
-                assets.mulDiv(
-                    tokenIds[tokenId].totalSupply,
-                    (tokenIds[tokenId].totalLiquidity + 1) -
-                        _donationLocked(tokenId),
-                    Math.Rounding.Down
-                )
-            );
+    function _convertToShares(uint128 assets, uint256 tokenId) internal view returns (uint128) {
+        return uint128(
+            assets.mulDiv(
+                tokenIds[tokenId].totalSupply,
+                (tokenIds[tokenId].totalLiquidity + 1) - _donationLocked(tokenId),
+                Math.Rounding.Down
+            )
+        );
     }
 
     /**
@@ -1122,19 +872,14 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
      * @param tokenId The tokenId of the position.
      * @return assets The amount of assets.
      */
-    function _convertToAssets(
-        uint128 shares,
-        uint256 tokenId
-    ) internal view returns (uint128) {
-        return
-            uint128(
-                shares.mulDiv(
-                    (tokenIds[tokenId].totalLiquidity + 1) -
-                        _donationLocked(tokenId),
-                    tokenIds[tokenId].totalSupply,
-                    Math.Rounding.Up
-                )
-            );
+    function _convertToAssets(uint128 shares, uint256 tokenId) internal view returns (uint128) {
+        return uint128(
+            shares.mulDiv(
+                (tokenIds[tokenId].totalLiquidity + 1) - _donationLocked(tokenId),
+                tokenIds[tokenId].totalSupply,
+                Math.Rounding.Up
+            )
+        );
     }
 
     /**
@@ -1142,10 +887,8 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
      * @param pool The UniswapV3Pool to get the sqrtPriceX96 from.
      * @return sqrtPriceX96 The current sqrtPriceX96 of the given UniswapV3Pool.
      */
-    function _getCurrentSqrtPriceX96(
-        IEqualizerV3Pool pool
-    ) internal view returns (uint160 sqrtPriceX96) {
-        (sqrtPriceX96, , , , , , ) = pool.slot0();
+    function _getCurrentSqrtPriceX96(IUniswapV3Pool pool) internal view returns (uint160 sqrtPriceX96) {
+        (sqrtPriceX96,,,,,,) = pool.slot0();
     }
 
     /**
@@ -1155,23 +898,18 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
      * @param tickUpper The upper tick of the position.
      * @return positionKey The position key for the given owner, tickLower, and tickUpper.
      */
-    function _computePositionKey(
-        address owner,
-        int24 tickLower,
-        int24 tickUpper
-    ) internal pure returns (bytes32) {
+    function _computePositionKey(address owner, int24 tickLower, int24 tickUpper) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(owner, tickLower, tickUpper));
     }
 
-    function getTokenIdData(
-        uint256 tokenId
-    ) external view returns (TokenIdInfo memory) {
+    function getTokenIdData(uint256 tokenId) external view returns (TokenIdInfo memory) {
         return tokenIds[tokenId];
     }
 
     function onlyWhitelisted() private {
-        if (!whitelistedApps[msg.sender])
-            revert UniswapV3SingleTickLiquidityHandlerV2__NotWhitelisted();
+        if (!whitelistedApps[msg.sender]) {
+            revert EqualizerV3SingleTickLiquidityHandlerV2__NotWhitelisted();
+        }
     }
 
     // admin functions
@@ -1181,10 +919,7 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
      * @param _app The app to update the whitelist status of.
      * @param _status The new whitelist status of the app.
      */
-    function updateWhitelistedApps(
-        address _app,
-        bool _status
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function updateWhitelistedApps(address _app, bool _status) external onlyRole(DEFAULT_ADMIN_ROLE) {
         whitelistedApps[_app] = _status;
         emit LogUpdateWhitelistedApp(_app, _status);
     }
@@ -1194,16 +929,13 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
      * @param _newLockedBlockDuration The new lock block duration.
      * @param _newReserveCooldown The new reserve cooldown.
      */
-    function updateLockedBlockDurationAndReserveCooldown(
-        uint64 _newLockedBlockDuration,
-        uint64 _newReserveCooldown
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function updateLockedBlockDurationAndReserveCooldown(uint64 _newLockedBlockDuration, uint64 _newReserveCooldown)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
         newLockedBlockDuration = _newLockedBlockDuration;
         reserveCooldown = _newReserveCooldown;
-        emit LogUpdatedLockBlockAndReserveCooldownDuration(
-            _newLockedBlockDuration,
-            _newReserveCooldown
-        );
+        emit LogUpdatedLockBlockAndReserveCooldownDuration(_newLockedBlockDuration, _newReserveCooldown);
     }
 
     // SOS admin functions
@@ -1217,23 +949,18 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
      * @param token The token to recover from this pool
      */
     function forceWithdrawUniswapV3LiquidityAndToken(
-        IEqualizerV3Pool pool,
+        IUniswapV3Pool pool,
         int24 tickLower,
         int24 tickUpper,
         uint128 liquidity,
         address token
     ) external onlyRole(SOS_ROLE) {
         if (token != address(0)) {
-            IERC20(token).transfer(
-                msg.sender,
-                IERC20(token).balanceOf(address(this))
-            );
+            IERC20(token).transfer(msg.sender, IERC20(token).balanceOf(address(this)));
             return;
         }
         pool.burn(tickLower, tickUpper, liquidity);
-        (, , , uint128 t0, uint128 t1) = pool.positions(
-            _computePositionKey(address(this), tickLower, tickUpper)
-        );
+        (,,, uint128 t0, uint128 t1) = pool.positions(_computePositionKey(address(this), tickLower, tickUpper));
         pool.collect(msg.sender, tickLower, tickUpper, t0, t1);
     }
 
@@ -1255,9 +982,7 @@ contract EqualizerV3SingleTickLiquidityHandlerV2 is
      * @notice Interface Support
      * @param interfaceId The Id of the interface
      */
-    function supportsInterface(
-        bytes4 interfaceId
-    ) public view override(ERC6909, AccessControl) returns (bool) {
+    function supportsInterface(bytes4 interfaceId) public view override(ERC6909, AccessControl) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
 }

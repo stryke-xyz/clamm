@@ -3,10 +3,10 @@ pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
 
-import {IEqualizerV3Pool} from "../../../src/equalizer-v3/v3-core/contracts/interfaces/IEqualizerV3Pool.sol";
-import {IEqualizerV3Factory} from "../../../src/equalizer-v3/v3-core/contracts/interfaces/IEqualizerV3Factory.sol";
+import {IUniswapV3Pool} from "../../../src/equalizer-v3/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import {IUniswapV3Factory} from "../../../src/equalizer-v3/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 
-import {ISwapRouter} from "v3-periphery/SwapRouter.sol";
+import {ISwapRouter02} from "../../../src/equalizer-v3/v3-periphery/interfaces/ISwapRouter02.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {FixedPoint96} from "@uniswap/v3-core/contracts/libraries/FixedPoint96.sol";
 import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
@@ -32,13 +32,13 @@ import {ERC20Mock} from "../../mocks/ERC20Mock.sol";
 // }
 
 contract EqualizerV3TestLib is Test {
-    IEqualizerV3Factory public immutable factory;
+    IUniswapV3Factory public immutable factory;
     EqualizerV3LiquidityManagement public immutable equalizerV3LiquidityManagement;
-    ISwapRouter public immutable swapRouter;
+    ISwapRouter02 public immutable swapRouter;
 
     struct AddLiquidityStruct {
         address user;
-        IEqualizerV3Pool pool;
+        IUniswapV3Pool pool;
         int24 desiredTickLower;
         int24 desiredTickUpper;
         uint256 desiredAmount0;
@@ -48,7 +48,7 @@ contract EqualizerV3TestLib is Test {
 
     struct RemoveLiquidityStruct {
         address user;
-        IEqualizerV3Pool pool;
+        IUniswapV3Pool pool;
         int24 desiredTickLower;
         int24 desiredTickUpper;
         uint128 liquidity;
@@ -57,7 +57,7 @@ contract EqualizerV3TestLib is Test {
 
     struct SwapParamsStruct {
         address user;
-        IEqualizerV3Pool pool;
+        IUniswapV3Pool pool;
         uint256 amountIn;
         bool zeroForOne;
         bool requireMint;
@@ -65,18 +65,18 @@ contract EqualizerV3TestLib is Test {
 
     struct TeleportParamsStruct {
         address user;
-        IEqualizerV3Pool pool;
+        IUniswapV3Pool pool;
         uint160 targetSqrtPriceX96;
         bool zeroForOne;
     }
 
     constructor(address _factory, address _swapRouter) {
-        factory = IEqualizerV3Factory(_factory);
+        factory = IUniswapV3Factory(_factory);
         equalizerV3LiquidityManagement = new EqualizerV3LiquidityManagement(address(factory));
-        swapRouter = ISwapRouter(_swapRouter);
+        swapRouter = ISwapRouter02(_swapRouter);
     }
 
-    function deployEqualizerV3PoolAndInitializePrice(address token0, address token1, uint24 fee, uint160 sqrtPriceX96)
+    function deployEqualizerV3PoolAndInitializePrice(address token0, address token1, int24 tickSpacing, uint160 sqrtPriceX96)
         public
         returns (address pool)
     {
@@ -84,16 +84,16 @@ contract EqualizerV3TestLib is Test {
             (token0, token1) = (token1, token0);
         }
 
-        pool = factory.createPool(token0, token1, fee);
+        pool = factory.createPool(token0, token1, tickSpacing);
 
-        IEqualizerV3Pool(pool).initialize(sqrtPriceX96);
+        IUniswapV3Pool(pool).initialize(sqrtPriceX96);
     }
 
-    function getCurrentSqrtPriceX96(IEqualizerV3Pool pool) public view returns (uint160 sqrtPriceX96) {
+    function getCurrentSqrtPriceX96(IUniswapV3Pool pool) public view returns (uint160 sqrtPriceX96) {
         (sqrtPriceX96,,,,,,) = pool.slot0();
     }
 
-    function getCurrentTick(IEqualizerV3Pool pool) public view returns (int24 tick) {
+    function getCurrentTick(IUniswapV3Pool pool) public view returns (int24 tick) {
         (, tick,,,,,) = pool.slot0();
     }
 
@@ -101,8 +101,8 @@ contract EqualizerV3TestLib is Test {
         ERC20Mock token0 = ERC20Mock(_params.pool.token0());
         ERC20Mock token1 = ERC20Mock(_params.pool.token1());
 
-        uint160 lower = TickMath.getSqrtRatioAtTick((_params.desiredTickLower / int24(10)) * 10 + 10);
-        uint160 upper = TickMath.getSqrtRatioAtTick((_params.desiredTickUpper / int24(10)) * 10);
+        uint160 lower = TickMath.getSqrtRatioAtTick((_params.desiredTickLower / int24(8)) * 8 + 8);
+        uint160 upper = TickMath.getSqrtRatioAtTick((_params.desiredTickUpper / int24(8)) * 8);
 
         uint256 liquidity0;
         uint256 liquidity1;
@@ -150,10 +150,10 @@ contract EqualizerV3TestLib is Test {
             EqualizerV3LiquidityManagement.AddLiquidityParams({
                 token0: _params.pool.token0(),
                 token1: _params.pool.token1(),
-                fee: _params.pool.fee(),
+                tickSpacing: _params.pool.tickSpacing(),
                 recipient: _params.user,
-                tickLower: (_params.desiredTickLower / int24(10)) * 10 + 10,
-                tickUpper: (_params.desiredTickUpper / int24(10)) * 10,
+                tickLower: (_params.desiredTickLower / int24(8)) * 8 + 8,
+                tickUpper: (_params.desiredTickUpper / int24(8)) * 8,
                 amount0Desired: amount0,
                 amount1Desired: amount1,
                 amount0Min: 0,
@@ -165,8 +165,8 @@ contract EqualizerV3TestLib is Test {
     }
 
     function removeLiquidity(RemoveLiquidityStruct memory _params) public returns (uint256 amount0, uint256 amount1) {
-        int24 tickLower = (_params.desiredTickLower / int24(10)) * 10 + 10;
-        int24 tickUpper = (_params.desiredTickUpper / int24(10)) * 10;
+        int24 tickLower = (_params.desiredTickLower / int24(8)) * 8 + 8;
+        int24 tickUpper = (_params.desiredTickUpper / int24(8)) * 8;
 
         if (_params.liquidity <= 0) {
             (_params.liquidity,,,,) =
@@ -208,13 +208,13 @@ contract EqualizerV3TestLib is Test {
             }
         }
 
+
         (amountOut) = swapRouter.exactInputSingle(
-            ISwapRouter.ExactInputSingleParams({
+            ISwapRouter02.ExactInputSingleParams({
                 tokenIn: _params.zeroForOne ? _params.pool.token0() : _params.pool.token1(),
                 tokenOut: _params.zeroForOne ? _params.pool.token1() : _params.pool.token0(),
-                fee: _params.pool.fee(),
+                tickSpacing: _params.pool.tickSpacing(),
                 recipient: _params.user,
-                deadline: block.timestamp + 5 days,
                 amountIn: _params.amountIn,
                 amountOutMinimum: 0,
                 sqrtPriceLimitX96: 0
@@ -245,12 +245,11 @@ contract EqualizerV3TestLib is Test {
         }
 
         (amountOut) = swapRouter.exactInputSingle(
-            ISwapRouter.ExactInputSingleParams({
+            ISwapRouter02.ExactInputSingleParams({
                 tokenIn: _params.zeroForOne ? _params.pool.token0() : _params.pool.token1(),
                 tokenOut: _params.zeroForOne ? _params.pool.token1() : _params.pool.token0(),
-                fee: _params.pool.fee(),
+                tickSpacing: _params.pool.tickSpacing(),
                 recipient: _params.user,
-                deadline: block.timestamp + 5 days,
                 amountIn: amountIn,
                 amountOutMinimum: 0,
                 sqrtPriceLimitX96: 0

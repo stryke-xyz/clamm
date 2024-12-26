@@ -4,7 +4,8 @@ pragma solidity ^0.8.0;
 /// @title Pool state that can change
 /// @notice These methods compose the pool's state, and can change with any frequency including multiple times
 /// per transaction
-interface IEqualizerV3PoolState {
+
+interface IUniswapV3PoolState {
     /// @notice The 0th storage slot in the pool stores many values, and is exposed as a single method to save gas
     /// when accessed externally.
     /// @return sqrtPriceX96 The current price of the pool as a sqrt(token1/token0) Q64.96 value
@@ -113,4 +114,8 @@ interface IEqualizerV3PoolState {
             uint160 secondsPerLiquidityCumulativeX128,
             bool initialized
         );
+
+    /// @notice The pool's fee in hundredths of a bip, i.e. 1e-6
+    /// @return The fee
+    function fee() external view returns (uint24);
 }

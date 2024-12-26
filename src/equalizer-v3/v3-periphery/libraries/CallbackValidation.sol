@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.0;
 
-import "../../v3-core/contracts/interfaces/IEqualizerV3Pool.sol";
+import "../../v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import "./PoolAddress.sol";
 
 /// @notice Provides validation for callbacks from Uniswap V3 Pools
@@ -10,14 +10,14 @@ library CallbackValidation {
     /// @param factory The contract address of the Uniswap V3 factory
     /// @param tokenA The contract address of either token0 or token1
     /// @param tokenB The contract address of the other token
-    /// @param fee The fee collected upon every swap in the pool, denominated in hundredths of a bip
+    /// @param _tickSpacing The fee collected upon every swap in the pool, denominated in hundredths of a bip
     /// @return pool The V3 pool contract address
-    function verifyCallback(address factory, address tokenA, address tokenB, uint24 fee)
+    function verifyCallback(address factory, address tokenA, address tokenB, int24 _tickSpacing)
         internal
         view
-        returns (IEqualizerV3Pool pool)
+        returns (IUniswapV3Pool pool)
     {
-        return verifyCallback(factory, PoolAddress.getPoolKey(tokenA, tokenB, fee));
+        return verifyCallback(factory, PoolAddress.getPoolKey(tokenA, tokenB, _tickSpacing));
     }
 
     /// @notice Returns the address of a valid Uniswap V3 Pool
@@ -27,9 +27,9 @@ library CallbackValidation {
     function verifyCallback(address factory, PoolAddress.PoolKey memory poolKey)
         internal
         view
-        returns (IEqualizerV3Pool pool)
+        returns (IUniswapV3Pool pool)
     {
-        pool = IEqualizerV3Pool(PoolAddress.computeAddress(factory, poolKey));
+        pool = IUniswapV3Pool(PoolAddress.computeAddress(factory, poolKey));
         require(msg.sender == address(pool));
     }
 }

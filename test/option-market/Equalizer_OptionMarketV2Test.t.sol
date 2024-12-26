@@ -4,8 +4,9 @@ pragma solidity ^0.8.13;
 import "forge-std/Test.sol";
 
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
-import {IEqualizerV3Pool} from "../../src/equalizer-v3/v3-core/contracts/interfaces/IEqualizerV3Pool.sol";
-import {IEqualizerV3Factory} from "../../src/equalizer-v3/v3-core/contracts/interfaces/IEqualizerV3Factory.sol";
+import {IUniswapV3Pool as IEqualizerV3Pool} from
+    "../../src/equalizer-v3/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import {IUniswapV3Factory} from "../../src/equalizer-v3/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 
 import {EqualizerV3TestLib} from "../utils/equalizer-v3/EqualizerV3TestLib.sol";
 import {ERC20Mock} from "../mocks/ERC20Mock.sol";
@@ -19,13 +20,13 @@ import {DopexV2OptionMarketV2} from "../../src/DopexV2OptionMarketV2.sol";
 
 import {OptionPricingV2} from "../../src/pricing/OptionPricingV2.sol";
 import {DopexV2ClammFeeStrategyV2} from "../../src/pricing/fees/DopexV2ClammFeeStrategyV2.sol";
-import {SwapRouterSwapper} from "../../src/swapper/SwapRouterSwapper.sol";
+import {SwapRouter02Swapper} from "../../src/equalizer-v3/SwapRouter02Swapper.sol";
 import {AutoExerciseTimeBased} from "../../src/periphery/AutoExerciseTimeBased.sol";
 
 import {IOptionPricingV2} from "../../src/pricing/IOptionPricingV2.sol";
 import {IHandler} from "../../src/interfaces/IHandler.sol";
 import {ISwapper} from "../../src/interfaces/ISwapper.sol";
-import {SwapRouter, ISwapRouter} from "../../src/equalizer-v3/v3-periphery/SwapRouter.sol";
+import {ISwapRouter02} from "../../src/equalizer-v3/v3-periphery/interfaces/ISwapRouter02.sol";
 import {IOptionMarket} from "../../src/interfaces/IOptionMarket.sol";
 
 contract Equalizer_OptionMarketV2Test is Test {
@@ -38,23 +39,23 @@ contract Equalizer_OptionMarketV2Test is Test {
     ERC20Mock token1;
 
     EqualizerV3TestLib equalizerV3TestLib;
-    IUniswapV3Pool pool;
+    IEqualizerV3Pool pool;
 
     OptionPricingV2 op;
-    SwapRouterSwapper srs;
+    SwapRouter02Swapper srs;
 
-    address swapRouter;
+    address v3factory = 0x7Ca1dCCFB4f49564b8f13E18a67747fd428F1C40;
 
-    address v3factory = 0xE6dA85feb3B4E0d6AEd95c41a125fba859bB9d24;
+    ISwapRouter02 swapRouter = ISwapRouter02(0xE4Ba08712C404042b8EEfC3fdF3b603c977500dF);
 
-    uint24 fee = 500;
+    int24 tickSpacing = 8;
 
     uint160 initSqrtPriceX96 = 1771845812700903892492222464; // 1 ETH = 2000 LUSD
 
-    int24 tickLowerCalls = -76260; // ~2050
-    int24 tickUpperCalls = -76250; // ~2048
+    int24 tickLowerCalls = -76264; // ~2050
+    int24 tickUpperCalls = -76256; // ~2048
 
-    int24 tickLowerPuts = -75770; // ~1950
+    int24 tickLowerPuts = -75768; // ~1950
     int24 tickUpperPuts = -75760; // ~1952
 
     uint256 premiumAmountCalls = 100;
@@ -82,32 +83,29 @@ contract Equalizer_OptionMarketV2Test is Test {
     AutoExerciseTimeBased autoExercise;
 
     function setUp() public {
-        vm.createSelectFork(vm.envString("FANTOM_RPC_URL"), 98384099);
-        // vm.warp(1693352493);
+        vm.createSelectFork(vm.envString("SONIC_RPC_URL"), 606919);
 
         ETH = address(new ERC20Mock());
         LUSD = address(new ERC20Mock());
 
-        swapRouter = address(new SwapRouter(v3factory, address(0)));
+        equalizerV3TestLib = new EqualizerV3TestLib(v3factory, address(swapRouter));
 
-        equalizerV3TestLib = new EqualizerV3TestLib(v3factory, swapRouter);
-        pool =
-            IUniswapV3Pool(equalizerV3TestLib.deployEqualizerV3PoolAndInitializePrice(ETH, LUSD, fee, initSqrtPriceX96));
+        pool = IEqualizerV3Pool(
+            equalizerV3TestLib.deployEqualizerV3PoolAndInitializePrice(ETH, LUSD, tickSpacing, initSqrtPriceX96)
+        );
 
         token0 = ERC20Mock(pool.token0());
         token1 = ERC20Mock(pool.token1());
 
         positionManager = new DopexV2PositionManager();
 
-        handler = new EqualizerV3SingleTickLiquidityHandlerV2(
-            v3factory, 0x01795efa243dc58f09de9b7c1fa74e72352806f279d62f49ef19e11c42a98292, swapRouter
-        );
+        handler = new EqualizerV3SingleTickLiquidityHandlerV2(v3factory, address(swapRouter));
 
         positionManagerHarness =
             new EqualizerV3SingleTickLiquidityHarnessV2(equalizerV3TestLib, positionManager, handler);
 
         op = new OptionPricingV2(500, 1e8);
-        srs = new SwapRouterSwapper(address(equalizerV3TestLib.swapRouter()));
+        srs = new SwapRouter02Swapper(address(equalizerV3TestLib.swapRouter()));
 
         feeStrategy = new DopexV2ClammFeeStrategyV2();
 
@@ -134,8 +132,8 @@ contract Equalizer_OptionMarketV2Test is Test {
             EqualizerV3TestLib.AddLiquidityStruct({
                 user: alice,
                 pool: IEqualizerV3Pool(address(pool)),
-                desiredTickLower: -78245, // 2500
-                desiredTickUpper: -73136, // 1500
+                desiredTickLower: -78240, // 2500
+                desiredTickUpper: -73128, // 1500
                 desiredAmount0: 5_000_000e18,
                 desiredAmount1: 0,
                 requireMint: true
@@ -160,8 +158,8 @@ contract Equalizer_OptionMarketV2Test is Test {
             token1,
             0,
             5e18,
-            -76260, // ~2050,
-            -76250, // ~2048,
+            tickLowerCalls, // ~2050,
+            tickUpperCalls, // ~2048,
             IEqualizerV3Pool(address(pool)),
             hook,
             bob
@@ -172,8 +170,8 @@ contract Equalizer_OptionMarketV2Test is Test {
             token1,
             0,
             5e18,
-            -76260, // ~2050,
-            -76250, // ~2048,
+            tickLowerCalls, // ~2050,
+            tickUpperCalls, // ~2048,
             IEqualizerV3Pool(address(pool)),
             hook,
             jason
@@ -185,8 +183,8 @@ contract Equalizer_OptionMarketV2Test is Test {
             token1,
             10_000e18,
             0,
-            -75770, // ~1950,
-            -75760, // ~1952,
+            tickLowerPuts, // ~1950,
+            tickUpperPuts, // ~1952,
             IEqualizerV3Pool(address(pool)),
             hook,
             bob
@@ -197,8 +195,8 @@ contract Equalizer_OptionMarketV2Test is Test {
             token1,
             10_000e18,
             0,
-            -75770, // ~1950,
-            -75760, // ~1952,
+            tickLowerPuts, // ~1950,
+            tickUpperPuts, // ~1952,
             IEqualizerV3Pool(address(pool)),
             hook,
             jason
@@ -214,8 +212,8 @@ contract Equalizer_OptionMarketV2Test is Test {
         uint256 _premiumAmountCalls = optionMarket.getPremiumAmount(
             false,
             block.timestamp + 20 minutes,
-            optionMarket.getPricePerCallAssetViaTick(pool, tickUpperCalls),
-            optionMarket.getCurrentPricePerCallAsset(pool),
+            optionMarket.getPricePerCallAssetViaTick(IUniswapV3Pool(address(pool)), tickUpperCalls),
+            optionMarket.getCurrentPricePerCallAsset(IUniswapV3Pool(address(pool))),
             5e18
         );
 
@@ -228,7 +226,7 @@ contract Equalizer_OptionMarketV2Test is Test {
 
         opTicks[0] = DopexV2OptionMarketV2.OptionTicks({
             _handler: handler,
-            pool: pool,
+            pool: IUniswapV3Pool(address(pool)),
             hook: hook,
             tickLower: tickLowerCalls,
             tickUpper: tickUpperCalls,
@@ -268,9 +266,9 @@ contract Equalizer_OptionMarketV2Test is Test {
         uint256 _premiumAmountPuts = optionMarket.getPremiumAmount(
             true,
             block.timestamp + 20 minutes,
-            optionMarket.getPricePerCallAssetViaTick(pool, tickLowerPuts),
-            optionMarket.getCurrentPricePerCallAsset(pool),
-            (10_000e18 * 1e18) / optionMarket.getPricePerCallAssetViaTick(pool, tickLowerPuts)
+            optionMarket.getPricePerCallAssetViaTick(IUniswapV3Pool(address(pool)), tickLowerPuts),
+            optionMarket.getCurrentPricePerCallAsset(IUniswapV3Pool(address(pool))),
+            (10_000e18 * 1e18) / optionMarket.getPricePerCallAssetViaTick(IUniswapV3Pool(address(pool)), tickLowerPuts)
         );
 
         uint256 _fee = optionMarket.getFee(0, _premiumAmountPuts);
@@ -282,7 +280,7 @@ contract Equalizer_OptionMarketV2Test is Test {
 
         opTicks[0] = DopexV2OptionMarketV2.OptionTicks({
             _handler: handler,
-            pool: pool,
+            pool: IUniswapV3Pool(address(pool)),
             hook: hook,
             tickLower: tickLowerPuts,
             tickUpper: tickUpperPuts,
@@ -326,8 +324,8 @@ contract Equalizer_OptionMarketV2Test is Test {
         uint256 _premiumAmountCalls = optionMarket.getPremiumAmount(
             false,
             block.timestamp + 20 minutes,
-            optionMarket.getPricePerCallAssetViaTick(pool, tickUpperCalls),
-            optionMarket.getCurrentPricePerCallAsset(pool),
+            optionMarket.getPricePerCallAssetViaTick(IUniswapV3Pool(address(pool)), tickUpperCalls),
+            optionMarket.getCurrentPricePerCallAsset(IUniswapV3Pool(address(pool))),
             9e18
         );
 
@@ -340,7 +338,7 @@ contract Equalizer_OptionMarketV2Test is Test {
 
         opTicks[0] = DopexV2OptionMarketV2.OptionTicks({
             _handler: handler,
-            pool: pool,
+            pool: IUniswapV3Pool(address(pool)),
             hook: hook,
             tickLower: tickLowerCalls,
             tickUpper: tickUpperCalls,
@@ -349,7 +347,7 @@ contract Equalizer_OptionMarketV2Test is Test {
 
         opTicks[1] = DopexV2OptionMarketV2.OptionTicks({
             _handler: handler,
-            pool: pool,
+            pool: IUniswapV3Pool(address(pool)),
             hook: hook,
             tickLower: tickLowerCalls,
             tickUpper: tickUpperCalls,
@@ -391,8 +389,8 @@ contract Equalizer_OptionMarketV2Test is Test {
         liquidityToExercise[1] = 0;
 
         bytes[] memory swapDatas = new bytes[](len);
-        swapDatas[0] = abi.encode(pool.fee(), 0);
-        swapDatas[1] = abi.encode(pool.fee(), 0);
+        swapDatas[0] = abi.encode(pool.tickSpacing(), 0);
+        swapDatas[1] = abi.encode(pool.tickSpacing(), 0);
 
         ISwapper[] memory swappers = new ISwapper[](len);
         swappers[0] = srs;
@@ -426,8 +424,8 @@ contract Equalizer_OptionMarketV2Test is Test {
         uint256 _premiumAmountCalls = optionMarket.getPremiumAmount(
             false,
             block.timestamp + 20 minutes,
-            optionMarket.getPricePerCallAssetViaTick(pool, tickUpperCalls),
-            optionMarket.getCurrentPricePerCallAsset(pool),
+            optionMarket.getPricePerCallAssetViaTick(IUniswapV3Pool(address(pool)), tickUpperCalls),
+            optionMarket.getCurrentPricePerCallAsset(IUniswapV3Pool(address(pool))),
             9e18
         );
 
@@ -440,7 +438,7 @@ contract Equalizer_OptionMarketV2Test is Test {
 
         opTicks[0] = DopexV2OptionMarketV2.OptionTicks({
             _handler: handler,
-            pool: pool,
+            pool: IUniswapV3Pool(address(pool)),
             hook: hook,
             tickLower: tickLowerCalls,
             tickUpper: tickUpperCalls,
@@ -449,7 +447,7 @@ contract Equalizer_OptionMarketV2Test is Test {
 
         opTicks[1] = DopexV2OptionMarketV2.OptionTicks({
             _handler: handler,
-            pool: pool,
+            pool: IUniswapV3Pool(address(pool)),
             hook: hook,
             tickLower: tickLowerCalls,
             tickUpper: tickUpperCalls,
@@ -491,8 +489,8 @@ contract Equalizer_OptionMarketV2Test is Test {
         liquidityToSettle[1] = 0;
 
         bytes[] memory swapDatas = new bytes[](len);
-        swapDatas[0] = abi.encode(pool.fee(), 0);
-        swapDatas[1] = abi.encode(pool.fee(), 0);
+        swapDatas[0] = abi.encode(pool.tickSpacing(), 0);
+        swapDatas[1] = abi.encode(pool.tickSpacing(), 0);
 
         ISwapper[] memory swappers = new ISwapper[](len);
         swappers[0] = srs;
@@ -542,7 +540,7 @@ contract Equalizer_OptionMarketV2Test is Test {
         liquidityToExercise[0] = liquidityToUse;
 
         bytes[] memory swapDatas = new bytes[](len);
-        swapDatas[0] = abi.encode(pool.fee(), 0);
+        swapDatas[0] = abi.encode(pool.tickSpacing(), 0);
 
         ISwapper[] memory swappers = new ISwapper[](len);
         swappers[0] = srs;
@@ -592,7 +590,7 @@ contract Equalizer_OptionMarketV2Test is Test {
         liquidityToExercise[0] = liquidityToUse;
 
         bytes[] memory swapDatas = new bytes[](len);
-        swapDatas[0] = abi.encode(pool.fee(), 0);
+        swapDatas[0] = abi.encode(pool.tickSpacing(), 0);
 
         ISwapper[] memory swappers = new ISwapper[](len);
         swappers[0] = srs;
@@ -632,7 +630,7 @@ contract Equalizer_OptionMarketV2Test is Test {
         liquidityToSettle[0] = liquidityToUse;
 
         bytes[] memory swapDatas = new bytes[](len);
-        swapDatas[0] = abi.encode(pool.fee(), 0);
+        swapDatas[0] = abi.encode(pool.tickSpacing(), 0);
 
         ISwapper[] memory swappers = new ISwapper[](len);
         swappers[0] = srs;
@@ -670,7 +668,7 @@ contract Equalizer_OptionMarketV2Test is Test {
         liquidityToSettle[0] = liquidityToUse;
 
         bytes[] memory swapDatas = new bytes[](len);
-        swapDatas[0] = abi.encode(pool.fee(), 0);
+        swapDatas[0] = abi.encode(pool.tickSpacing(), 0);
 
         ISwapper[] memory swappers = new ISwapper[](len);
         swappers[0] = srs;
@@ -717,7 +715,7 @@ contract Equalizer_OptionMarketV2Test is Test {
         liquidityToSettle[0] = liquidityToUse;
 
         bytes[] memory swapDatas = new bytes[](len);
-        swapDatas[0] = abi.encode(pool.fee(), 0);
+        swapDatas[0] = abi.encode(pool.tickSpacing(), 0);
 
         ISwapper[] memory swappers = new ISwapper[](len);
         swappers[0] = srs;
@@ -766,7 +764,7 @@ contract Equalizer_OptionMarketV2Test is Test {
         liquidityToSettle[0] = liquidityToUse;
 
         bytes[] memory swapDatas = new bytes[](len);
-        swapDatas[0] = abi.encode(pool.fee(), 0);
+        swapDatas[0] = abi.encode(pool.tickSpacing(), 0);
 
         ISwapper[] memory swappers = new ISwapper[](len);
         swappers[0] = srs;
@@ -827,7 +825,7 @@ contract Equalizer_OptionMarketV2Test is Test {
         liquidityToSettle[0] = liquidityToUse;
 
         bytes[] memory swapDatas = new bytes[](len);
-        swapDatas[0] = abi.encode(pool.fee(), 0);
+        swapDatas[0] = abi.encode(pool.tickSpacing(), 0);
 
         ISwapper[] memory swappers = new ISwapper[](len);
         swappers[0] = srs;
@@ -897,7 +895,7 @@ contract Equalizer_OptionMarketV2Test is Test {
         liquidityToSettle[0] = liquidityToUse;
 
         bytes[] memory swapDatas = new bytes[](len);
-        swapDatas[0] = abi.encode(pool.fee(), 0);
+        swapDatas[0] = abi.encode(pool.tickSpacing(), 0);
 
         ISwapper[] memory swappers = new ISwapper[](len);
         swappers[0] = srs;
@@ -999,7 +997,7 @@ contract Equalizer_OptionMarketV2Test is Test {
         liquidityToExercise[0] = liquidityToUse;
 
         bytes[] memory swapDatas = new bytes[](len);
-        swapDatas[0] = abi.encode(pool.fee(), 0);
+        swapDatas[0] = abi.encode(pool.tickSpacing(), 0);
 
         ISwapper[] memory swappers = new ISwapper[](len);
         swappers[0] = srs;

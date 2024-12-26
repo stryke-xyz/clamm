@@ -3,10 +3,10 @@ pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
 
-import {IEqualizerV3Factory} from "../../../src/equalizer-v3/v3-core/contracts/interfaces/IEqualizerV3Factory.sol";
-import {IEqualizerV3MintCallback} from
-    "../../../src/equalizer-v3/v3-core/contracts/interfaces/callback/IEqualizerV3MintCallback.sol";
-import "../../../src/equalizer-v3/v3-core/contracts/interfaces/IEqualizerV3Pool.sol";
+import {IUniswapV3Factory} from "../../../src/equalizer-v3/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+import {IUniswapV3MintCallback} from
+    "../../../src/equalizer-v3/v3-core/contracts/interfaces/callback/IUniswapV3MintCallback.sol";
+import "../../../src/equalizer-v3/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 
 import "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import "v3-periphery/libraries/LiquidityAmounts.sol";
@@ -16,7 +16,7 @@ import {CallbackValidation} from "../../../src/equalizer-v3/v3-periphery/librari
 
 /// @title Liquidity management functions
 /// @notice Internal functions for safely managing liquidity in Uniswap V3
-contract EqualizerV3LiquidityManagement is IEqualizerV3MintCallback {
+contract EqualizerV3LiquidityManagement is IUniswapV3MintCallback {
     address public immutable factory;
 
     constructor(address _factory) {
@@ -28,7 +28,7 @@ contract EqualizerV3LiquidityManagement is IEqualizerV3MintCallback {
         address payer;
     }
 
-    /// @inheritdoc IEqualizerV3MintCallback
+    /// @inheritdoc IUniswapV3MintCallback
     function uniswapV3MintCallback(uint256 amount0Owed, uint256 amount1Owed, bytes calldata data) external override {
         MintCallbackData memory decoded = abi.decode(data, (MintCallbackData));
         CallbackValidation.verifyCallback(factory, decoded.poolKey);
@@ -44,7 +44,7 @@ contract EqualizerV3LiquidityManagement is IEqualizerV3MintCallback {
     struct AddLiquidityParams {
         address token0;
         address token1;
-        uint24 fee;
+        int24 tickSpacing;
         address recipient;
         int24 tickLower;
         int24 tickUpper;
@@ -57,12 +57,12 @@ contract EqualizerV3LiquidityManagement is IEqualizerV3MintCallback {
     /// @notice Add liquidity to an initialized pool
     function addLiquidity(AddLiquidityParams memory params)
         external
-        returns (uint128 liquidity, uint256 amount0, uint256 amount1, IEqualizerV3Pool pool)
+        returns (uint128 liquidity, uint256 amount0, uint256 amount1, IUniswapV3Pool pool)
     {
         PoolAddress.PoolKey memory poolKey =
-            PoolAddress.PoolKey({token0: params.token0, token1: params.token1, fee: params.fee});
+            PoolAddress.PoolKey({token0: params.token0, token1: params.token1, tickSpacing: params.tickSpacing});
 
-        pool = IEqualizerV3Pool(PoolAddress.computeAddress(factory, poolKey));
+        pool = IUniswapV3Pool(PoolAddress.computeAddress(factory, poolKey));
 
         // compute the liquidity amount
         {

@@ -1,31 +1,34 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-pragma solidity ^0.8.0;
+pragma solidity >=0.7.6;
 
-import "../../v3-core/contracts/interfaces/IEqualizerV3Factory.sol";
+import "../../v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 
 /// @title Provides functions for deriving a pool address from the factory, tokens, and the fee
 library PoolAddress {
     /// @notice The identifying key of the pool
+    /// @dev salt hash based on tickSpacing (constant) instead of on fees (variable)
     struct PoolKey {
         address token0;
         address token1;
-        uint24 fee;
+        int24 tickSpacing;
     }
 
     /// @notice Returns PoolKey: the ordered tokens with the matched fee levels
     /// @param tokenA The first token of a pool, unsorted
     /// @param tokenB The second token of a pool, unsorted
-    /// @param fee The fee level of the pool
+    /// @param _tickSpacing The tickSpacing of the pool
     /// @return Poolkey The pool details with ordered token0 and token1 assignments
-    function getPoolKey(address tokenA, address tokenB, uint24 fee) internal pure returns (PoolKey memory) {
+    /// @dev salt hash based on tickSpacing (constant) instead of on fees (variable)
+    function getPoolKey(address tokenA, address tokenB, int24 _tickSpacing) internal pure returns (PoolKey memory) {
         if (tokenA > tokenB) (tokenA, tokenB) = (tokenB, tokenA);
-        return PoolKey({token0: tokenA, token1: tokenB, fee: fee});
+        return PoolKey({token0: tokenA, token1: tokenB, tickSpacing: _tickSpacing});
     }
 
     /// @notice Deterministically computes the pool address given the factory and PoolKey
     /// @param factory The Uniswap V3 factory contract address
     /// @param key The PoolKey
     /// @return pool The contract address of the V3 pool
+    /// @dev salt hash based on tickSpacing (constant) instead of on fees (variable)
     function computeAddress(address factory, PoolKey memory key) internal view returns (address pool) {
         require(key.token0 < key.token1);
         pool = address(
@@ -35,8 +38,8 @@ library PoolAddress {
                         abi.encodePacked(
                             hex"ff",
                             factory,
-                            keccak256(abi.encode(key.token0, key.token1, key.fee)),
-                            IEqualizerV3Factory(factory).POOL_INIT_CODE_HASH()
+                            keccak256(abi.encode(key.token0, key.token1, key.tickSpacing)),
+                            IUniswapV3Factory(factory).POOL_INIT_CODE_HASH()
                         )
                     )
                 )

@@ -3,8 +3,8 @@ pragma solidity ^0.8.0;
 
 /// @title Pool state that never changes
 /// @notice These parameters are fixed for a pool forever, i.e., the methods will always return the same values
-interface IEqualizerV3PoolImmutables {
-    /// @notice The contract that deployed the pool, which must adhere to the IEqualizerV3Factory interface
+interface IUniswapV3PoolImmutables {
+    /// @notice The contract that deployed the pool, which must adhere to the IUniswapV3Factory interface
     /// @return The contract address
     function factory() external view returns (address);
 
@@ -16,9 +16,9 @@ interface IEqualizerV3PoolImmutables {
     /// @return The token contract address
     function token1() external view returns (address);
 
-    /// @notice The pool's fee in hundredths of a bip, i.e. 1e-6
-    /// @return The fee
-    function fee() external view returns (uint24);
+    ////// @notice The pool's fee in hundredths of a bip, i.e. 1e-6
+    ////// @return The fee
+    ///function fee() external view returns (uint24);
 
     /// @notice The pool tick spacing
     /// @dev Ticks can only be used at multiples of this value, minimum of 1 and always positive

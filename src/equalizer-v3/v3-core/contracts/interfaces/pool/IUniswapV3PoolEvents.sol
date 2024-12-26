@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 /// @title Events emitted by a pool
 /// @notice Contains all events emitted by the pool
-interface IEqualizerV3PoolEvents {
+interface IUniswapV3PoolEvents {
     /// @notice Emitted exactly once by a pool when #initialize is first called on the pool
     /// @dev Mint/Burn/Swap cannot be emitted by the pool before Initialize
     /// @param sqrtPriceX96 The initial sqrt price of the pool, as a Q64.96
@@ -108,6 +108,11 @@ interface IEqualizerV3PoolEvents {
     /// @param feeProtocolOld The previous value of the token0 protocol fee
     /// @param feeProtocolNew The updated value of the token1 protocol fee
     event SetFeeProtocol(uint8 feeProtocolOld, uint8 feeProtocolNew);
+
+    /// @notice Emitted when the protocol fee is changed by the pool
+    /// @param feeOld The previous value of the token0 protocol fee
+    /// @param feeNew The updated value of the token1 protocol fee
+    event SetSwapFee(uint24 feeOld, uint24 feeNew);
 
     /// @notice Emitted when the collected protocol fees are withdrawn by the factory owner
     /// @param sender The address that collects the protocol fees

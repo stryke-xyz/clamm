@@ -7,9 +7,9 @@ import {EqualizerV3TestLib} from "../utils/equalizer-v3/EqualizerV3TestLib.sol";
 import {ERC20Mock} from "../mocks/ERC20Mock.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
-import {SwapRouter} from "../../src/equalizer-v3/v3-periphery/SwapRouter.sol";
+import {ISwapRouter02} from "../../src/equalizer-v3/v3-periphery/interfaces/ISwapRouter02.sol";
 
-import {IEqualizerV3Pool} from "../../src/equalizer-v3/v3-core/contracts/interfaces/IEqualizerV3Pool.sol";
+import {IUniswapV3Pool} from "../../src/equalizer-v3/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {DopexV2PositionManager} from "../../src/DopexV2PositionManager.sol";
 import {EqualizerV3SingleTickLiquidityHarnessV2} from "../harness/EqualizerV3SingleTickLiquidityHarnessV2.sol";
 import {EqualizerV3SingleTickLiquidityHandlerV2} from "../../src/handlers/EqualizerV3SingleTickLiquidityHandlerV2.sol";
@@ -20,15 +20,15 @@ contract EqualizerSingleTickLiquidityHandlerV2_Test is Test {
     address ETH; // token1
     address LUSD; // token0
 
-    address v3factory = 0xE6dA85feb3B4E0d6AEd95c41a125fba859bB9d24;
+    address v3factory = 0x7Ca1dCCFB4f49564b8f13E18a67747fd428F1C40;
 
     ERC20Mock token0;
     ERC20Mock token1;
 
     EqualizerV3TestLib equalizerV3TestLib;
-    IEqualizerV3Pool pool;
+    IUniswapV3Pool pool;
 
-    uint24 fee = 500;
+    int24 tickSpacing = 8;
 
     uint160 initSqrtPriceX96 = 1771845812700903892492222464; // 1 FTM = 2000 LUSD
 
@@ -44,23 +44,21 @@ contract EqualizerSingleTickLiquidityHandlerV2_Test is Test {
     EqualizerV3SingleTickLiquidityHarnessV2 positionManagerHarness;
     EqualizerV3SingleTickLiquidityHandlerV2 equalizerV3Handler;
 
-    address swapRouter;
+    ISwapRouter02 swapRouter = ISwapRouter02(0xE4Ba08712C404042b8EEfC3fdF3b603c977500dF);
 
     address hook = address(0);
     bytes hookData = new bytes(0);
 
     function setUp() public {
-        vm.createSelectFork(vm.envString("FANTOM_RPC_URL"), 98384099);
-
-        swapRouter = address(new SwapRouter(v3factory, address(0)));
+        vm.createSelectFork(vm.envString("SONIC_RPC_URL"), 606919);
 
         ETH = address(new ERC20Mock());
         LUSD = address(new ERC20Mock());
 
-        equalizerV3TestLib = new EqualizerV3TestLib(v3factory, swapRouter);
+        equalizerV3TestLib = new EqualizerV3TestLib(v3factory, address(swapRouter));
 
-        pool = IEqualizerV3Pool(
-            equalizerV3TestLib.deployEqualizerV3PoolAndInitializePrice(ETH, LUSD, fee, initSqrtPriceX96)
+        pool = IUniswapV3Pool(
+            equalizerV3TestLib.deployEqualizerV3PoolAndInitializePrice(ETH, LUSD, tickSpacing, initSqrtPriceX96)
         );
 
         token0 = ERC20Mock(pool.token0());
@@ -70,8 +68,8 @@ contract EqualizerSingleTickLiquidityHandlerV2_Test is Test {
             EqualizerV3TestLib.AddLiquidityStruct({
                 user: alice,
                 pool: pool,
-                desiredTickLower: -78245, // 2500
-                desiredTickUpper: -73136, // 1500
+                desiredTickLower: -78200,
+                desiredTickUpper: -73104,
                 desiredAmount0: 5_000_000e18,
                 desiredAmount1: 0,
                 requireMint: true
@@ -80,9 +78,7 @@ contract EqualizerSingleTickLiquidityHandlerV2_Test is Test {
 
         positionManager = new DopexV2PositionManager();
 
-        equalizerV3Handler = new EqualizerV3SingleTickLiquidityHandlerV2(
-            v3factory, 0x01795efa243dc58f09de9b7c1fa74e72352806f279d62f49ef19e11c42a98292, swapRouter
-        );
+        equalizerV3Handler = new EqualizerV3SingleTickLiquidityHandlerV2(v3factory, address(swapRouter));
 
         positionManagerHarness =
             new EqualizerV3SingleTickLiquidityHarnessV2(equalizerV3TestLib, positionManager, equalizerV3Handler);
@@ -94,16 +90,14 @@ contract EqualizerSingleTickLiquidityHandlerV2_Test is Test {
         equalizerV3Handler.updateWhitelistedApps(address(positionManager), true);
     }
 
-
     function testMintPosition() public {
         uint256 amount0 = 0;
         uint256 amount1 = 5e18;
 
-        int24 tickLower = -77420; // 2299.8
-        int24 tickUpper = -77410; // 2302.1
+        int24 tickLower = -77416;
+        int24 tickUpper = -77408;
 
         positionManagerHarness.mintPosition(token0, token1, amount0, amount1, tickLower, tickUpper, pool, hook, bob);
-
         positionManagerHarness.mintPosition(token0, token1, amount0, amount1, tickLower, tickUpper, pool, hook, jason);
     }
 
@@ -114,8 +108,8 @@ contract EqualizerSingleTickLiquidityHandlerV2_Test is Test {
         uint256 amount01 = 10_000e18;
         uint256 amount11 = 0;
 
-        int24 tickLower = -77420; // 2299.8
-        int24 tickUpper = -77410; // 2302.1
+        int24 tickLower = -77416; // 2299.8
+        int24 tickUpper = -77408; // 2302.1
 
         positionManagerHarness.mintPosition(token0, token1, amount0, amount1, tickLower, tickUpper, pool, hook, bob);
 
@@ -141,8 +135,8 @@ contract EqualizerSingleTickLiquidityHandlerV2_Test is Test {
         uint256 amount01 = 10_000e18;
         uint256 amount11 = 0;
 
-        int24 tickLower = -77420; // 2299.8
-        int24 tickUpper = -77410; // 2302.1
+        int24 tickLower = -77416; // 2299.8
+        int24 tickUpper = -77408; // 2302.1
 
         equalizerV3TestLib.performSwap(
             EqualizerV3TestLib.SwapParamsStruct({
@@ -173,8 +167,8 @@ contract EqualizerSingleTickLiquidityHandlerV2_Test is Test {
         uint256 amount0 = 0;
         uint256 amount1 = 5e18;
 
-        int24 tickLower = -77420; // 2299.8
-        int24 tickUpper = -77410; // 2302.1
+        int24 tickLower = -77416; // 2299.8
+        int24 tickUpper = -77408; // 2302.1
 
         positionManagerHarness.mintPosition(token0, token1, amount0, amount1, tickLower, tickUpper, pool, hook, bob);
 
@@ -222,8 +216,8 @@ contract EqualizerSingleTickLiquidityHandlerV2_Test is Test {
     }
 
     function testBurnPosition() public {
-        int24 tickLower = -77420;
-        int24 tickUpper = -77410;
+        int24 tickLower = -77416;
+        int24 tickUpper = -77408;
 
         testMintPositionWithSwaps();
 
@@ -246,8 +240,8 @@ contract EqualizerSingleTickLiquidityHandlerV2_Test is Test {
     }
 
     function testBurnPositionSmallValue() public {
-        int24 tickLower = -77420;
-        int24 tickUpper = -77410;
+        int24 tickLower = -77416;
+        int24 tickUpper = -77408;
 
         positionManagerHarness.mintPosition(token0, token1, 0, 2, tickLower, tickUpper, pool, hook, bob);
 
@@ -286,8 +280,8 @@ contract EqualizerSingleTickLiquidityHandlerV2_Test is Test {
         uint256 amount0 = 0;
         uint256 amount1 = 5e18;
 
-        int24 tickLower = -77420;
-        int24 tickUpper = -77410;
+        int24 tickLower = -77416;
+        int24 tickUpper = -77408;
 
         positionManagerHarness.usePosition(amount0, amount1, tickLower, tickUpper, pool, hook, hookData, garbage);
 
@@ -319,8 +313,8 @@ contract EqualizerSingleTickLiquidityHandlerV2_Test is Test {
         uint256 amount0 = 0;
         uint256 amount1 = 5e18;
 
-        int24 tickLower = -77420;
-        int24 tickUpper = -77410;
+        int24 tickLower = -77416;
+        int24 tickUpper = -77408;
 
         positionManagerHarness.unusePosition(
             amount0, amount1, 0, 1e18, tickLower, tickUpper, pool, hook, hookData, garbage
@@ -350,8 +344,8 @@ contract EqualizerSingleTickLiquidityHandlerV2_Test is Test {
         uint256 amount0 = 0;
         uint256 amount1 = 0;
 
-        int24 tickLower = -77420;
-        int24 tickUpper = -77410;
+        int24 tickLower = -77416;
+        int24 tickUpper = -77408;
 
         vm.roll(block.number + 1);
 
@@ -397,8 +391,8 @@ contract EqualizerSingleTickLiquidityHandlerV2_Test is Test {
         uint256 amount0 = 10_000e18;
         uint256 amount1 = 0;
 
-        int24 tickLower = -75770; // ~1950
-        int24 tickUpper = -75760; // ~1952
+        int24 tickLower = -75776; // ~1950
+        int24 tickUpper = -75768; // ~1952
 
         positionManagerHarness.mintPosition(token0, token1, amount0, amount1, tickLower, tickUpper, pool, hook, bob);
 
@@ -467,8 +461,8 @@ contract EqualizerSingleTickLiquidityHandlerV2_Test is Test {
         uint256 amount0 = 0;
         uint256 amount1 = 5e18;
 
-        int24 tickLower = -76260; // ~2050
-        int24 tickUpper = -76250; // ~2048
+        int24 tickLower = -76264;
+        int24 tickUpper = -76256;
 
         positionManagerHarness.mintPosition(token0, token1, amount0, amount1, tickLower, tickUpper, pool, hook, bob);
 
@@ -536,8 +530,8 @@ contract EqualizerSingleTickLiquidityHandlerV2_Test is Test {
         uint256 amount0 = 0;
         uint256 amount1 = 5e18;
 
-        int24 tickLower = -76260; // ~2050
-        int24 tickUpper = -76250; // ~2048
+        int24 tickLower = -76264;
+        int24 tickUpper = -76256;
 
         positionManagerHarness.mintPosition(token0, token1, amount0, amount1, tickLower, tickUpper, pool, hook, bob);
 
@@ -616,8 +610,8 @@ contract EqualizerSingleTickLiquidityHandlerV2_Test is Test {
         uint256 amount0 = 0;
         uint256 amount1 = 5e18;
 
-        int24 tickLower = -76260; // ~2050
-        int24 tickUpper = -76250; // ~2048
+        int24 tickLower = -76264;
+        int24 tickUpper = -76256;
 
         positionManagerHarness.mintPosition(token0, token1, amount0, amount1, tickLower, tickUpper, pool, hook, bob);
 
@@ -736,8 +730,8 @@ contract EqualizerSingleTickLiquidityHandlerV2_Test is Test {
         uint256 amount0 = 0;
         uint256 amount1 = 5e18;
 
-        int24 tickLower = -76260; // ~2050
-        int24 tickUpper = -76250; // ~2048
+        int24 tickLower = -76264;
+        int24 tickUpper = -76256;
 
         positionManagerHarness.mintPosition(token0, token1, amount0, amount1, tickLower, tickUpper, pool, hook, bob);
 
@@ -791,8 +785,8 @@ contract EqualizerSingleTickLiquidityHandlerV2_Test is Test {
         uint256 amount0 = 0;
         uint256 amount1 = 5e18;
 
-        int24 tickLower = -76260; // ~2050
-        int24 tickUpper = -76250; // ~2048
+        int24 tickLower = -76264;
+        int24 tickUpper = -76256;
 
         positionManagerHarness.mintPosition(token0, token1, amount0, amount1, tickLower, tickUpper, pool, hook, bob);
 
@@ -844,8 +838,8 @@ contract EqualizerSingleTickLiquidityHandlerV2_Test is Test {
         uint256 amount0 = 0;
         uint256 amount1 = 5e18;
 
-        int24 tickLower = -76260; // ~2050
-        int24 tickUpper = -76250; // ~2048
+        int24 tickLower = -76264;
+        int24 tickUpper = -76256;
 
         positionManagerHarness.mintPosition(token0, token1, amount0, amount1, tickLower, tickUpper, pool, hook, bob);
 
@@ -886,8 +880,8 @@ contract EqualizerSingleTickLiquidityHandlerV2_Test is Test {
         uint256 amount0 = 0;
         uint256 amount1 = 5e18;
 
-        int24 tickLower = -76260; // ~2050
-        int24 tickUpper = -76250; // ~2048
+        int24 tickLower = -76264;
+        int24 tickUpper = -76256;
 
         positionManagerHarness.mintPosition(token0, token1, amount0, amount1, tickLower, tickUpper, pool, hook, bob);
 

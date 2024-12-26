@@ -3,8 +3,8 @@ pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
 
-import {IEqualizerV3Pool} from "../../src/equalizer-v3/v3-core/contracts/interfaces/IEqualizerV3Pool.sol";
-import {IEqualizerV3Factory} from "../../src/equalizer-v3/v3-core/contracts/interfaces/IEqualizerV3Factory.sol";
+import {IUniswapV3Pool} from "../../src/equalizer-v3/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import {IUniswapV3Factory} from "../../src/equalizer-v3/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 
 import {EqualizerV3TestLib} from "../utils/equalizer-v3/EqualizerV3TestLib.sol";
 import {ERC20Mock} from "../mocks/ERC20Mock.sol";
@@ -36,7 +36,7 @@ contract EqualizerV3SingleTickLiquidityHarnessV2 is Test {
         handler = IHandler(address(_equalizerV3Handler));
     }
 
-    function getTokenId(IEqualizerV3Pool pool, address hook, int24 tickLower, int24 tickUpper)
+    function getTokenId(IUniswapV3Pool pool, address hook, int24 tickLower, int24 tickUpper)
         public
         view
         returns (uint256)
@@ -51,7 +51,7 @@ contract EqualizerV3SingleTickLiquidityHarnessV2 is Test {
         uint256 amount1,
         int24 tickLower,
         int24 tickUpper,
-        IEqualizerV3Pool pool,
+        IUniswapV3Pool pool,
         address hook,
         address user
     ) public returns (uint256 lm) {
@@ -91,7 +91,7 @@ contract EqualizerV3SingleTickLiquidityHarnessV2 is Test {
         uint256 shares,
         int24 tickLower,
         int24 tickUpper,
-        IEqualizerV3Pool pool,
+        IUniswapV3Pool pool,
         address hook,
         address user
     ) public returns (uint256 lb) {
@@ -118,7 +118,7 @@ contract EqualizerV3SingleTickLiquidityHarnessV2 is Test {
         uint256 amount1,
         int24 tickLower,
         int24 tickUpper,
-        IEqualizerV3Pool pool,
+        IUniswapV3Pool pool,
         address hook,
         bytes calldata hookData,
         address user
@@ -172,7 +172,7 @@ contract EqualizerV3SingleTickLiquidityHarnessV2 is Test {
         uint256 amount1ToDonate,
         int24 tickLower,
         int24 tickUpper,
-        IEqualizerV3Pool pool,
+        IUniswapV3Pool pool,
         address hook,
         bytes calldata hookData,
         address user
@@ -223,7 +223,7 @@ contract EqualizerV3SingleTickLiquidityHarnessV2 is Test {
         uint256 amount1ToDonate,
         int24 tickLower,
         int24 tickUpper,
-        IEqualizerV3Pool pool,
+        IUniswapV3Pool pool,
         address hook,
         address user
     ) public returns (uint256[] memory amounts, uint256 liquidityToDonate) {
