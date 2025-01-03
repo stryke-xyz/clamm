@@ -10,6 +10,10 @@ contract DeployAutoExercise is Script {
 
         vm.startBroadcast(deployerPrivateKey);
         AutoExerciseTimeBased aetb = new AutoExerciseTimeBased();
+
+        aetb.updateFeeTo(address(0));
+        aetb.grantRole(keccak256("EXECUTOR"), address(0));
+
         console.log(address(aetb));
         vm.stopBroadcast();
     }
