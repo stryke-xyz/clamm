@@ -24,7 +24,7 @@ contract SwapRouter02Swapper is ISwapper {
 
         IERC20(_tokenIn).safeIncreaseAllowance(address(sr), _amountIn);
 
-        amountOut = sr.exactInputSingle{value: 0}(
+        amountOut = sr.exactInputSingle(
             ISwapRouter02.ExactInputSingleParams({
                 tokenIn: _tokenIn,
                 tokenOut: _tokenOut,
