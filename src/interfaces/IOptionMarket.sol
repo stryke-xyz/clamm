@@ -89,4 +89,6 @@ interface IOptionMarket {
     function isApprovedForAll(address owner, address operator) external view returns (bool result);
 
     function primePool() external view returns (IUniswapV3Pool pool);
+
+    function exerciseDelegator(address, address) external view returns (bool);
 }
