@@ -17,20 +17,6 @@ import {SwapMath} from "@uniswap/v3-core/contracts/libraries/SwapMath.sol";
 import {EqualizerV3LiquidityManagement} from "./EqualizerV3LiquidityManagement.sol";
 import {ERC20Mock} from "../../mocks/ERC20Mock.sol";
 
-// interface ISwapRouter {
-//     struct ExactInputSingleParams {
-//         address tokenIn;
-//         address tokenOut;
-//         uint24 fee;
-//         address recipient;
-//         uint256 amountIn;
-//         uint256 amountOutMinimum;
-//         uint160 sqrtPriceLimitX96;
-//     }
-
-//     function exactInputSingle(ExactInputSingleParams calldata params) external payable returns (uint256 amountOut);
-// }
-
 contract EqualizerV3TestLib is Test {
     IUniswapV3Factory public immutable factory;
     EqualizerV3LiquidityManagement public immutable equalizerV3LiquidityManagement;
