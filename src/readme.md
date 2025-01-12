@@ -1,2 +1,0 @@
-Equalizer Exchange Contracts: https://docs.equalizer.exchange/equal-fantom/contracts/ 
-POOL_INIT_CODE_HASH=0x01795efa243dc58f09de9b7c1fa74e72352806f279d62f49ef19e11c42a98292
