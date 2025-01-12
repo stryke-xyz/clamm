@@ -146,9 +146,9 @@ contract SushiV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, Acc
 
     ISwapRouter swapRouter;
 
-    uint64 reserveCooldown = 6 hours;
+    uint64 public reserveCooldown = 6 hours;
     uint64 public lockedBlockDuration = 100;
-    uint64 newLockedBlockDuration;
+    uint64 public newLockedBlockDuration;
 
     bytes32 constant PAUSER_ROLE = keccak256("P");
     bytes32 constant SOS_ROLE = keccak256("SOS");
@@ -442,7 +442,7 @@ contract SushiV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, Acc
      */
     function withdrawReserveLiquidity(address context, bytes calldata _reserveLiquidityParam) external whenNotPaused {
         onlyWhitelisted();
-        
+
         BurnPositionParams memory _params = abi.decode(_reserveLiquidityParam, (BurnPositionParams));
 
         uint256 tokenId = _getHandlerIdentifier(_params.pool, _params.hook, _params.tickLower, _params.tickUpper);
@@ -882,7 +882,7 @@ contract SushiV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, Acc
         return tokenIds[tokenId];
     }
 
-    function onlyWhitelisted() private {
+    function onlyWhitelisted() private view {
         if (!whitelistedApps[msg.sender]) {
             revert UniswapV3SingleTickLiquidityHandlerV2__NotWhitelisted();
         }

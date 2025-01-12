@@ -18,7 +18,7 @@ import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
  * It does not store any user data, it accepts truth from the handlers.
  * Use only known Handler! Be Safe!
  */
-contract StrykePositionManager is Ownable, ReentrancyGuard, Multicall {
+contract DopexV2PositionManagerV2 is Ownable, ReentrancyGuard, Multicall {
     using SafeERC20 for IERC20;
 
     mapping(bytes32 => bool) public whitelistedHandlersWithApp;
