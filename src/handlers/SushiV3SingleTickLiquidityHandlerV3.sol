@@ -15,6 +15,7 @@ import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {FullMath} from "@uniswap/v3-core/contracts/libraries/FullMath.sol";
 import {FixedPoint128} from "@uniswap/v3-core/contracts/libraries/FixedPoint128.sol";
+import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 
 // Contracts
 import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
@@ -22,7 +23,7 @@ import {Pausable} from "openzeppelin-contracts/contracts/security/Pausable.sol";
 import {ERC6909} from "../libraries/tokens/ERC6909.sol";
 import {LiquidityManager} from "../uniswap-v3/LiquidityManager.sol";
 
-contract SushiV3SingleTickLiquidityHandlerV2 is ERC6909, IHandler, Pausable, AccessControl, LiquidityManager {
+contract SushiV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, AccessControl, LiquidityManager {
     using Math for uint128;
     using TickMath for int24;
     using SafeERC20 for IERC20;
@@ -89,8 +90,6 @@ contract SushiV3SingleTickLiquidityHandlerV2 is ERC6909, IHandler, Pausable, Acc
     }
 
     struct MintPositionCache {
-        int24 tickLower;
-        int24 tickUpper;
         uint160 sqrtRatioTickLower;
         uint160 sqrtRatioTickUpper;
         uint128 liquidity;
@@ -147,9 +146,9 @@ contract SushiV3SingleTickLiquidityHandlerV2 is ERC6909, IHandler, Pausable, Acc
 
     ISwapRouter swapRouter;
 
-    uint64 public reserveCooldown = 6 hours;
+    uint64 reserveCooldown = 6 hours;
     uint64 public lockedBlockDuration = 100;
-    uint64 public newLockedBlockDuration;
+    uint64 newLockedBlockDuration;
 
     bytes32 constant PAUSER_ROLE = keccak256("P");
     bytes32 constant SOS_ROLE = keccak256("SOS");
@@ -179,9 +178,7 @@ contract SushiV3SingleTickLiquidityHandlerV2 is ERC6909, IHandler, Pausable, Acc
 
         MintPositionParams memory _params = abi.decode(_mintPositionData, (MintPositionParams));
 
-        uint256 tokenId = uint256(
-            keccak256(abi.encode(address(this), _params.pool, _params.hook, _params.tickLower, _params.tickUpper))
-        );
+        uint256 tokenId = _getHandlerIdentifier(_params.pool, _params.hook, _params.tickLower, _params.tickUpper);
 
         TokenIdInfo storage tki = tokenIds[tokenId];
 
@@ -192,8 +189,6 @@ contract SushiV3SingleTickLiquidityHandlerV2 is ERC6909, IHandler, Pausable, Acc
         }
 
         MintPositionCache memory posCache = MintPositionCache({
-            tickLower: _params.tickLower,
-            tickUpper: _params.tickUpper,
             sqrtRatioTickLower: _params.tickLower.getSqrtRatioAtTick(),
             sqrtRatioTickUpper: _params.tickUpper.getSqrtRatioAtTick(),
             liquidity: 0,
@@ -201,12 +196,8 @@ contract SushiV3SingleTickLiquidityHandlerV2 is ERC6909, IHandler, Pausable, Acc
             amount1: 0
         });
 
-        (posCache.amount0, posCache.amount1) = LiquidityAmounts.getAmountsForLiquidity(
-            _getCurrentSqrtPriceX96(_params.pool),
-            posCache.sqrtRatioTickLower,
-            posCache.sqrtRatioTickUpper,
-            uint128(_params.liquidity)
-        );
+        (posCache.amount0, posCache.amount1) =
+            getAmountsForLiquidity(_params.pool, _params.tickLower, _params.tickUpper, uint128(_params.liquidity));
 
         if (posCache.amount0 > 0 && posCache.amount1 > 0) {
             revert UniswapV3SingleTickLiquidityHandlerV2__InRangeLP();
@@ -218,8 +209,8 @@ contract SushiV3SingleTickLiquidityHandlerV2 is ERC6909, IHandler, Pausable, Acc
                 token1: tki.token1,
                 fee: tki.fee,
                 recipient: address(this),
-                tickLower: posCache.tickLower,
-                tickUpper: posCache.tickUpper,
+                tickLower: _params.tickLower,
+                tickUpper: _params.tickUpper,
                 amount0Desired: posCache.amount0,
                 amount1Desired: posCache.amount1,
                 amount0Min: posCache.amount0,
@@ -227,7 +218,7 @@ contract SushiV3SingleTickLiquidityHandlerV2 is ERC6909, IHandler, Pausable, Acc
             })
         );
 
-        _feeCalculation(tki, _params.pool, posCache.tickLower, posCache.tickUpper);
+        _feeCalculation(tki, _params.pool, _params.tickLower, _params.tickUpper);
 
         if (tki.totalSupply > 0) {
             // compound fees
@@ -241,11 +232,7 @@ contract SushiV3SingleTickLiquidityHandlerV2 is ERC6909, IHandler, Pausable, Acc
                 if (expectedAmountForLiquidity0 > tki.tokensOwed0 || expectedAmountForLiquidity1 > tki.tokensOwed1) {
                     bool isAmount0 = posCache.amount0 > 0;
                     (uint256 a0, uint256 a1) = _params.pool.collect(
-                        address(this),
-                        _params.tickLower,
-                        _params.tickUpper,
-                        uint128(tki.tokensOwed0),
-                        uint128(tki.tokensOwed1)
+                        address(this), _params.tickLower, _params.tickUpper, (tki.tokensOwed0), (tki.tokensOwed1)
                     );
 
                     (tki.tokensOwed0, tki.tokensOwed1) = (0, 0);
@@ -270,7 +257,7 @@ contract SushiV3SingleTickLiquidityHandlerV2 is ERC6909, IHandler, Pausable, Acc
                         );
                     }
 
-                    (uint128 liquidityFee,,,) = SushiV3SingleTickLiquidityHandlerV2(address(this)).addLiquidity(
+                    (uint128 liquidityFee,,,) = addLiquidity(
                         LiquidityManager.AddLiquidityParams({
                             token0: tki.token0,
                             token1: tki.token1,
@@ -287,7 +274,7 @@ contract SushiV3SingleTickLiquidityHandlerV2 is ERC6909, IHandler, Pausable, Acc
                     tki.totalLiquidity += liquidityFee;
 
                     emit LogFeeCompound(
-                        address(this), _params.pool, tokenId, posCache.tickLower, posCache.tickUpper, liquidityFee
+                        address(this), _params.pool, tokenId, _params.tickLower, _params.tickUpper, liquidityFee
                     );
                 }
             }
@@ -313,8 +300,8 @@ contract SushiV3SingleTickLiquidityHandlerV2 is ERC6909, IHandler, Pausable, Acc
             address(_params.pool),
             _params.hook,
             context,
-            posCache.tickLower,
-            posCache.tickUpper
+            _params.tickLower,
+            _params.tickUpper
         );
     }
 
@@ -335,9 +322,7 @@ contract SushiV3SingleTickLiquidityHandlerV2 is ERC6909, IHandler, Pausable, Acc
 
         BurnPositionParams memory _params = abi.decode(_burnPositionData, (BurnPositionParams));
 
-        uint256 tokenId = uint256(
-            keccak256(abi.encode(address(this), _params.pool, _params.hook, _params.tickLower, _params.tickUpper))
-        );
+        uint256 tokenId = _getHandlerIdentifier(_params.pool, _params.hook, _params.tickLower, _params.tickUpper);
 
         TokenIdInfo storage tki = tokenIds[tokenId];
 
@@ -402,10 +387,7 @@ contract SushiV3SingleTickLiquidityHandlerV2 is ERC6909, IHandler, Pausable, Acc
     function reserveLiquidity(bytes calldata _reserveLiquidityParam) external whenNotPaused returns (uint256) {
         BurnPositionParams memory _params = abi.decode(_reserveLiquidityParam, (BurnPositionParams));
 
-        uint256 tokenId = uint256(
-            keccak256(abi.encode(address(this), _params.pool, _params.hook, _params.tickLower, _params.tickUpper))
-        );
-
+        uint256 tokenId = _getHandlerIdentifier(_params.pool, _params.hook, _params.tickLower, _params.tickUpper);
         TokenIdInfo storage tki = tokenIds[tokenId];
 
         uint128 liquidityToBurn = _convertToAssets(_params.shares, tokenId);
@@ -493,9 +475,7 @@ contract SushiV3SingleTickLiquidityHandlerV2 is ERC6909, IHandler, Pausable, Acc
     function withdrawReserveLiquidity(bytes calldata _reserveLiquidityParam) external whenNotPaused {
         BurnPositionParams memory _params = abi.decode(_reserveLiquidityParam, (BurnPositionParams));
 
-        uint256 tokenId = uint256(
-            keccak256(abi.encode(address(this), _params.pool, _params.hook, _params.tickLower, _params.tickUpper))
-        );
+        uint256 tokenId = _getHandlerIdentifier(_params.pool, _params.hook, _params.tickLower, _params.tickUpper);
 
         TokenIdInfo storage tki = tokenIds[tokenId];
         ReserveLiquidityData storage rld = reservedLiquidityPerUser[tokenId][msg.sender];
@@ -538,9 +518,7 @@ contract SushiV3SingleTickLiquidityHandlerV2 is ERC6909, IHandler, Pausable, Acc
         (UsePositionParams memory _params, bytes memory hookData) =
             abi.decode(_usePositionHandler, (UsePositionParams, bytes));
 
-        uint256 tokenId = uint256(
-            keccak256(abi.encode(address(this), _params.pool, _params.hook, _params.tickLower, _params.tickUpper))
-        );
+        uint256 tokenId = _getHandlerIdentifier(_params.pool, _params.hook, _params.tickLower, _params.tickUpper);
 
         TokenIdInfo storage tki = tokenIds[tokenId];
 
@@ -583,16 +561,14 @@ contract SushiV3SingleTickLiquidityHandlerV2 is ERC6909, IHandler, Pausable, Acc
     function unusePositionHandler(bytes calldata _unusePositionData)
         external
         whenNotPaused
-        returns (uint256[] memory, uint256)
+        returns (uint256[] memory amounts, uint256)
     {
         onlyWhitelisted();
 
         (UnusePositionParams memory _params, bytes memory hookData) =
             abi.decode(_unusePositionData, (UnusePositionParams, bytes));
 
-        uint256 tokenId = uint256(
-            keccak256(abi.encode(address(this), _params.pool, _params.hook, _params.tickLower, _params.tickUpper))
-        );
+        uint256 tokenId = _getHandlerIdentifier(_params.pool, _params.hook, _params.tickLower, _params.tickUpper);
 
         TokenIdInfo storage tki = tokenIds[tokenId];
 
@@ -600,12 +576,8 @@ contract SushiV3SingleTickLiquidityHandlerV2 is ERC6909, IHandler, Pausable, Acc
             IHook(_params.hook).onPositionUnUse(hookData);
         }
 
-        (uint256 amount0, uint256 amount1) = LiquidityAmounts.getAmountsForLiquidity(
-            _getCurrentSqrtPriceX96(_params.pool),
-            _params.tickLower.getSqrtRatioAtTick(),
-            _params.tickUpper.getSqrtRatioAtTick(),
-            uint128(_params.liquidityToUnuse)
-        );
+        (uint256 amount0, uint256 amount1) =
+            getAmountsForLiquidity((_params.pool), _params.tickLower, _params.tickUpper, (_params.liquidityToUnuse));
 
         (uint128 liquidity,,,) = addLiquidity(
             LiquidityManager.AddLiquidityParams({
@@ -651,18 +623,12 @@ contract SushiV3SingleTickLiquidityHandlerV2 is ERC6909, IHandler, Pausable, Acc
 
         DonateParams memory _params = abi.decode(_donateData, (DonateParams));
 
-        uint256 tokenId = uint256(
-            keccak256(abi.encode(address(this), _params.pool, _params.hook, _params.tickLower, _params.tickUpper))
-        );
+        uint256 tokenId = _getHandlerIdentifier(_params.pool, _params.hook, _params.tickLower, _params.tickUpper);
 
         TokenIdInfo storage tki = tokenIds[tokenId];
 
-        (uint256 amount0, uint256 amount1) = LiquidityAmounts.getAmountsForLiquidity(
-            _getCurrentSqrtPriceX96(_params.pool),
-            _params.tickLower.getSqrtRatioAtTick(),
-            _params.tickUpper.getSqrtRatioAtTick(),
-            uint128(_params.liquidityToDonate)
-        );
+        (uint256 amount0, uint256 amount1) =
+            getAmountsForLiquidity(_params.pool, _params.tickLower, _params.tickUpper, _params.liquidityToDonate);
 
         (uint128 liquidity,,,) = addLiquidity(
             LiquidityManager.AddLiquidityParams({
@@ -698,6 +664,19 @@ contract SushiV3SingleTickLiquidityHandlerV2 is ERC6909, IHandler, Pausable, Acc
 
         emit LogDonation(tokenId, liquidity);
         return (amounts, liquidity);
+    }
+
+    function getAmountsForLiquidity(IUniswapV3Pool pool, int24 tickLower, int24 tickUpper, uint128 liquidityToDonate)
+        public
+        view
+        returns (uint256 amount0, uint256 amount1)
+    {
+        (amount0, amount1) = LiquidityAmounts.getAmountsForLiquidity(
+            _getCurrentSqrtPriceX96(pool),
+            tickLower.getSqrtRatioAtTick(),
+            tickUpper.getSqrtRatioAtTick(),
+            liquidityToDonate
+        );
     }
 
     /**
@@ -738,10 +717,18 @@ contract SushiV3SingleTickLiquidityHandlerV2 is ERC6909, IHandler, Pausable, Acc
      * @param _data The encoded position data.
      * @return handlerIdentifierId The handler identifier for the position.
      */
-    function getHandlerIdentifier(bytes calldata _data) external view returns (uint256 handlerIdentifierId) {
+    function getHandlerIdentifier(bytes calldata _data) public view returns (uint256 handlerIdentifierId) {
         (IUniswapV3Pool pool, address hook, int24 tickLower, int24 tickUpper) =
             abi.decode(_data, (IUniswapV3Pool, address, int24, int24));
 
+        return _getHandlerIdentifier(pool, hook, tickLower, tickUpper);
+    }
+
+    function _getHandlerIdentifier(IUniswapV3Pool pool, address hook, int24 tickLower, int24 tickUpper)
+        private
+        view
+        returns (uint256)
+    {
         return uint256(keccak256(abi.encode(address(this), pool, hook, tickLower, tickUpper)));
     }
 
@@ -789,12 +776,8 @@ contract SushiV3SingleTickLiquidityHandlerV2 is ERC6909, IHandler, Pausable, Acc
     function _tokensToPull(bytes calldata _positionData) private view returns (address[] memory, uint256[] memory) {
         MintPositionParams memory _params = abi.decode(_positionData, (MintPositionParams));
 
-        (uint256 amount0, uint256 amount1) = LiquidityAmounts.getAmountsForLiquidity(
-            _getCurrentSqrtPriceX96(_params.pool),
-            _params.tickLower.getSqrtRatioAtTick(),
-            _params.tickUpper.getSqrtRatioAtTick(),
-            uint128(_params.liquidity)
-        );
+        (uint256 amount0, uint256 amount1) =
+            getAmountsForLiquidity((_params.pool), _params.tickLower, _params.tickUpper, (_params.liquidity));
 
         address[] memory tokens = new address[](2);
         tokens[0] = _params.pool.token0();
@@ -812,15 +795,13 @@ contract SushiV3SingleTickLiquidityHandlerV2 is ERC6909, IHandler, Pausable, Acc
      * @param tokenId The tokenId of the position.
      * @return donationLocked The amount of donated liquidity that is locked.
      */
-    function _donationLocked(uint256 tokenId) internal view returns (uint128) {
-        TokenIdInfo memory tki = tokenIds[tokenId];
+    function _donationLocked(uint256 tokenId) internal view returns (uint128 donationLocked) {
+        TokenIdInfo storage tki = tokenIds[tokenId];
 
-        if (block.number >= tki.lastDonation + lockedBlockDuration) return 0;
-
-        uint128 donationLocked = tki.donatedLiquidity
-            - (tki.donatedLiquidity * (uint64(block.number) - tki.lastDonation)) / lockedBlockDuration;
-
-        return donationLocked;
+        if (block.number < tki.lastDonation + lockedBlockDuration) {
+            donationLocked = tki.donatedLiquidity
+                - (tki.donatedLiquidity * (uint64(block.number) - tki.lastDonation)) / lockedBlockDuration;
+        }
     }
 
     /**
