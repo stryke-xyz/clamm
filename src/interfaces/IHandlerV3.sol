@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-interface IHandler {
+interface IHandlerV3 {
     function getHandlerIdentifier(bytes calldata _data) external view returns (uint256 handlerIdentifierId);
 
     function tokensToPullForMint(bytes calldata _mintPositionData)
@@ -38,4 +38,8 @@ interface IHandler {
         external
         view
         returns (address[] memory tokens, uint256[] memory amounts);
+
+    function reserveLiquidity(address context, bytes calldata _reserveLiquidityParam) external returns (uint256);
+
+    function withdrawReserveLiquidity(address context, bytes calldata _reserveLiquidityParam) external;
 }
