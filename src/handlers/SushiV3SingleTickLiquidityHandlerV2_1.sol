@@ -531,7 +531,7 @@ contract SushiV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, Acc
     function unusePositionHandler(bytes calldata _unusePositionData)
         external
         whenNotPaused
-        returns (uint256[] memory amounts, uint256)
+        returns (uint256[] memory, uint256)
     {
         onlyWhitelisted();
 
