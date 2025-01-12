@@ -189,11 +189,19 @@ contract DopexV2PositionManagerV2 is Ownable, ReentrancyGuard, Multicall {
         emit LogDonation(_handler, liquidity);
     }
 
-    function reserveLiquidity(IHandlerV3 _handler, bytes calldata _reserveLiquidityData) external {
+    function reserveLiquidity(IHandlerV3 _handler, bytes calldata _reserveLiquidityData)
+        external
+        onlyWhitelistedHandlers(_handler)
+        nonReentrant
+    {
         _handler.reserveLiquidity(msg.sender, _reserveLiquidityData);
     }
 
-    function withdrawReserveLiquidity(IHandlerV3 _handler, bytes calldata _withdrawReserveLiquidityData) external {
+    function withdrawReserveLiquidity(IHandlerV3 _handler, bytes calldata _withdrawReserveLiquidityData)
+        external
+        onlyWhitelistedHandlers(_handler)
+        nonReentrant
+    {
         _handler.reserveLiquidity(msg.sender, _withdrawReserveLiquidityData);
     }
 
