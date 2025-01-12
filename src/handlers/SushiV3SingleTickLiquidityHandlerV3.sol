@@ -384,7 +384,13 @@ contract SushiV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, Acc
      * be burned and they will receive Uniswap V3 fees upto this point.
      * @return The number of shares burned.
      */
-    function reserveLiquidity(bytes calldata _reserveLiquidityParam) external whenNotPaused returns (uint256) {
+    function reserveLiquidity(address context, bytes calldata _reserveLiquidityParam)
+        external
+        whenNotPaused
+        returns (uint256)
+    {
+        onlyWhitelisted();
+
         BurnPositionParams memory _params = abi.decode(_reserveLiquidityParam, (BurnPositionParams));
 
         uint256 tokenId = _getHandlerIdentifier(_params.pool, _params.hook, _params.tickLower, _params.tickUpper);
@@ -404,10 +410,10 @@ contract SushiV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, Acc
         tki.tokensOwed1 -= feesOwedToken1;
 
         _params.pool.collect(
-            msg.sender, _params.tickLower, _params.tickUpper, uint128(feesOwedToken0), uint128(feesOwedToken1)
+            context, _params.tickLower, _params.tickUpper, uint128(feesOwedToken0), uint128(feesOwedToken1)
         );
 
-        ReserveLiquidityData storage rld = reservedLiquidityPerUser[tokenId][msg.sender];
+        ReserveLiquidityData storage rld = reservedLiquidityPerUser[tokenId][context];
 
         rld.liquidity += liquidityToBurn;
         rld.lastReserve = uint64(block.timestamp);
@@ -417,53 +423,15 @@ contract SushiV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, Acc
 
         tki.reservedLiquidity += liquidityToBurn;
 
-        _burn(msg.sender, tokenId, _params.shares);
+        _burn(context, tokenId, _params.shares);
 
         emit LogBurnedPosition(
-            tokenId,
-            liquidityToBurn,
-            address(_params.pool),
-            _params.hook,
-            msg.sender,
-            _params.tickLower,
-            _params.tickUpper
+            tokenId, liquidityToBurn, address(_params.pool), _params.hook, context, _params.tickLower, _params.tickUpper
         );
 
-        emit LogReservedLiquidity(tokenId, liquidityToBurn, msg.sender);
+        emit LogReservedLiquidity(tokenId, liquidityToBurn, context);
 
         return (_params.shares);
-    }
-
-    function _feesTokenOwed(
-        int24 tickLower,
-        int24 tickUpper,
-        uint128 liquidityToBurn,
-        uint128 totalLiquidity,
-        uint128 tokensOwed0,
-        uint128 tokensOwed1
-    ) private view returns (uint128 feesOwedToken0, uint128 feesOwedToken1) {
-        uint256 userLiquidity0 = LiquidityAmounts.getAmount0ForLiquidity(
-            tickLower.getSqrtRatioAtTick(), tickUpper.getSqrtRatioAtTick(), liquidityToBurn
-        );
-
-        uint256 userLiquidity1 = LiquidityAmounts.getAmount1ForLiquidity(
-            tickLower.getSqrtRatioAtTick(), tickUpper.getSqrtRatioAtTick(), liquidityToBurn
-        );
-
-        uint256 totalLiquidity0 = LiquidityAmounts.getAmount0ForLiquidity(
-            tickLower.getSqrtRatioAtTick(), tickUpper.getSqrtRatioAtTick(), totalLiquidity
-        );
-
-        uint256 totalLiquidity1 = LiquidityAmounts.getAmount1ForLiquidity(
-            tickLower.getSqrtRatioAtTick(), tickUpper.getSqrtRatioAtTick(), totalLiquidity
-        );
-
-        if (totalLiquidity0 > 0) {
-            feesOwedToken0 = uint128((tokensOwed0 * userLiquidity0) / totalLiquidity0);
-        }
-        if (totalLiquidity1 > 0) {
-            feesOwedToken1 = uint128((tokensOwed1 * userLiquidity1) / totalLiquidity1);
-        }
     }
 
     /**
@@ -472,13 +440,15 @@ contract SushiV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, Acc
      * @dev This can be called by the user directly, it uses msg.sender context. Users can withdraw
      * liquidity if it is available and their cooldown is over.
      */
-    function withdrawReserveLiquidity(bytes calldata _reserveLiquidityParam) external whenNotPaused {
+    function withdrawReserveLiquidity(address context, bytes calldata _reserveLiquidityParam) external whenNotPaused {
+        onlyWhitelisted();
+        
         BurnPositionParams memory _params = abi.decode(_reserveLiquidityParam, (BurnPositionParams));
 
         uint256 tokenId = _getHandlerIdentifier(_params.pool, _params.hook, _params.tickLower, _params.tickUpper);
 
         TokenIdInfo storage tki = tokenIds[tokenId];
-        ReserveLiquidityData storage rld = reservedLiquidityPerUser[tokenId][msg.sender];
+        ReserveLiquidityData storage rld = reservedLiquidityPerUser[tokenId][context];
 
         if (rld.lastReserve + reserveCooldown > block.timestamp) {
             revert UniswapV3SingleTickLiquidityHandlerV2__BeforeReserveCooldown();
@@ -490,14 +460,14 @@ contract SushiV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, Acc
 
         (uint256 amount0, uint256 amount1) = _params.pool.burn(_params.tickLower, _params.tickUpper, _params.shares);
 
-        _params.pool.collect(msg.sender, _params.tickLower, _params.tickUpper, uint128(amount0), uint128(amount1));
+        _params.pool.collect(context, _params.tickLower, _params.tickUpper, uint128(amount0), uint128(amount1));
 
         _feeCalculation(tki, _params.pool, _params.tickLower, _params.tickUpper);
 
         tki.reservedLiquidity -= _params.shares;
         rld.liquidity -= _params.shares;
 
-        emit LogWithdrawReservedLiquidity(tokenId, _params.shares, msg.sender);
+        emit LogWithdrawReservedLiquidity(tokenId, _params.shares, context);
     }
 
     /**
@@ -709,6 +679,38 @@ contract SushiV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, Acc
 
             _tki.feeGrowthInside0LastX128 = feeGrowthInside0LastX128;
             _tki.feeGrowthInside1LastX128 = feeGrowthInside1LastX128;
+        }
+    }
+
+    function _feesTokenOwed(
+        int24 tickLower,
+        int24 tickUpper,
+        uint128 liquidityToBurn,
+        uint128 totalLiquidity,
+        uint128 tokensOwed0,
+        uint128 tokensOwed1
+    ) private view returns (uint128 feesOwedToken0, uint128 feesOwedToken1) {
+        uint256 userLiquidity0 = LiquidityAmounts.getAmount0ForLiquidity(
+            tickLower.getSqrtRatioAtTick(), tickUpper.getSqrtRatioAtTick(), liquidityToBurn
+        );
+
+        uint256 userLiquidity1 = LiquidityAmounts.getAmount1ForLiquidity(
+            tickLower.getSqrtRatioAtTick(), tickUpper.getSqrtRatioAtTick(), liquidityToBurn
+        );
+
+        uint256 totalLiquidity0 = LiquidityAmounts.getAmount0ForLiquidity(
+            tickLower.getSqrtRatioAtTick(), tickUpper.getSqrtRatioAtTick(), totalLiquidity
+        );
+
+        uint256 totalLiquidity1 = LiquidityAmounts.getAmount1ForLiquidity(
+            tickLower.getSqrtRatioAtTick(), tickUpper.getSqrtRatioAtTick(), totalLiquidity
+        );
+
+        if (totalLiquidity0 > 0) {
+            feesOwedToken0 = uint128((tokensOwed0 * userLiquidity0) / totalLiquidity0);
+        }
+        if (totalLiquidity1 > 0) {
+            feesOwedToken1 = uint128((tokensOwed1 * userLiquidity1) / totalLiquidity1);
         }
     }
 
