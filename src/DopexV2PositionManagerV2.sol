@@ -11,7 +11,7 @@ import {ReentrancyGuard} from "openzeppelin-contracts/contracts/security/Reentra
 import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 
 /**
- * @title StrykePositionManager
+ * @title DopexV2PositionManagerV2
  * @author 0xcarrot & aercwarden
  * @dev This contract is an entry point which acts as shared interface
  * between liquidity managers (handlers) and apps utilizing the liquidity.
