@@ -40,19 +40,19 @@ contract DopexV2PositionManagerV2 is Ownable, ReentrancyGuard, Multicall {
     event LogUpdateWhitelistHandler(address _handler, bool _status);
 
     // errors
-    error StrykePositionManager__NotWhitelistedApp();
-    error StrykePositionManager__NotWhitelistedHandler();
+    error DopexV2PositionManagerV2__NotWhitelistedApp();
+    error DopexV2PositionManagerV2__NotWhitelistedHandler();
 
     modifier onlyWhitelistedHandlersWithApps(IHandlerV3 _handler) {
         if (!whitelistedHandlersWithApp[keccak256(abi.encode(address(_handler), msg.sender))]) {
-            revert StrykePositionManager__NotWhitelistedApp();
+            revert DopexV2PositionManagerV2__NotWhitelistedApp();
         }
         _;
     }
 
     modifier onlyWhitelistedHandlers(IHandlerV3 _handler) {
         if (!whitelistedHandlers[address(_handler)]) {
-            revert StrykePositionManager__NotWhitelistedHandler();
+            revert DopexV2PositionManagerV2__NotWhitelistedHandler();
         }
         _;
     }
@@ -193,7 +193,7 @@ contract DopexV2PositionManagerV2 is Ownable, ReentrancyGuard, Multicall {
         external
         onlyWhitelistedHandlers(_handler)
         nonReentrant
-    {
+    {   
         _handler.reserveLiquidity(msg.sender, _reserveLiquidityData);
     }
 
