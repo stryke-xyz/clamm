@@ -130,6 +130,7 @@ contract SushiV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, Acc
     event LogUnusePosition(uint256 tokenId, uint128 liquidityUnused);
     event LogDonation(uint256 tokenId, uint128 liquidityDonated);
     event LogUpdateWhitelistedApp(address _app, bool _status);
+    event LogUpdateWhitelistedPools(address _pool, bool _status);
     event LogUpdatedLockBlockAndReserveCooldownDuration(uint64 _newLockedBlockDuration, uint64 _newReserveCooldown);
     event LogReservedLiquidity(uint256 tokenId, uint128 liquidityReserved, address user);
     event LogWithdrawReservedLiquidity(uint256 tokenId, uint128 liquidityWithdrawn, address user);
@@ -139,9 +140,11 @@ contract SushiV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, Acc
     error UniswapV3SingleTickLiquidityHandlerV2__InRangeLP();
     error UniswapV3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
     error UniswapV3SingleTickLiquidityHandlerV2__BeforeReserveCooldown();
+    error SushiV2SingleTickLiquidityHandlerV3__NotWhitelistedPool();
 
     mapping(uint256 => TokenIdInfo) public tokenIds;
     mapping(address => bool) public whitelistedApps;
+    mapping(address => bool) public whitelistedPools;
     mapping(uint256 => mapping(address => ReserveLiquidityData)) public reservedLiquidityPerUser;
 
     ISwapRouter swapRouter;
@@ -177,6 +180,8 @@ contract SushiV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, Acc
         onlyWhitelisted();
 
         MintPositionParams memory _params = abi.decode(_mintPositionData, (MintPositionParams));
+
+        if (!whitelistedPools[address(_params.pool)]) revert SushiV2SingleTickLiquidityHandlerV3__NotWhitelistedPool();
 
         uint256 tokenId = _getHandlerIdentifier(_params.pool, _params.hook, _params.tickLower, _params.tickUpper);
 
@@ -889,6 +894,16 @@ contract SushiV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, Acc
     }
 
     // admin functions
+
+    /**
+     * @notice Updates the whitelist status of the given pool.
+     * @param _pool The pool to update the whitelist status of.
+     * @param _status The new whitelist status of the pool.
+     */
+    function updateWhitelistedPools(address _pool, bool _status) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        whitelistedPools[_pool] = _status;
+        emit LogUpdateWhitelistedPools(_pool, _status);
+    }
 
     /**
      * @notice Updates the whitelist status of the given app.
