@@ -79,6 +79,8 @@ contract SushiV3SingleTickLiquidityHandlerV3_Test is Test {
             address(testLib.swapRouter())
         );
 
+        handler.updateWhitelistedPools(address(pool), true);
+
         positionManagerHarness = new SushiV3SingleTickLiquidityHarnessV3(testLib, positionManager, handler);
 
         positionManager.updateWhitelistHandlerWithApp(address(handler), garbage, true);
