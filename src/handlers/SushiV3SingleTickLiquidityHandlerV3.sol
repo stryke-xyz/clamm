@@ -15,7 +15,6 @@ import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {FullMath} from "@uniswap/v3-core/contracts/libraries/FullMath.sol";
 import {FixedPoint128} from "@uniswap/v3-core/contracts/libraries/FixedPoint128.sol";
-import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 
 // Contracts
 import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
@@ -136,11 +135,11 @@ contract SushiV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, Acc
     event LogWithdrawReservedLiquidity(uint256 tokenId, uint128 liquidityWithdrawn, address user);
 
     // errors
-    error UniswapV3SingleTickLiquidityHandlerV2__NotWhitelisted();
-    error UniswapV3SingleTickLiquidityHandlerV2__InRangeLP();
-    error UniswapV3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
-    error UniswapV3SingleTickLiquidityHandlerV2__BeforeReserveCooldown();
-    error SushiV2SingleTickLiquidityHandlerV3__NotWhitelistedPool();
+    error SushiV3SingleTickLiquidityHandlerV3__NotWhitelisted();
+    error SushiV3SingleTickLiquidityHandlerV3__InRangeLP();
+    error SushiV3SingleTickLiquidityHandlerV3__InsufficientLiquidity();
+    error SushiV3SingleTickLiquidityHandlerV3__BeforeReserveCooldown();
+    error SushiV3SingleTickLiquidityHandlerV3__NotWhitelistedPool();
 
     mapping(uint256 => TokenIdInfo) public tokenIds;
     mapping(address => bool) public whitelistedApps;
@@ -181,7 +180,7 @@ contract SushiV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, Acc
 
         MintPositionParams memory _params = abi.decode(_mintPositionData, (MintPositionParams));
 
-        if (!whitelistedPools[address(_params.pool)]) revert SushiV2SingleTickLiquidityHandlerV3__NotWhitelistedPool();
+        if (!whitelistedPools[address(_params.pool)]) revert SushiV3SingleTickLiquidityHandlerV3__NotWhitelistedPool();
 
         uint256 tokenId = _getHandlerIdentifier(_params.pool, _params.hook, _params.tickLower, _params.tickUpper);
 
@@ -205,7 +204,7 @@ contract SushiV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, Acc
             getAmountsForLiquidity(_params.pool, _params.tickLower, _params.tickUpper, uint128(_params.liquidity));
 
         if (posCache.amount0 > 0 && posCache.amount1 > 0) {
-            revert UniswapV3SingleTickLiquidityHandlerV2__InRangeLP();
+            revert SushiV3SingleTickLiquidityHandlerV3__InRangeLP();
         }
 
         (posCache.liquidity,,,) = addLiquidity(
@@ -336,7 +335,7 @@ contract SushiV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, Acc
         posCache.liquidityToBurn = _convertToAssets(_params.shares, tokenId);
 
         if ((tki.totalLiquidity - tki.liquidityUsed) < posCache.liquidityToBurn) {
-            revert UniswapV3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
+            revert SushiV3SingleTickLiquidityHandlerV3__InsufficientLiquidity();
         }
 
         (posCache.amount0, posCache.amount1) =
@@ -456,11 +455,11 @@ contract SushiV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, Acc
         ReserveLiquidityData storage rld = reservedLiquidityPerUser[tokenId][context];
 
         if (rld.lastReserve + reserveCooldown > block.timestamp) {
-            revert UniswapV3SingleTickLiquidityHandlerV2__BeforeReserveCooldown();
+            revert SushiV3SingleTickLiquidityHandlerV3__BeforeReserveCooldown();
         }
 
         if (((tki.totalLiquidity + tki.reservedLiquidity) - tki.liquidityUsed) < _params.shares) {
-            revert UniswapV3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
+            revert SushiV3SingleTickLiquidityHandlerV3__InsufficientLiquidity();
         }
 
         (uint256 amount0, uint256 amount1) = _params.pool.burn(_params.tickLower, _params.tickUpper, _params.shares);
@@ -502,7 +501,7 @@ contract SushiV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, Acc
         }
 
         if ((tki.totalLiquidity - tki.liquidityUsed) < _params.liquidityToUse) {
-            revert UniswapV3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
+            revert SushiV3SingleTickLiquidityHandlerV3__InsufficientLiquidity();
         }
 
         (uint256 amount0, uint256 amount1) =
@@ -889,7 +888,7 @@ contract SushiV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, Acc
 
     function onlyWhitelisted() private view {
         if (!whitelistedApps[msg.sender]) {
-            revert UniswapV3SingleTickLiquidityHandlerV2__NotWhitelisted();
+            revert SushiV3SingleTickLiquidityHandlerV3__NotWhitelisted();
         }
     }
 

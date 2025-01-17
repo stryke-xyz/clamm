@@ -15,7 +15,6 @@ import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {FullMath} from "@uniswap/v3-core/contracts/libraries/FullMath.sol";
 import {FixedPoint128} from "@uniswap/v3-core/contracts/libraries/FixedPoint128.sol";
-import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 
 // Contracts
 import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
@@ -129,19 +128,22 @@ contract UniswapV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, A
     event LogUsePosition(uint256 tokenId, uint128 liquidityUsed);
     event LogUnusePosition(uint256 tokenId, uint128 liquidityUnused);
     event LogDonation(uint256 tokenId, uint128 liquidityDonated);
+    event LogUpdateWhitelistedPools(address _pool, bool _status);
     event LogUpdateWhitelistedApp(address _app, bool _status);
     event LogUpdatedLockBlockAndReserveCooldownDuration(uint64 _newLockedBlockDuration, uint64 _newReserveCooldown);
     event LogReservedLiquidity(uint256 tokenId, uint128 liquidityReserved, address user);
     event LogWithdrawReservedLiquidity(uint256 tokenId, uint128 liquidityWithdrawn, address user);
 
     // errors
-    error UniswapV3SingleTickLiquidityHandlerV2__NotWhitelisted();
-    error UniswapV3SingleTickLiquidityHandlerV2__InRangeLP();
-    error UniswapV3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
-    error UniswapV3SingleTickLiquidityHandlerV2__BeforeReserveCooldown();
+    error UniswapV3SingleTickLiquidityHandlerV3__NotWhitelisted();
+    error UniswapV3SingleTickLiquidityHandlerV3__InRangeLP();
+    error UniswapV3SingleTickLiquidityHandlerV3__InsufficientLiquidity();
+    error UniswapV3SingleTickLiquidityHandlerV3__BeforeReserveCooldown();
+    error UniswapV3SingleTickLiquidityHandlerV3__NotWhitelistedPool();
 
     mapping(uint256 => TokenIdInfo) public tokenIds;
     mapping(address => bool) public whitelistedApps;
+    mapping(address => bool) public whitelistedPools;
     mapping(uint256 => mapping(address => ReserveLiquidityData)) public reservedLiquidityPerUser;
 
     ISwapRouter swapRouter;
@@ -178,6 +180,8 @@ contract UniswapV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, A
 
         MintPositionParams memory _params = abi.decode(_mintPositionData, (MintPositionParams));
 
+        if (!whitelistedPools[address(_params.pool)]) revert UniswapV3SingleTickLiquidityHandlerV3__NotWhitelistedPool();
+
         uint256 tokenId = _getHandlerIdentifier(_params.pool, _params.hook, _params.tickLower, _params.tickUpper);
 
         TokenIdInfo storage tki = tokenIds[tokenId];
@@ -200,7 +204,7 @@ contract UniswapV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, A
             getAmountsForLiquidity(_params.pool, _params.tickLower, _params.tickUpper, uint128(_params.liquidity));
 
         if (posCache.amount0 > 0 && posCache.amount1 > 0) {
-            revert UniswapV3SingleTickLiquidityHandlerV2__InRangeLP();
+            revert UniswapV3SingleTickLiquidityHandlerV3__InRangeLP();
         }
 
         (posCache.liquidity,,,) = addLiquidity(
@@ -331,7 +335,7 @@ contract UniswapV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, A
         posCache.liquidityToBurn = _convertToAssets(_params.shares, tokenId);
 
         if ((tki.totalLiquidity - tki.liquidityUsed) < posCache.liquidityToBurn) {
-            revert UniswapV3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
+            revert UniswapV3SingleTickLiquidityHandlerV3__InsufficientLiquidity();
         }
 
         (posCache.amount0, posCache.amount1) =
@@ -451,11 +455,11 @@ contract UniswapV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, A
         ReserveLiquidityData storage rld = reservedLiquidityPerUser[tokenId][context];
 
         if (rld.lastReserve + reserveCooldown > block.timestamp) {
-            revert UniswapV3SingleTickLiquidityHandlerV2__BeforeReserveCooldown();
+            revert UniswapV3SingleTickLiquidityHandlerV3__BeforeReserveCooldown();
         }
 
         if (((tki.totalLiquidity + tki.reservedLiquidity) - tki.liquidityUsed) < _params.shares) {
-            revert UniswapV3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
+            revert UniswapV3SingleTickLiquidityHandlerV3__InsufficientLiquidity();
         }
 
         (uint256 amount0, uint256 amount1) = _params.pool.burn(_params.tickLower, _params.tickUpper, _params.shares);
@@ -497,7 +501,7 @@ contract UniswapV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, A
         }
 
         if ((tki.totalLiquidity - tki.liquidityUsed) < _params.liquidityToUse) {
-            revert UniswapV3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
+            revert UniswapV3SingleTickLiquidityHandlerV3__InsufficientLiquidity();
         }
 
         (uint256 amount0, uint256 amount1) =
@@ -884,11 +888,21 @@ contract UniswapV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, A
 
     function onlyWhitelisted() private view {
         if (!whitelistedApps[msg.sender]) {
-            revert UniswapV3SingleTickLiquidityHandlerV2__NotWhitelisted();
+            revert UniswapV3SingleTickLiquidityHandlerV3__NotWhitelisted();
         }
     }
 
     // admin functions
+
+    /**
+     * @notice Updates the whitelist status of the given pool.
+     * @param _pool The pool to update the whitelist status of.
+     * @param _status The new whitelist status of the pool.
+     */
+    function updateWhitelistedPools(address _pool, bool _status) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        whitelistedPools[_pool] = _status;
+        emit LogUpdateWhitelistedPools(_pool, _status);
+    }
 
     /**
      * @notice Updates the whitelist status of the given app.

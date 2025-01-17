@@ -15,7 +15,6 @@ import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {FullMath} from "@uniswap/v3-core/contracts/libraries/FullMath.sol";
 import {FixedPoint128} from "@uniswap/v3-core/contracts/libraries/FixedPoint128.sol";
-import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 
 // Contracts
 import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
@@ -130,18 +129,21 @@ contract PancakeV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, A
     event LogUnusePosition(uint256 tokenId, uint128 liquidityUnused);
     event LogDonation(uint256 tokenId, uint128 liquidityDonated);
     event LogUpdateWhitelistedApp(address _app, bool _status);
+    event LogUpdateWhitelistedPools(address _pool, bool _status);
     event LogUpdatedLockBlockAndReserveCooldownDuration(uint64 _newLockedBlockDuration, uint64 _newReserveCooldown);
     event LogReservedLiquidity(uint256 tokenId, uint128 liquidityReserved, address user);
     event LogWithdrawReservedLiquidity(uint256 tokenId, uint128 liquidityWithdrawn, address user);
 
     // errors
-    error PancakeV3SingleTickLiquidityHandlerV2__NotWhitelisted();
-    error PancakeV3SingleTickLiquidityHandlerV2__InRangeLP();
-    error PancakeV3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
-    error PancakeV3SingleTickLiquidityHandlerV2__BeforeReserveCooldown();
+    error PancakeV3SingleTickLiquidityHandlerV3__NotWhitelisted();
+    error PancakeV3SingleTickLiquidityHandlerV3__InRangeLP();
+    error PancakeV3SingleTickLiquidityHandlerV3__InsufficientLiquidity();
+    error PancakeV3SingleTickLiquidityHandlerV3__BeforeReserveCooldown();
+    error PancakeV3SingleTickLiquidityHandlerV3__NotWhitelistedPool();
 
     mapping(uint256 => TokenIdInfo) public tokenIds;
     mapping(address => bool) public whitelistedApps;
+    mapping(address => bool) public whitelistedPools;
     mapping(uint256 => mapping(address => ReserveLiquidityData)) public reservedLiquidityPerUser;
 
     ISwapRouter swapRouter;
@@ -164,7 +166,7 @@ contract PancakeV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, A
      * @notice Mints a new position for the user.
      * @param context The address of the user minting the position.
      * @param _mintPositionData The data required to mint the position.
-     * @dev Only whitelisted DopexV2PositionManager can call it. It auto-compounds
+     * @dev Only whitelisted DopexV2PositionManager or DopexV2PositionManagerV2 can call it. It auto-compounds
      * the fees on mint. You cannot mint in range liquidity. Recommended to add liquidity
      * on a single ticks only.
      * @return sharesMinted The number of shares minted.
@@ -177,6 +179,8 @@ contract PancakeV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, A
         onlyWhitelisted();
 
         MintPositionParams memory _params = abi.decode(_mintPositionData, (MintPositionParams));
+        
+        if (!whitelistedPools[address(_params.pool)]) revert PancakeV3SingleTickLiquidityHandlerV3__NotWhitelistedPool();
 
         uint256 tokenId = _getHandlerIdentifier(_params.pool, _params.hook, _params.tickLower, _params.tickUpper);
 
@@ -200,7 +204,7 @@ contract PancakeV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, A
             getAmountsForLiquidity(_params.pool, _params.tickLower, _params.tickUpper, uint128(_params.liquidity));
 
         if (posCache.amount0 > 0 && posCache.amount1 > 0) {
-            revert PancakeV3SingleTickLiquidityHandlerV2__InRangeLP();
+            revert PancakeV3SingleTickLiquidityHandlerV3__InRangeLP();
         }
 
         (posCache.liquidity,,,) = addLiquidity(
@@ -309,7 +313,7 @@ contract PancakeV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, A
      * @notice Burn an existing position.
      * @param context The address of the user burning the position.
      * @param _burnPositionData The data required to burn the position.
-     * @dev Only whitelisted DopexV2PositionManager can call it. Users will receive the fees
+     * @dev Only whitelisted DopexV2PositionManager or DopexV2PositionManagerV2 can call it. Users will receive the fees
      * in either token0 or token1 or both based on the fee collection.
      * @return The number of shares burned.
      */
@@ -331,7 +335,7 @@ contract PancakeV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, A
         posCache.liquidityToBurn = _convertToAssets(_params.shares, tokenId);
 
         if ((tki.totalLiquidity - tki.liquidityUsed) < posCache.liquidityToBurn) {
-            revert PancakeV3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
+            revert PancakeV3SingleTickLiquidityHandlerV3__InsufficientLiquidity();
         }
 
         (posCache.amount0, posCache.amount1) =
@@ -451,11 +455,11 @@ contract PancakeV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, A
         ReserveLiquidityData storage rld = reservedLiquidityPerUser[tokenId][context];
 
         if (rld.lastReserve + reserveCooldown > block.timestamp) {
-            revert PancakeV3SingleTickLiquidityHandlerV2__BeforeReserveCooldown();
+            revert PancakeV3SingleTickLiquidityHandlerV3__BeforeReserveCooldown();
         }
 
         if (((tki.totalLiquidity + tki.reservedLiquidity) - tki.liquidityUsed) < _params.shares) {
-            revert PancakeV3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
+            revert PancakeV3SingleTickLiquidityHandlerV3__InsufficientLiquidity();
         }
 
         (uint256 amount0, uint256 amount1) = _params.pool.burn(_params.tickLower, _params.tickUpper, _params.shares);
@@ -473,7 +477,7 @@ contract PancakeV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, A
     /**
      * @notice Use an existing position.
      * @param _usePositionHandler The data required to use the position.
-     * @dev Only whitelisted DopexV2PositionManager can call it.
+     * @dev Only whitelisted DopexV2PositionManager or DopexV2PositionManagerV2 can call it.
      * @return tokens The addresses of the tokens that were unwrapped.
      * @return amounts The amounts of the tokens that were unwrapped.
      * @return liquidityUsed The amount of liquidity that was used.
@@ -497,7 +501,7 @@ contract PancakeV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, A
         }
 
         if ((tki.totalLiquidity - tki.liquidityUsed) < _params.liquidityToUse) {
-            revert PancakeV3SingleTickLiquidityHandlerV2__InsufficientLiquidity();
+            revert PancakeV3SingleTickLiquidityHandlerV3__InsufficientLiquidity();
         }
 
         (uint256 amount0, uint256 amount1) =
@@ -524,7 +528,7 @@ contract PancakeV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, A
     /**
      * @notice Unuse a portion of an existing position.
      * @param _unusePositionData The data required to unuse the position.
-     * @dev Only whitelisted DopexV2PositionManager can call it.
+     * @dev Only whitelisted DopexV2PositionManager or DopexV2PositionManager can call it.
      * @return amounts The amounts of the tokens that were wrapped.
      * @return liquidityUnused The amount of liquidity that was unused.
      */
@@ -884,11 +888,21 @@ contract PancakeV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, A
 
     function onlyWhitelisted() private view {
         if (!whitelistedApps[msg.sender]) {
-            revert PancakeV3SingleTickLiquidityHandlerV2__NotWhitelisted();
+            revert PancakeV3SingleTickLiquidityHandlerV3__NotWhitelisted();
         }
     }
 
     // admin functions
+
+    /**
+     * @notice Updates the whitelist status of the given pool.
+     * @param _pool The pool to update the whitelist status of.
+     * @param _status The new whitelist status of the pool.
+     */
+    function updateWhitelistedPools(address _pool, bool _status) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        whitelistedPools[_pool] = _status;
+        emit LogUpdateWhitelistedPools(_pool, _status);
+    }
 
     /**
      * @notice Updates the whitelist status of the given app.

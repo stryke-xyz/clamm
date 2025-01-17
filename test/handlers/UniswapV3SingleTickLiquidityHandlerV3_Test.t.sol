@@ -16,7 +16,7 @@ import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Po
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
 
-contract SushiV3SingleTickLiquidityHandlerV3_Test is Test {
+contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
     using TickMath for int24;
 
     address ETH; // token1
