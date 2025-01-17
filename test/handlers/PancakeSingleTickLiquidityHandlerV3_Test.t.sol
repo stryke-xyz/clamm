@@ -88,6 +88,8 @@ contract PancakeSingleTickLiquidityHandlerV3_Test is Test {
         positionManager.updateWhitelistHandler(address(pcsV3Handler), true);
 
         pcsV3Handler.updateWhitelistedApps(address(positionManager), true);
+
+        pcsV3Handler.updateWhitelistedPools(address(pool), true);
     }
 
     function testExample() public {}

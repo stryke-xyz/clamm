@@ -88,6 +88,8 @@ contract SushiV3SingleTickLiquidityHandlerV3_Test is Test {
         positionManager.updateWhitelistHandler(address(handler), true);
 
         handler.updateWhitelistedApps(address(positionManager), true);
+
+        handler.updateWhitelistedPools(address(pool), true);
     }
 
     function testMintPosition() public {

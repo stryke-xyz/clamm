@@ -5,9 +5,9 @@ import "forge-std/Test.sol";
 
 import {DopexV2PositionManagerV2} from "../../src/DopexV2PositionManagerV2.sol";
 import {IHandlerV3} from "../../src/interfaces/IHandlerV3.sol";
-import {SushiV3TestLib} from "../utils/sushi-v3/SushiV3TestLib.sol";
-import {SushiV3SingleTickLiquidityHarnessV3} from "../harness/SushiV3SingleTickLiquidityHarnessV3.sol";
-import {SushiV3SingleTickLiquidityHandlerV3} from "../../src/handlers/SushiV3SingleTickLiquidityHandlerV3.sol";
+import {UniswapV3TestLib} from "../utils/uniswap-v3/UniswapV3TestLib.sol";
+import {UniswapV3SingleTickLiquidityHarnessV3} from "../harness/UniswapV3SingleTickLiquidityHarnessV3.sol";
+import {UniswapV3SingleTickLiquidityHandlerV3} from "../../src/handlers/UniswapV3SingleTickLiquidityHandlerV3.sol";
 import {ERC20Mock} from "../mocks/ERC20Mock.sol";
 
 import {IUniswapV3Factory} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
@@ -25,7 +25,7 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
     ERC20Mock token0;
     ERC20Mock token1;
 
-    SushiV3TestLib testLib;
+    UniswapV3TestLib uniswapV3TestLib;
     IUniswapV3Pool pool;
 
     uint24 fee = 500;
@@ -41,8 +41,8 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
     address tango = makeAddr("tango"); // tango address
 
     DopexV2PositionManagerV2 positionManager;
-    SushiV3SingleTickLiquidityHarnessV3 positionManagerHarness;
-    SushiV3SingleTickLiquidityHandlerV3 handler;
+    UniswapV3SingleTickLiquidityHarnessV3 positionManagerHarness;
+    UniswapV3SingleTickLiquidityHandlerV3 uniV3Handler;
 
     address hook = address(0);
     bytes hookData = new bytes(0);
@@ -53,14 +53,14 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
         ETH = address(new ERC20Mock());
         LUSD = address(new ERC20Mock());
 
-        testLib = new SushiV3TestLib();
-        pool = IUniswapV3Pool(testLib.deploySushiV3PoolAndInitializePrice(ETH, LUSD, fee, initSqrtPriceX96));
+        uniswapV3TestLib = new UniswapV3TestLib();
+        pool = IUniswapV3Pool(uniswapV3TestLib.deployUniswapV3PoolAndInitializePrice(ETH, LUSD, fee, initSqrtPriceX96));
 
         token0 = ERC20Mock(pool.token0());
         token1 = ERC20Mock(pool.token1());
 
-        testLib.addLiquidity(
-            SushiV3TestLib.AddLiquidityStruct({
+        uniswapV3TestLib.addLiquidity(
+            UniswapV3TestLib.AddLiquidityStruct({
                 user: alice,
                 pool: pool,
                 desiredTickLower: -78245, // 2500
@@ -73,19 +73,21 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
 
         positionManager = new DopexV2PositionManagerV2();
 
-        handler = new SushiV3SingleTickLiquidityHandlerV3(
-            0x1af415a1EbA07a4986a52B6f2e7dE7003D82231e,
-            0xe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54,
-            address(testLib.swapRouter())
+        uniV3Handler = new UniswapV3SingleTickLiquidityHandlerV3(
+            address(uniswapV3TestLib.factory()),
+            0xa598dd2fba360510c5a8f02f44423a4468e902df5857dbce3ca162a43a3a31ff,
+            address(uniswapV3TestLib.swapRouter())
         );
 
-        positionManagerHarness = new SushiV3SingleTickLiquidityHarnessV3(testLib, positionManager, handler);
+        positionManagerHarness = new UniswapV3SingleTickLiquidityHarnessV3(uniswapV3TestLib, positionManager, uniV3Handler);
 
-        positionManager.updateWhitelistHandlerWithApp(address(handler), garbage, true);
+        positionManager.updateWhitelistHandlerWithApp(address(uniV3Handler), garbage, true);
 
-        positionManager.updateWhitelistHandler(address(handler), true);
+        positionManager.updateWhitelistHandler(address(uniV3Handler), true);
 
-        handler.updateWhitelistedApps(address(positionManager), true);
+        uniV3Handler.updateWhitelistedApps(address(positionManager), true);
+
+        uniV3Handler.updateWhitelistedPools(address(pool), true);
     }
 
     function testMintPosition() public {
@@ -112,8 +114,8 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
 
         positionManagerHarness.mintPosition(token0, token1, amount0, amount1, tickLower, tickUpper, pool, hook, bob);
 
-        testLib.performSwap(
-            SushiV3TestLib.SwapParamsStruct({
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
                 user: garbage,
                 pool: pool,
                 amountIn: 2_000_000e18,
@@ -135,8 +137,8 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
         int24 tickLower = -77420; // 2299.8
         int24 tickUpper = -77410; // 2302.1
 
-        testLib.performSwap(
-            SushiV3TestLib.SwapParamsStruct({
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
                 user: garbage,
                 pool: pool,
                 amountIn: 2_000_000e18,
@@ -147,8 +149,8 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
 
         positionManagerHarness.mintPosition(token0, token1, amount01, amount11, tickLower, tickUpper, pool, hook, bob);
 
-        testLib.performSwap(
-            SushiV3TestLib.SwapParamsStruct({
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
                 user: garbage,
                 pool: pool,
                 amountIn: 910e18,
@@ -169,8 +171,8 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
 
         positionManagerHarness.mintPosition(token0, token1, amount0, amount1, tickLower, tickUpper, pool, hook, bob);
 
-        testLib.performSwap(
-            SushiV3TestLib.SwapParamsStruct({
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
                 user: garbage,
                 pool: pool,
                 amountIn: 2_000_000e18,
@@ -179,8 +181,8 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
             })
         );
 
-        testLib.performSwap(
-            SushiV3TestLib.SwapParamsStruct({
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
                 user: garbage,
                 pool: pool,
                 amountIn: 910e18,
@@ -191,8 +193,8 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
 
         positionManagerHarness.mintPosition(token0, token1, amount0, amount1, tickLower, tickUpper, pool, hook, jason);
 
-        testLib.performSwap(
-            SushiV3TestLib.SwapParamsStruct({
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
                 user: garbage,
                 pool: pool,
                 amountIn: 2_000_000e18,
@@ -201,8 +203,8 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
             })
         );
 
-        testLib.performSwap(
-            SushiV3TestLib.SwapParamsStruct({
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
                 user: garbage,
                 pool: pool,
                 amountIn: 910e18,
@@ -218,10 +220,10 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
 
         testMintPositionWithSwaps();
 
-        uint256 bobBalance = handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+        uint256 bobBalance = uniV3Handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         uint256 jasonBalance =
-            handler.balanceOf(jason, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+            uniV3Handler.balanceOf(jason, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         positionManagerHarness.burnPosition(bobBalance, tickLower, tickUpper, pool, hook, bob);
 
@@ -241,8 +243,8 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
 
         positionManagerHarness.mintPosition(token0, token1, 0, 2, tickLower, tickUpper, pool, hook, bob);
 
-        testLib.performSwap(
-            SushiV3TestLib.SwapParamsStruct({
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
                 user: garbage,
                 pool: pool,
                 amountIn: 2_000_000e18,
@@ -253,10 +255,10 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
 
         positionManagerHarness.mintPosition(token0, token1, 2, 0, tickLower, tickUpper, pool, hook, jason);
 
-        uint256 bobBalance = handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+        uint256 bobBalance = uniV3Handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         uint256 jasonBalance =
-            handler.balanceOf(jason, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+            uniV3Handler.balanceOf(jason, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         positionManagerHarness.burnPosition(bobBalance, tickLower, tickUpper, pool, hook, bob);
 
@@ -280,8 +282,8 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
 
         positionManagerHarness.usePosition(amount0, amount1, tickLower, tickUpper, pool, hook, hookData, garbage);
 
-        testLib.performSwap(
-            SushiV3TestLib.SwapParamsStruct({
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
                 user: garbage,
                 pool: pool,
                 amountIn: 2_000_000e18,
@@ -290,8 +292,8 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
             })
         );
 
-        testLib.performSwap(
-            SushiV3TestLib.SwapParamsStruct({
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
                 user: garbage,
                 pool: pool,
                 amountIn: 910e18,
@@ -315,10 +317,10 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
             amount0, amount1, 0, 1e18, tickLower, tickUpper, pool, hook, hookData, garbage
         );
 
-        uint256 bobBalance = handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+        uint256 bobBalance = uniV3Handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         uint256 jasonBalance =
-            handler.balanceOf(jason, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+            uniV3Handler.balanceOf(jason, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         positionManagerHarness.burnPosition(bobBalance, tickLower, tickUpper, pool, hook, bob);
 
@@ -355,16 +357,16 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
 
         vm.roll(block.number + 10);
 
-        uint256 bobBalance = handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+        uint256 bobBalance = uniV3Handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         uint256 jasonBalance =
-            handler.balanceOf(jason, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+            uniV3Handler.balanceOf(jason, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         uint256 rogerBalance =
-            handler.balanceOf(roger, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+            uniV3Handler.balanceOf(roger, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         uint256 tangoBalance =
-            handler.balanceOf(tango, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+            uniV3Handler.balanceOf(tango, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         positionManagerHarness.burnPosition(bobBalance, tickLower, tickUpper, pool, hook, bob);
 
@@ -393,11 +395,11 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
 
         positionManagerHarness.usePosition(amount0, amount1, tickLower, tickUpper, pool, hook, hookData, garbage);
 
-        SushiV3SingleTickLiquidityHandlerV3.TokenIdInfo memory tki =
-            handler.getTokenIdData(uint256(keccak256(abi.encode(address(handler), pool, hook, tickLower, tickUpper))));
+        UniswapV3SingleTickLiquidityHandlerV3.TokenIdInfo memory tki =
+            uniV3Handler.getTokenIdData(uint256(keccak256(abi.encode(address(uniV3Handler), pool, hook, tickLower, tickUpper))));
 
-        testLib.performSwap(
-            SushiV3TestLib.SwapParamsStruct({
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
                 user: trader,
                 pool: pool,
                 amountIn: 200e18, // pushes to 1921
@@ -406,8 +408,8 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
             })
         );
 
-        testLib.performSwap(
-            SushiV3TestLib.SwapParamsStruct({
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
                 user: garbage,
                 pool: pool,
                 amountIn: token0.balanceOf(garbage), // pushes to 1925
@@ -417,7 +419,7 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
         );
 
         (uint256 a0, uint256 a1) = LiquidityAmounts.getAmountsForLiquidity(
-            testLib.getCurrentSqrtPriceX96(pool),
+            uniswapV3TestLib.getCurrentSqrtPriceX96(pool),
             tickLower.getSqrtRatioAtTick(),
             tickUpper.getSqrtRatioAtTick(),
             tki.liquidityUsed
@@ -425,8 +427,8 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
 
         positionManagerHarness.unusePosition(a0, a1, 0, 1, tickLower, tickUpper, pool, hook, hookData, garbage);
 
-        testLib.performSwap(
-            SushiV3TestLib.SwapParamsStruct({
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
                 user: garbage,
                 pool: pool,
                 amountIn: token1.balanceOf(garbage), // pushes to 1921
@@ -451,11 +453,11 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
 
         positionManagerHarness.usePosition(amount0, amount1, tickLower, tickUpper, pool, hook, hookData, garbage);
 
-        SushiV3SingleTickLiquidityHandlerV3.TokenIdInfo memory tki =
-            handler.getTokenIdData(uint256(keccak256(abi.encode(address(handler), pool, hook, tickLower, tickUpper))));
+        UniswapV3SingleTickLiquidityHandlerV3.TokenIdInfo memory tki =
+            uniV3Handler.getTokenIdData(uint256(keccak256(abi.encode(address(uniV3Handler), pool, hook, tickLower, tickUpper))));
 
-        testLib.performSwap(
-            SushiV3TestLib.SwapParamsStruct({
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
                 user: trader,
                 pool: pool,
                 amountIn: 400000e18, // pushes to 2078
@@ -464,8 +466,8 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
             })
         );
 
-        testLib.performSwap(
-            SushiV3TestLib.SwapParamsStruct({
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
                 user: garbage,
                 pool: pool,
                 amountIn: token1.balanceOf(garbage), // pushes to 2076
@@ -475,7 +477,7 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
         );
 
         (uint256 a0, uint256 a1) = LiquidityAmounts.getAmountsForLiquidity(
-            testLib.getCurrentSqrtPriceX96(pool),
+            uniswapV3TestLib.getCurrentSqrtPriceX96(pool),
             tickLower.getSqrtRatioAtTick(),
             tickUpper.getSqrtRatioAtTick(),
             tki.liquidityUsed
@@ -483,8 +485,8 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
 
         positionManagerHarness.unusePosition(a0, a1, 1, 0, tickLower, tickUpper, pool, hook, hookData, garbage);
 
-        testLib.performSwap(
-            SushiV3TestLib.SwapParamsStruct({
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
                 user: garbage,
                 pool: pool,
                 amountIn: token0.balanceOf(garbage), // pushes to 1921
@@ -508,10 +510,10 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
         positionManagerHarness.usePosition(amount0, 10e18 - 3, tickLower, tickUpper, pool, hook, hookData, garbage);
 
         vm.startPrank(bob);
-        uint256 bobBalance = handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+        uint256 bobBalance = uniV3Handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         bytes memory reserveData = abi.encode(
-            SushiV3SingleTickLiquidityHandlerV3.BurnPositionParams({
+            UniswapV3SingleTickLiquidityHandlerV3.BurnPositionParams({
                 pool: pool,
                 hook: hook,
                 tickLower: tickLower,
@@ -520,7 +522,7 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
             })
         );
 
-        positionManager.reserveLiquidity(IHandlerV3(address(handler)), reserveData);
+        positionManager.reserveLiquidity(IHandlerV3(address(uniV3Handler)), reserveData);
 
         vm.stopPrank();
 
@@ -531,12 +533,12 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
         vm.warp(block.timestamp + 6 hours);
         vm.startPrank(bob);
 
-        (uint256 bobReserveBalance,) = handler.reservedLiquidityPerUser(
-            uint256(keccak256(abi.encode(address(handler), pool, tickLower, tickUpper))), bob
+        (uint256 bobReserveBalance,) = uniV3Handler.reservedLiquidityPerUser(
+            uint256(keccak256(abi.encode(address(uniV3Handler), pool, tickLower, tickUpper))), bob
         );
 
         reserveData = abi.encode(
-            SushiV3SingleTickLiquidityHandlerV3.BurnPositionParams({
+            UniswapV3SingleTickLiquidityHandlerV3.BurnPositionParams({
                 pool: pool,
                 hook: hook,
                 tickLower: tickLower,
@@ -545,12 +547,12 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
             })
         );
 
-        positionManager.withdrawReserveLiquidity(IHandlerV3(address(handler)), reserveData);
+        positionManager.withdrawReserveLiquidity(IHandlerV3(address(uniV3Handler)), reserveData);
 
         vm.stopPrank();
 
         uint256 jasonBalance =
-            handler.balanceOf(jason, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+            uniV3Handler.balanceOf(jason, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         positionManagerHarness.burnPosition(jasonBalance - 1, tickLower, tickUpper, pool, hook, jason);
     }
@@ -566,8 +568,8 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
 
         positionManagerHarness.mintPosition(token0, token1, amount0, amount1, tickLower, tickUpper, pool, hook, jason);
 
-        testLib.performSwap(
-            SushiV3TestLib.SwapParamsStruct({
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
                 user: garbage,
                 pool: pool,
                 amountIn: 2_000_000e18,
@@ -576,8 +578,8 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
             })
         );
 
-        testLib.performSwap(
-            SushiV3TestLib.SwapParamsStruct({
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
                 user: garbage,
                 pool: pool,
                 amountIn: 910e18,
@@ -589,10 +591,10 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
         positionManagerHarness.usePosition(amount0, amount1, tickLower, tickUpper, pool, hook, hookData, garbage);
 
         vm.startPrank(bob);
-        uint256 bobBalance = handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+        uint256 bobBalance = uniV3Handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         bytes memory reserveData = abi.encode(
-            SushiV3SingleTickLiquidityHandlerV3.BurnPositionParams({
+            UniswapV3SingleTickLiquidityHandlerV3.BurnPositionParams({
                 pool: pool,
                 hook: hook,
                 tickLower: tickLower,
@@ -601,12 +603,12 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
             })
         );
 
-        positionManager.reserveLiquidity(IHandlerV3(address(handler)), reserveData);
+        positionManager.reserveLiquidity(IHandlerV3(address(uniV3Handler)), reserveData);
 
         vm.stopPrank();
 
-        testLib.performSwap(
-            SushiV3TestLib.SwapParamsStruct({
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
                 user: garbage,
                 pool: pool,
                 amountIn: 2_000_000e18,
@@ -615,8 +617,8 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
             })
         );
 
-        testLib.performSwap(
-            SushiV3TestLib.SwapParamsStruct({
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
                 user: garbage,
                 pool: pool,
                 amountIn: 910e18,
@@ -629,8 +631,8 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
             amount0, amount1, 0, 1, tickLower, tickUpper, pool, hook, hookData, garbage
         );
 
-        testLib.performSwap(
-            SushiV3TestLib.SwapParamsStruct({
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
                 user: garbage,
                 pool: pool,
                 amountIn: 2_000_000e18,
@@ -639,8 +641,8 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
             })
         );
 
-        testLib.performSwap(
-            SushiV3TestLib.SwapParamsStruct({
+        uniswapV3TestLib.performSwap(
+            UniswapV3TestLib.SwapParamsStruct({
                 user: garbage,
                 pool: pool,
                 amountIn: 910e18,
@@ -652,13 +654,13 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
         vm.warp(block.timestamp + 6 hours);
         vm.startPrank(bob);
 
-        (uint256 bobReserveBalance,) = handler.reservedLiquidityPerUser(
-            uint256(keccak256(abi.encode(address(handler), pool, tickLower, tickUpper))), bob
+        (uint256 bobReserveBalance,) = uniV3Handler.reservedLiquidityPerUser(
+            uint256(keccak256(abi.encode(address(uniV3Handler), pool, tickLower, tickUpper))), bob
         );
 
         reserveData = (
             abi.encode(
-                SushiV3SingleTickLiquidityHandlerV3.BurnPositionParams({
+                UniswapV3SingleTickLiquidityHandlerV3.BurnPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -668,12 +670,12 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
             )
         );
 
-        positionManager.withdrawReserveLiquidity(IHandlerV3(address(handler)), reserveData);
+        positionManager.withdrawReserveLiquidity(IHandlerV3(address(uniV3Handler)), reserveData);
 
         vm.stopPrank();
 
         uint256 jasonBalance =
-            handler.balanceOf(jason, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+            uniV3Handler.balanceOf(jason, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         positionManagerHarness.burnPosition(jasonBalance - 1, tickLower, tickUpper, pool, hook, jason);
     }
@@ -692,11 +694,11 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
         positionManagerHarness.mintPosition(token0, token1, amount0, amount1, tickLower, tickUpper, pool, hook, jason);
 
         vm.startPrank(bob);
-        uint256 bobBalance = handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+        uint256 bobBalance = uniV3Handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         bytes memory reserveData = (
             abi.encode(
-                SushiV3SingleTickLiquidityHandlerV3.BurnPositionParams({
+                UniswapV3SingleTickLiquidityHandlerV3.BurnPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -706,19 +708,19 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
             )
         );
 
-        positionManager.reserveLiquidity(IHandlerV3(address(handler)), reserveData);
+        positionManager.reserveLiquidity(IHandlerV3(address(uniV3Handler)), reserveData);
 
         vm.stopPrank();
 
         vm.warp(block.timestamp + 6 hours);
         vm.startPrank(bob);
-        (uint256 bobReserveBalance,) = handler.reservedLiquidityPerUser(
-            uint256(keccak256(abi.encode(address(handler), pool, tickLower, tickUpper))), bob
+        (uint256 bobReserveBalance,) = uniV3Handler.reservedLiquidityPerUser(
+            uint256(keccak256(abi.encode(address(uniV3Handler), pool, tickLower, tickUpper))), bob
         );
 
         reserveData = (
             abi.encode(
-                SushiV3SingleTickLiquidityHandlerV3.BurnPositionParams({
+                UniswapV3SingleTickLiquidityHandlerV3.BurnPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -728,12 +730,12 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
             )
         );
 
-        positionManager.reserveLiquidity(IHandlerV3(address(handler)), reserveData);
+        positionManager.reserveLiquidity(IHandlerV3(address(uniV3Handler)), reserveData);
 
         vm.stopPrank();
 
         uint256 jasonBalance =
-            handler.balanceOf(jason, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+            uniV3Handler.balanceOf(jason, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         positionManagerHarness.burnPosition(jasonBalance - 1, tickLower, tickUpper, pool, hook, jason);
     }
@@ -752,11 +754,11 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
         positionManagerHarness.usePosition(amount0, 10e18 - 3, tickLower, tickUpper, pool, hook, hookData, garbage);
 
         vm.startPrank(bob);
-        uint256 bobBalance = handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+        uint256 bobBalance = uniV3Handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         bytes memory reserveData = abi.encode(
             abi.encode(
-                SushiV3SingleTickLiquidityHandlerV3.BurnPositionParams({
+                UniswapV3SingleTickLiquidityHandlerV3.BurnPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -766,7 +768,7 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
             )
         );
 
-        positionManager.reserveLiquidity(IHandlerV3(address(handler)), reserveData);
+        positionManager.reserveLiquidity(IHandlerV3(address(uniV3Handler)), reserveData);
 
         vm.stopPrank();
 
@@ -775,13 +777,13 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
         );
 
         vm.startPrank(bob);
-        (uint256 bobReserveBalance,) = handler.reservedLiquidityPerUser(
-            uint256(keccak256(abi.encode(address(handler), pool, tickLower, tickUpper))), bob
+        (uint256 bobReserveBalance,) = uniV3Handler.reservedLiquidityPerUser(
+            uint256(keccak256(abi.encode(address(uniV3Handler), pool, tickLower, tickUpper))), bob
         );
 
         reserveData = (
             abi.encode(
-                SushiV3SingleTickLiquidityHandlerV3.BurnPositionParams({
+                UniswapV3SingleTickLiquidityHandlerV3.BurnPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -791,7 +793,7 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
             )
         );
 
-        positionManager.reserveLiquidity(IHandlerV3(address(handler)), reserveData);
+        positionManager.reserveLiquidity(IHandlerV3(address(uniV3Handler)), reserveData);
 
         vm.stopPrank();
     }
@@ -812,11 +814,11 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
         positionManagerHarness.usePosition(amount0, amount1 - 3, tickLower, tickUpper, pool, hook, hookData, garbage);
 
         vm.startPrank(bob);
-        uint256 bobBalance = handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+        uint256 bobBalance = uniV3Handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         bytes memory reserveData = (
             abi.encode(
-                SushiV3SingleTickLiquidityHandlerV3.BurnPositionParams({
+                UniswapV3SingleTickLiquidityHandlerV3.BurnPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -826,7 +828,7 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
             )
         );
 
-        positionManager.reserveLiquidity(IHandlerV3(address(handler)), reserveData);
+        positionManager.reserveLiquidity(IHandlerV3(address(uniV3Handler)), reserveData);
 
         vm.stopPrank();
 
@@ -835,7 +837,7 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
         );
 
         uint256 jasonBalance =
-            handler.balanceOf(jason, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+            uniV3Handler.balanceOf(jason, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         positionManagerHarness.burnPosition(jasonBalance - 1, tickLower, tickUpper, pool, hook, jason);
     }
@@ -854,11 +856,11 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
         positionManagerHarness.usePosition(amount0, 10e18 - 3, tickLower, tickUpper, pool, hook, hookData, garbage);
 
         vm.startPrank(bob);
-        uint256 bobBalance = handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
+        uint256 bobBalance = uniV3Handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
         bytes memory reserveData = (
             abi.encode(
-                SushiV3SingleTickLiquidityHandlerV3.BurnPositionParams({
+                UniswapV3SingleTickLiquidityHandlerV3.BurnPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -868,7 +870,7 @@ contract UniswapV3SingleTickLiquidityHandlerV3_Test is Test {
             )
         );
 
-        positionManager.reserveLiquidity(IHandlerV3(address(handler)), reserveData);
+        positionManager.reserveLiquidity(IHandlerV3(address(uniV3Handler)), reserveData);
 
         vm.stopPrank();
 
