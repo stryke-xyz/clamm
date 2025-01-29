@@ -7,3 +7,7 @@ optimizer = true
 optimizer_runs = 0
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
+
+[etherscan]
+sonic = { chain = 146, key = "${SONIC_SCAN_API_KEY}", url = "https://api.sonicscan.org/api" }
+arbitrum = { chain = 42161, key = "${ARBISCAN_API_KEY}", url = "https://api.arbiscan.io/api" }
