@@ -11,3 +11,4 @@ optimizer_runs = 0
 [etherscan]
 sonic = { chain = 146, key = "${SONIC_SCAN_API_KEY}", url = "https://api.sonicscan.org/api" }
 arbitrum = { chain = 42161, key = "${ARBISCAN_API_KEY}", url = "https://api.arbiscan.io/api" }
+base = { chain = 8453, key = "${BASESCAN_API_KEY}", url = "https://api.basescan.org/api" }
