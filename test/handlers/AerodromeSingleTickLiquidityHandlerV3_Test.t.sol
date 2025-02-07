@@ -6,17 +6,18 @@ import "forge-std/Test.sol";
 import {ICLFactory} from "../../src/aerodrome/v3-core/contracts/interfaces/ICLFactory.sol";
 import {ICLPool} from "../../src/aerodrome/v3-core/contracts/interfaces/ICLPool.sol";
 import {ISwapRouter} from "../../src/aerodrome/v3-core/contracts/interfaces/ISwapRouter.sol";
+import {IHandlerV3} from "../../src/interfaces/IHandlerV3.sol";
 
 import {AerodromeTestLib} from "../utils/aerodrome/AerodromeTestLib.sol";
 import {ERC20Mock} from "../mocks/ERC20Mock.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
 
-import {DopexV2PositionManager} from "../../src/DopexV2PositionManager.sol";
-import {AerodromeSingleTickLiquidityHarnessV2} from "../harness/AerodromeSingleTickLiquidityHarnessV2.sol";
-import {AerodromeSingleTickLiquidityHandlerV2} from "../../src/handlers/AerodromeSingleTickLiquidityHandlerV2.sol";
+import {DopexV2PositionManagerV2} from "../../src/DopexV2PositionManagerV2.sol";
+import {AerodromeSingleTickLiquidityHarnessV3} from "../harness/AerodromeSingleTickLiquidityHarnessV3.sol";
+import {AerodromeSingleTickLiquidityHandlerV3} from "../../src/handlers/AerodromeSingleTickLiquidityHandlerV3.sol";
 
-contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
+contract AerodromeSingleTickLiquidityHandlerV3_Test is Test {
     using TickMath for int24;
 
     address ETH; // token1
@@ -45,9 +46,9 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
 
     address testAddr = 0x07aE8551Be970cB1cCa11Dd7a11F47Ae82e70E67;
 
-    DopexV2PositionManager positionManager;
-    AerodromeSingleTickLiquidityHarnessV2 positionManagerHarness;
-    AerodromeSingleTickLiquidityHandlerV2 handler;
+    DopexV2PositionManagerV2 positionManager;
+    AerodromeSingleTickLiquidityHarnessV3 positionManagerHarness;
+    AerodromeSingleTickLiquidityHandlerV3 handler;
 
     address hook = address(0);
     bytes hookData = new bytes(0);
@@ -76,10 +77,10 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
             })
         );
 
-        handler = new AerodromeSingleTickLiquidityHandlerV2(clFactory, address(swapRouter));
-        positionManager = new DopexV2PositionManager();
+        handler = new AerodromeSingleTickLiquidityHandlerV3(clFactory, address(swapRouter));
+        positionManager = new DopexV2PositionManagerV2();
 
-        positionManagerHarness = new AerodromeSingleTickLiquidityHarnessV2(testLib, positionManager, handler);
+        positionManagerHarness = new AerodromeSingleTickLiquidityHarnessV3(testLib, positionManager, handler);
 
         positionManager.updateWhitelistHandlerWithApp(address(handler), garbage, true);
         positionManager.updateWhitelistHandler(address(handler), true);
@@ -393,7 +394,7 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
 
         // console.log("Total Token 0 Borrowed", token0.balanceOf(garbage));
 
-        AerodromeSingleTickLiquidityHandlerV2.TokenIdInfo memory tki =
+        AerodromeSingleTickLiquidityHandlerV3.TokenIdInfo memory tki =
             handler.getTokenIdData(uint256(keccak256(abi.encode(address(handler), pool, hook, tickLower, tickUpper))));
         // console.log(tl, ts, lu);
 
@@ -467,7 +468,7 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
 
         // console.log("Total Token 1 Borrowed", token1.balanceOf(garbage));
 
-        AerodromeSingleTickLiquidityHandlerV2.TokenIdInfo memory tki =
+        AerodromeSingleTickLiquidityHandlerV3.TokenIdInfo memory tki =
             handler.getTokenIdData(uint256(keccak256(abi.encode(address(handler), pool, hook, tickLower, tickUpper))));
         // console.log(tl, ts, lu);
 
@@ -536,9 +537,10 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
         vm.startPrank(bob);
         uint256 bobBalance = handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
-        handler.reserveLiquidity(
+        positionManager.reserveLiquidity(
+            IHandlerV3(address(handler)),
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV2.BurnPositionParams({
+                AerodromeSingleTickLiquidityHandlerV3.BurnPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -560,9 +562,10 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
             uint256(keccak256(abi.encode(address(handler), pool, tickLower, tickUpper))), bob
         );
 
-        handler.withdrawReserveLiquidity(
+        positionManager.withdrawReserveLiquidity(
+            IHandlerV3(address(handler)),
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV2.BurnPositionParams({
+                AerodromeSingleTickLiquidityHandlerV3.BurnPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -578,7 +581,7 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
 
         positionManagerHarness.burnPosition(jasonBalance - 1, tickLower, tickUpper, pool, hook, jason);
 
-        // AerodromeSingleTickLiquidityHandlerV2.TokenIdInfo memory tki = handler
+        // AerodromeSingleTickLiquidityHandlerV3.TokenIdInfo memory tki = handler
         //     .getTokenIdData(
         //         uint256(
         //             keccak256(
@@ -635,9 +638,10 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
         vm.startPrank(bob);
         uint256 bobBalance = handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
-        handler.reserveLiquidity(
+        positionManager.reserveLiquidity(
+            IHandlerV3(address(handler)),
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV2.BurnPositionParams({
+                AerodromeSingleTickLiquidityHandlerV3.BurnPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -699,9 +703,10 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
             uint256(keccak256(abi.encode(address(handler), pool, tickLower, tickUpper))), bob
         );
 
-        handler.withdrawReserveLiquidity(
+        positionManager.withdrawReserveLiquidity(
+            IHandlerV3(address(handler)),
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV2.BurnPositionParams({
+                AerodromeSingleTickLiquidityHandlerV3.BurnPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -734,9 +739,9 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
         vm.startPrank(bob);
         uint256 bobBalance = handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
-        handler.reserveLiquidity(
+        bytes memory reserveData = (
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV2.BurnPositionParams({
+                AerodromeSingleTickLiquidityHandlerV3.BurnPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -745,6 +750,9 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
                 })
             )
         );
+
+        positionManager.reserveLiquidity(IHandlerV3(address(handler)), reserveData);
+
         vm.stopPrank();
 
         vm.warp(block.timestamp + 6 hours);
@@ -753,9 +761,9 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
             uint256(keccak256(abi.encode(address(handler), pool, tickLower, tickUpper))), bob
         );
 
-        handler.withdrawReserveLiquidity(
+        reserveData = (
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV2.BurnPositionParams({
+                AerodromeSingleTickLiquidityHandlerV3.BurnPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -764,6 +772,8 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
                 })
             )
         );
+
+        positionManager.withdrawReserveLiquidity(IHandlerV3(address(handler)), reserveData);
         vm.stopPrank();
 
         uint256 jasonBalance =
@@ -788,9 +798,9 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
         vm.startPrank(bob);
         uint256 bobBalance = handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
-        handler.reserveLiquidity(
+        bytes memory reserveData = abi.encode(
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV2.BurnPositionParams({
+                AerodromeSingleTickLiquidityHandlerV3.BurnPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -799,6 +809,8 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
                 })
             )
         );
+
+        positionManager.reserveLiquidity(IHandlerV3(address(handler)), reserveData);
         vm.stopPrank();
 
         positionManagerHarness.unusePosition(
@@ -810,17 +822,20 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
             uint256(keccak256(abi.encode(address(handler), pool, tickLower, tickUpper))), bob
         );
 
-        handler.withdrawReserveLiquidity(
+        reserveData = (
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV2.BurnPositionParams({
+                AerodromeSingleTickLiquidityHandlerV3.BurnPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
                     tickUpper: tickUpper,
-                    shares: uint128(bobReserveBalance)
+                    shares: uint128(bobBalance)
                 })
             )
         );
+
+        positionManager.reserveLiquidity(IHandlerV3(address(handler)), reserveData);
+
         vm.stopPrank();
     }
 
@@ -842,9 +857,9 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
         vm.startPrank(bob);
         uint256 bobBalance = handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
-        handler.reserveLiquidity(
+        bytes memory reserveData = (
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV2.BurnPositionParams({
+                AerodromeSingleTickLiquidityHandlerV3.BurnPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -853,6 +868,9 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
                 })
             )
         );
+
+        positionManager.reserveLiquidity(IHandlerV3(address(handler)), reserveData);
+
         vm.stopPrank();
 
         positionManagerHarness.unusePosition(
@@ -881,9 +899,9 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
         vm.startPrank(bob);
         uint256 bobBalance = handler.balanceOf(bob, positionManagerHarness.getTokenId(pool, hook, tickLower, tickUpper));
 
-        handler.reserveLiquidity(
+        bytes memory reserveData = (
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV2.BurnPositionParams({
+                AerodromeSingleTickLiquidityHandlerV3.BurnPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -892,6 +910,9 @@ contract AerodromeSingleTickLiquidityHandlerV2_Test is Test {
                 })
             )
         );
+
+        positionManager.reserveLiquidity(IHandlerV3(address(handler)), reserveData);
+
         vm.stopPrank();
 
         positionManagerHarness.unusePosition(

@@ -22,21 +22,14 @@ import {Pausable} from "openzeppelin-contracts/contracts/security/Pausable.sol";
 import {ERC6909} from "../libraries/tokens/ERC6909.sol";
 import {LiquidityManager} from "../aerodrome/LiquidityManager.sol";
 
-
 /**
- * @title AerodromeSingleTickLiquidityHandlerV2
+ * @title AerodromeSingleTickLiquidityHandlerV3
  * @author Aercwardeth
  * @dev This is a handler contract for providing liquidity
  * for Aerodrome Style AMMs. The V2 version supports reserved liquidity and hooks.
  * Do NOT deploy on zkSync, verifyCallback code needs to be updated for zkSync.
  */
-contract AerodromeSingleTickLiquidityHandlerV2 is
-    ERC6909,
-    IHandler,
-    Pausable,
-    AccessControl,
-    LiquidityManager
-{
+contract AerodromeSingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, AccessControl, LiquidityManager {
     using Math for uint128;
     using TickMath for int24;
     using SafeERC20 for IERC20;
@@ -103,8 +96,6 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
     }
 
     struct MintPositionCache {
-        int24 tickLower;
-        int24 tickUpper;
         uint160 sqrtRatioTickLower;
         uint160 sqrtRatioTickUpper;
         uint128 liquidity;
@@ -145,18 +136,21 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
     event LogUnusePosition(uint256 tokenId, uint128 liquidityUnused);
     event LogDonation(uint256 tokenId, uint128 liquidityDonated);
     event LogUpdateWhitelistedApp(address _app, bool _status);
+    event LogUpdateWhitelistedPools(address _pool, bool _status);
     event LogUpdatedLockBlockAndReserveCooldownDuration(uint64 _newLockedBlockDuration, uint64 _newReserveCooldown);
     event LogReservedLiquidity(uint256 tokenId, uint128 liquidityReserved, address user);
     event LogWithdrawReservedLiquidity(uint256 tokenId, uint128 liquidityWithdrawn, address user);
 
     // errors
-    error AerodromeSingleTickLiquidityHandlerV2__NotWhitelisted();
-    error AerodromeSingleTickLiquidityHandlerV2__InRangeLP();
-    error AerodromeSingleTickLiquidityHandlerV2__InsufficientLiquidity();
-    error AerodromeSingleTickLiquidityHandlerV2__BeforeReserveCooldown();
+    error AerodromeSingleTickLiquidityHandlerV3__NotWhitelisted();
+    error AerodromeSingleTickLiquidityHandlerV3__NotWhitelistedPool();
+    error AerodromeSingleTickLiquidityHandlerV3__InRangeLP();
+    error AerodromeSingleTickLiquidityHandlerV3__InsufficientLiquidity();
+    error AerodromeSingleTickLiquidityHandlerV3__BeforeReserveCooldown();
 
     mapping(uint256 => TokenIdInfo) public tokenIds;
     mapping(address => bool) public whitelistedApps;
+    mapping(address => bool) public whitelistedPools;
     mapping(uint256 => mapping(address => ReserveLiquidityData)) public reservedLiquidityPerUser;
 
     ISwapRouter swapRouter;
@@ -166,7 +160,7 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
     uint64 public newLockedBlockDuration;
 
     bytes32 constant PAUSER_ROLE = keccak256("P");
-    bytes32 constant SOS_ROLE = keccak256("SOS"); // modifiers
+    bytes32 constant SOS_ROLE = keccak256("SOS");
 
     constructor(address _factory, address _swapRouter) LiquidityManager(_factory) {
         swapRouter = ISwapRouter(_swapRouter);
@@ -191,9 +185,11 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
 
         MintPositionParams memory _params = abi.decode(_mintPositionData, (MintPositionParams));
 
-        uint256 tokenId = uint256(
-            keccak256(abi.encode(address(this), _params.pool, _params.hook, _params.tickLower, _params.tickUpper))
-        );
+        if (!whitelistedPools[address(_params.pool)]) {
+            revert AerodromeSingleTickLiquidityHandlerV3__NotWhitelistedPool();
+        }
+
+        uint256 tokenId = _getHandlerIdentifier(_params.pool, _params.hook, _params.tickLower, _params.tickUpper);
 
         TokenIdInfo storage tki = tokenIds[tokenId];
 
@@ -204,8 +200,6 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
         }
 
         MintPositionCache memory posCache = MintPositionCache({
-            tickLower: _params.tickLower,
-            tickUpper: _params.tickUpper,
             sqrtRatioTickLower: _params.tickLower.getSqrtRatioAtTick(),
             sqrtRatioTickUpper: _params.tickUpper.getSqrtRatioAtTick(),
             liquidity: 0,
@@ -213,15 +207,11 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
             amount1: 0
         });
 
-        (posCache.amount0, posCache.amount1) = LiquidityAmounts.getAmountsForLiquidity(
-            _getCurrentSqrtPriceX96(_params.pool),
-            posCache.sqrtRatioTickLower,
-            posCache.sqrtRatioTickUpper,
-            uint128(_params.liquidity)
-        );
+        (posCache.amount0, posCache.amount1) =
+            getAmountsForLiquidity(_params.pool, _params.tickLower, _params.tickUpper, uint128(_params.liquidity));
 
         if (posCache.amount0 > 0 && posCache.amount1 > 0) {
-            revert AerodromeSingleTickLiquidityHandlerV2__InRangeLP();
+            revert AerodromeSingleTickLiquidityHandlerV3__InRangeLP();
         }
 
         (posCache.liquidity,,,) = addLiquidity(
@@ -230,8 +220,8 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
                 token1: tki.token1,
                 tickSpacing: tki.tickSpacing,
                 recipient: address(this),
-                tickLower: posCache.tickLower,
-                tickUpper: posCache.tickUpper,
+                tickLower: _params.tickLower,
+                tickUpper: _params.tickUpper,
                 amount0Desired: posCache.amount0,
                 amount1Desired: posCache.amount1,
                 amount0Min: posCache.amount0,
@@ -239,7 +229,7 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
             })
         );
 
-        _feeCalculation(tki, _params.pool, posCache.tickLower, posCache.tickUpper);
+        _feeCalculation(tki, _params.pool, _params.tickLower, _params.tickUpper);
 
         if (tki.totalSupply > 0) {
             // compound fees
@@ -253,11 +243,7 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
                 if (expectedAmountForLiquidity0 > tki.tokensOwed0 || expectedAmountForLiquidity1 > tki.tokensOwed1) {
                     bool isAmount0 = posCache.amount0 > 0;
                     (uint256 a0, uint256 a1) = _params.pool.collect(
-                        address(this),
-                        _params.tickLower,
-                        _params.tickUpper,
-                        uint128(tki.tokensOwed0),
-                        uint128(tki.tokensOwed1)
+                        address(this), _params.tickLower, _params.tickUpper, (tki.tokensOwed0), (tki.tokensOwed1)
                     );
 
                     (tki.tokensOwed0, tki.tokensOwed1) = (0, 0);
@@ -282,7 +268,7 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
                         );
                     }
 
-                    (uint128 liquidityFee,,,) = AerodromeSingleTickLiquidityHandlerV2(address(this)).addLiquidity(
+                    (uint128 liquidityFee,,,) = addLiquidity(
                         LiquidityManager.AddLiquidityParams({
                             token0: tki.token0,
                             token1: tki.token1,
@@ -299,7 +285,7 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
                     tki.totalLiquidity += liquidityFee;
 
                     emit LogFeeCompound(
-                        address(this), _params.pool, tokenId, posCache.tickLower, posCache.tickUpper, liquidityFee
+                        address(this), _params.pool, tokenId, _params.tickLower, _params.tickUpper, liquidityFee
                     );
                 }
             }
@@ -323,10 +309,10 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
             tokenId,
             posCache.liquidity,
             address(_params.pool),
-            context,
             _params.hook,
-            posCache.tickLower,
-            posCache.tickUpper
+            context,
+            _params.tickLower,
+            _params.tickUpper
         );
     }
 
@@ -347,9 +333,7 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
 
         BurnPositionParams memory _params = abi.decode(_burnPositionData, (BurnPositionParams));
 
-        uint256 tokenId = uint256(
-            keccak256(abi.encode(address(this), _params.pool, _params.hook, _params.tickLower, _params.tickUpper))
-        );
+        uint256 tokenId = _getHandlerIdentifier(_params.pool, _params.hook, _params.tickLower, _params.tickUpper);
 
         TokenIdInfo storage tki = tokenIds[tokenId];
 
@@ -358,7 +342,7 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
         posCache.liquidityToBurn = _convertToAssets(_params.shares, tokenId);
 
         if ((tki.totalLiquidity - tki.liquidityUsed) < posCache.liquidityToBurn) {
-            revert AerodromeSingleTickLiquidityHandlerV2__InsufficientLiquidity();
+            revert AerodromeSingleTickLiquidityHandlerV3__InsufficientLiquidity();
         }
 
         (posCache.amount0, posCache.amount1) =
@@ -395,11 +379,12 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
             tokenId,
             posCache.liquidityToBurn,
             address(_params.pool),
-            context,
             _params.hook,
+            context,
             _params.tickLower,
             _params.tickUpper
         );
+
         return (_params.shares);
     }
 
@@ -410,13 +395,16 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
      * be burned and they will receive Aerodrome fees upto this point.
      * @return The number of shares burned.
      */
-    function reserveLiquidity(bytes calldata _reserveLiquidityParam) external whenNotPaused returns (uint256) {
+    function reserveLiquidity(address context, bytes calldata _reserveLiquidityParam)
+        external
+        whenNotPaused
+        returns (uint256)
+    {
+        onlyWhitelisted();
+
         BurnPositionParams memory _params = abi.decode(_reserveLiquidityParam, (BurnPositionParams));
 
-        uint256 tokenId = uint256(
-            keccak256(abi.encode(address(this), _params.pool, _params.hook, _params.tickLower, _params.tickUpper))
-        );
-
+        uint256 tokenId = _getHandlerIdentifier(_params.pool, _params.hook, _params.tickLower, _params.tickUpper);
         TokenIdInfo storage tki = tokenIds[tokenId];
 
         uint128 liquidityToBurn = _convertToAssets(_params.shares, tokenId);
@@ -433,10 +421,10 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
         tki.tokensOwed1 -= feesOwedToken1;
 
         _params.pool.collect(
-            msg.sender, _params.tickLower, _params.tickUpper, uint128(feesOwedToken0), uint128(feesOwedToken1)
+            context, _params.tickLower, _params.tickUpper, uint128(feesOwedToken0), uint128(feesOwedToken1)
         );
 
-        ReserveLiquidityData storage rld = reservedLiquidityPerUser[tokenId][msg.sender];
+        ReserveLiquidityData storage rld = reservedLiquidityPerUser[tokenId][context];
 
         rld.liquidity += liquidityToBurn;
         rld.lastReserve = uint64(block.timestamp);
@@ -446,53 +434,15 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
 
         tki.reservedLiquidity += liquidityToBurn;
 
-        _burn(msg.sender, tokenId, _params.shares);
+        _burn(context, tokenId, _params.shares);
 
         emit LogBurnedPosition(
-            tokenId,
-            liquidityToBurn,
-            address(_params.pool),
-            msg.sender,
-            _params.hook,
-            _params.tickLower,
-            _params.tickUpper
+            tokenId, liquidityToBurn, address(_params.pool), _params.hook, context, _params.tickLower, _params.tickUpper
         );
 
-        emit LogReservedLiquidity(tokenId, liquidityToBurn, msg.sender);
+        emit LogReservedLiquidity(tokenId, liquidityToBurn, context);
 
         return (_params.shares);
-    }
-
-    function _feesTokenOwed(
-        int24 tickLower,
-        int24 tickUpper,
-        uint128 liquidityToBurn,
-        uint128 totalLiquidity,
-        uint128 tokensOwed0,
-        uint128 tokensOwed1
-    ) private view returns (uint128 feesOwedToken0, uint128 feesOwedToken1) {
-        uint256 userLiquidity0 = LiquidityAmounts.getAmount0ForLiquidity(
-            tickLower.getSqrtRatioAtTick(), tickUpper.getSqrtRatioAtTick(), liquidityToBurn
-        );
-
-        uint256 userLiquidity1 = LiquidityAmounts.getAmount1ForLiquidity(
-            tickLower.getSqrtRatioAtTick(), tickUpper.getSqrtRatioAtTick(), liquidityToBurn
-        );
-
-        uint256 totalLiquidity0 = LiquidityAmounts.getAmount0ForLiquidity(
-            tickLower.getSqrtRatioAtTick(), tickUpper.getSqrtRatioAtTick(), totalLiquidity
-        );
-
-        uint256 totalLiquidity1 = LiquidityAmounts.getAmount1ForLiquidity(
-            tickLower.getSqrtRatioAtTick(), tickUpper.getSqrtRatioAtTick(), totalLiquidity
-        );
-
-        if (totalLiquidity0 > 0) {
-            feesOwedToken0 = uint128((tokensOwed0 * userLiquidity0) / totalLiquidity0);
-        }
-        if (totalLiquidity1 > 0) {
-            feesOwedToken1 = uint128((tokensOwed1 * userLiquidity1) / totalLiquidity1);
-        }
     }
 
     /**
@@ -501,34 +451,34 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
      * @dev This can be called by the user directly, it uses msg.sender context. Users can withdraw
      * liquidity if it is available and their cooldown is over.
      */
-    function withdrawReserveLiquidity(bytes calldata _reserveLiquidityParam) external whenNotPaused {
+    function withdrawReserveLiquidity(address context, bytes calldata _reserveLiquidityParam) external whenNotPaused {
+        onlyWhitelisted();
+
         BurnPositionParams memory _params = abi.decode(_reserveLiquidityParam, (BurnPositionParams));
 
-        uint256 tokenId = uint256(
-            keccak256(abi.encode(address(this), _params.pool, _params.hook, _params.tickLower, _params.tickUpper))
-        );
+        uint256 tokenId = _getHandlerIdentifier(_params.pool, _params.hook, _params.tickLower, _params.tickUpper);
 
         TokenIdInfo storage tki = tokenIds[tokenId];
-        ReserveLiquidityData storage rld = reservedLiquidityPerUser[tokenId][msg.sender];
+        ReserveLiquidityData storage rld = reservedLiquidityPerUser[tokenId][context];
 
         if (rld.lastReserve + reserveCooldown > block.timestamp) {
-            revert AerodromeSingleTickLiquidityHandlerV2__BeforeReserveCooldown();
+            revert AerodromeSingleTickLiquidityHandlerV3__BeforeReserveCooldown();
         }
 
         if (((tki.totalLiquidity + tki.reservedLiquidity) - tki.liquidityUsed) < _params.shares) {
-            revert AerodromeSingleTickLiquidityHandlerV2__InsufficientLiquidity();
+            revert AerodromeSingleTickLiquidityHandlerV3__InsufficientLiquidity();
         }
 
         (uint256 amount0, uint256 amount1) = _params.pool.burn(_params.tickLower, _params.tickUpper, _params.shares);
 
-        _params.pool.collect(msg.sender, _params.tickLower, _params.tickUpper, uint128(amount0), uint128(amount1));
+        _params.pool.collect(context, _params.tickLower, _params.tickUpper, uint128(amount0), uint128(amount1));
 
         _feeCalculation(tki, _params.pool, _params.tickLower, _params.tickUpper);
 
         tki.reservedLiquidity -= _params.shares;
         rld.liquidity -= _params.shares;
 
-        emit LogWithdrawReservedLiquidity(tokenId, _params.shares, msg.sender);
+        emit LogWithdrawReservedLiquidity(tokenId, _params.shares, context);
     }
 
     /**
@@ -549,9 +499,7 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
         (UsePositionParams memory _params, bytes memory hookData) =
             abi.decode(_usePositionHandler, (UsePositionParams, bytes));
 
-        uint256 tokenId = uint256(
-            keccak256(abi.encode(address(this), _params.pool, _params.hook, _params.tickLower, _params.tickUpper))
-        );
+        uint256 tokenId = _getHandlerIdentifier(_params.pool, _params.hook, _params.tickLower, _params.tickUpper);
 
         TokenIdInfo storage tki = tokenIds[tokenId];
 
@@ -560,7 +508,7 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
         }
 
         if ((tki.totalLiquidity - tki.liquidityUsed) < _params.liquidityToUse) {
-            revert AerodromeSingleTickLiquidityHandlerV2__InsufficientLiquidity();
+            revert AerodromeSingleTickLiquidityHandlerV3__InsufficientLiquidity();
         }
 
         (uint256 amount0, uint256 amount1) =
@@ -601,9 +549,7 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
         (UnusePositionParams memory _params, bytes memory hookData) =
             abi.decode(_unusePositionData, (UnusePositionParams, bytes));
 
-        uint256 tokenId = uint256(
-            keccak256(abi.encode(address(this), _params.pool, _params.hook, _params.tickLower, _params.tickUpper))
-        );
+        uint256 tokenId = _getHandlerIdentifier(_params.pool, _params.hook, _params.tickLower, _params.tickUpper);
 
         TokenIdInfo storage tki = tokenIds[tokenId];
 
@@ -611,12 +557,8 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
             IHook(_params.hook).onPositionUnUse(hookData);
         }
 
-        (uint256 amount0, uint256 amount1) = LiquidityAmounts.getAmountsForLiquidity(
-            _getCurrentSqrtPriceX96(_params.pool),
-            _params.tickLower.getSqrtRatioAtTick(),
-            _params.tickUpper.getSqrtRatioAtTick(),
-            uint128(_params.liquidityToUnuse)
-        );
+        (uint256 amount0, uint256 amount1) =
+            getAmountsForLiquidity((_params.pool), _params.tickLower, _params.tickUpper, (_params.liquidityToUnuse));
 
         (uint128 liquidity,,,) = addLiquidity(
             LiquidityManager.AddLiquidityParams({
@@ -662,18 +604,12 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
 
         DonateParams memory _params = abi.decode(_donateData, (DonateParams));
 
-        uint256 tokenId = uint256(
-            keccak256(abi.encode(address(this), _params.pool, _params.hook, _params.tickLower, _params.tickUpper))
-        );
+        uint256 tokenId = _getHandlerIdentifier(_params.pool, _params.hook, _params.tickLower, _params.tickUpper);
 
         TokenIdInfo storage tki = tokenIds[tokenId];
 
-        (uint256 amount0, uint256 amount1) = LiquidityAmounts.getAmountsForLiquidity(
-            _getCurrentSqrtPriceX96(_params.pool),
-            _params.tickLower.getSqrtRatioAtTick(),
-            _params.tickUpper.getSqrtRatioAtTick(),
-            uint128(_params.liquidityToDonate)
-        );
+        (uint256 amount0, uint256 amount1) =
+            getAmountsForLiquidity(_params.pool, _params.tickLower, _params.tickUpper, _params.liquidityToDonate);
 
         (uint128 liquidity,,,) = addLiquidity(
             LiquidityManager.AddLiquidityParams({
@@ -711,10 +647,23 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
         return (amounts, liquidity);
     }
 
+    function getAmountsForLiquidity(ICLPool pool, int24 tickLower, int24 tickUpper, uint128 liquidityToDonate)
+        public
+        view
+        returns (uint256 amount0, uint256 amount1)
+    {
+        (amount0, amount1) = LiquidityAmounts.getAmountsForLiquidity(
+            _getCurrentSqrtPriceX96(pool),
+            tickLower.getSqrtRatioAtTick(),
+            tickUpper.getSqrtRatioAtTick(),
+            liquidityToDonate
+        );
+    }
+
     /**
      * @notice Calculates the fees owed to the position.
      * @param _tki The TokenIdInfo struct for the position.
-     * @param _pool The AerodromePool contract.
+     * @param _pool The Aerodrome pool contract.
      * @param _tickLower The lower tick of the position.
      * @param _tickUpper The upper tick of the position.
      */
@@ -742,15 +691,55 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
         }
     }
 
+    function _feesTokenOwed(
+        int24 tickLower,
+        int24 tickUpper,
+        uint128 liquidityToBurn,
+        uint128 totalLiquidity,
+        uint128 tokensOwed0,
+        uint128 tokensOwed1
+    ) private view returns (uint128 feesOwedToken0, uint128 feesOwedToken1) {
+        uint256 userLiquidity0 = LiquidityAmounts.getAmount0ForLiquidity(
+            tickLower.getSqrtRatioAtTick(), tickUpper.getSqrtRatioAtTick(), liquidityToBurn
+        );
+
+        uint256 userLiquidity1 = LiquidityAmounts.getAmount1ForLiquidity(
+            tickLower.getSqrtRatioAtTick(), tickUpper.getSqrtRatioAtTick(), liquidityToBurn
+        );
+
+        uint256 totalLiquidity0 = LiquidityAmounts.getAmount0ForLiquidity(
+            tickLower.getSqrtRatioAtTick(), tickUpper.getSqrtRatioAtTick(), totalLiquidity
+        );
+
+        uint256 totalLiquidity1 = LiquidityAmounts.getAmount1ForLiquidity(
+            tickLower.getSqrtRatioAtTick(), tickUpper.getSqrtRatioAtTick(), totalLiquidity
+        );
+
+        if (totalLiquidity0 > 0) {
+            feesOwedToken0 = uint128((tokensOwed0 * userLiquidity0) / totalLiquidity0);
+        }
+        if (totalLiquidity1 > 0) {
+            feesOwedToken1 = uint128((tokensOwed1 * userLiquidity1) / totalLiquidity1);
+        }
+    }
+
     /**
      * @notice Calculates the handler identifier for a position.
      * @param _data The encoded position data.
      * @return handlerIdentifierId The handler identifier for the position.
      */
-    function getHandlerIdentifier(bytes calldata _data) external view returns (uint256 handlerIdentifierId) {
+    function getHandlerIdentifier(bytes calldata _data) public view returns (uint256 handlerIdentifierId) {
         (ICLPool pool, address hook, int24 tickLower, int24 tickUpper) =
             abi.decode(_data, (ICLPool, address, int24, int24));
 
+        return _getHandlerIdentifier(pool, hook, tickLower, tickUpper);
+    }
+
+    function _getHandlerIdentifier(ICLPool pool, address hook, int24 tickLower, int24 tickUpper)
+        private
+        view
+        returns (uint256)
+    {
         return uint256(keccak256(abi.encode(address(this), pool, hook, tickLower, tickUpper)));
     }
 
@@ -798,12 +787,8 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
     function _tokensToPull(bytes calldata _positionData) private view returns (address[] memory, uint256[] memory) {
         MintPositionParams memory _params = abi.decode(_positionData, (MintPositionParams));
 
-        (uint256 amount0, uint256 amount1) = LiquidityAmounts.getAmountsForLiquidity(
-            _getCurrentSqrtPriceX96(_params.pool),
-            _params.tickLower.getSqrtRatioAtTick(),
-            _params.tickUpper.getSqrtRatioAtTick(),
-            uint128(_params.liquidity)
-        );
+        (uint256 amount0, uint256 amount1) =
+            getAmountsForLiquidity((_params.pool), _params.tickLower, _params.tickUpper, (_params.liquidity));
 
         address[] memory tokens = new address[](2);
         tokens[0] = _params.pool.token0();
@@ -821,15 +806,13 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
      * @param tokenId The tokenId of the position.
      * @return donationLocked The amount of donated liquidity that is locked.
      */
-    function _donationLocked(uint256 tokenId) internal view returns (uint128) {
-        TokenIdInfo memory tki = tokenIds[tokenId];
+    function _donationLocked(uint256 tokenId) internal view returns (uint128 donationLocked) {
+        TokenIdInfo storage tki = tokenIds[tokenId];
 
-        if (block.number >= tki.lastDonation + lockedBlockDuration) return 0;
-
-        uint128 donationLocked = tki.donatedLiquidity
-            - (tki.donatedLiquidity * (uint64(block.number) - tki.lastDonation)) / lockedBlockDuration;
-
-        return donationLocked;
+        if (block.number < tki.lastDonation + lockedBlockDuration) {
+            donationLocked = tki.donatedLiquidity
+                - (tki.donatedLiquidity * (uint64(block.number) - tki.lastDonation)) / lockedBlockDuration;
+        }
     }
 
     /**
@@ -885,9 +868,9 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
     }
 
     /**
-     * @notice Gets the current sqrtPriceX96 of the given AerodromePool.
-     * @param pool The AerodromePool to get the sqrtPriceX96 from.
-     * @return sqrtPriceX96 The current sqrtPriceX96 of the given AerodromePool.
+     * @notice Gets the current sqrtPriceX96 of the given Aerodrome pool.
+     * @param pool The Aerodrome pool to get the sqrtPriceX96 from.
+     * @return sqrtPriceX96 The current sqrtPriceX96 of the given Aerodrome pool.
      */
     function _getCurrentSqrtPriceX96(ICLPool pool) internal view returns (uint160 sqrtPriceX96) {
         (sqrtPriceX96,,,,,) = pool.slot0();
@@ -908,13 +891,23 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
         return tokenIds[tokenId];
     }
 
-    function onlyWhitelisted() private {
+    function onlyWhitelisted() private view {
         if (!whitelistedApps[msg.sender]) {
-            revert AerodromeSingleTickLiquidityHandlerV2__NotWhitelisted();
+            revert AerodromeSingleTickLiquidityHandlerV3__NotWhitelisted();
         }
     }
 
     // admin functions
+
+    /**
+     * @notice Updates the whitelist status of the given pool.
+     * @param _pool The pool to update the whitelist status of.
+     * @param _status The new whitelist status of the pool.
+     */
+    function updateWhitelistedPools(address _pool, bool _status) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        whitelistedPools[_pool] = _status;
+        emit LogUpdateWhitelistedPools(_pool, _status);
+    }
 
     /**
      * @notice Updates the whitelist status of the given app.
@@ -944,13 +937,13 @@ contract AerodromeSingleTickLiquidityHandlerV2 is
 
     /**
      * @notice Forcefully withdraws Aerodrome liquidity from the given position.
-     * @param pool The AerodromePool to withdraw liquidity from.
+     * @param pool The ICLPool to withdraw liquidity from.
      * @param tickLower The lower tick of the position to withdraw liquidity from.
      * @param tickUpper The upper tick of the position to withdraw liquidity from.
      * @param liquidity The amount of liquidity to withdraw.
      * @param token The token to recover from this pool
      */
-    function forceWithdrawAerodromeLiquidity(
+    function forceWithdrawAerodromeLiquidityAndToken(
         ICLPool pool,
         int24 tickLower,
         int24 tickUpper,

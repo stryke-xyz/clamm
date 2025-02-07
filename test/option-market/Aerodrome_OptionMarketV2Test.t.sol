@@ -12,9 +12,9 @@ import {ERC20Mock} from "../mocks/ERC20Mock.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
 
-import {DopexV2PositionManager} from "../../src/DopexV2PositionManager.sol";
-import {AerodromeSingleTickLiquidityHarnessV2} from "../harness/AerodromeSingleTickLiquidityHarnessV2.sol";
-import {AerodromeSingleTickLiquidityHandlerV2} from "../../src/handlers/AerodromeSingleTickLiquidityHandlerV2.sol";
+import {DopexV2PositionManagerV2} from "../../src/DopexV2PositionManagerV2.sol";
+import {AerodromeSingleTickLiquidityHarnessV3} from "../harness/AerodromeSingleTickLiquidityHarnessV3.sol";
+import {AerodromeSingleTickLiquidityHandlerV3} from "../../src/handlers/AerodromeSingleTickLiquidityHandlerV3.sol";
 import {SwapRouterSwapper} from "../../src/aerodrome/SwapRouterSwapper.sol";
 import {DopexV2OptionMarketV2} from "../../src/DopexV2OptionMarketV2.sol";
 
@@ -69,10 +69,10 @@ contract Aerodrome_OptionMarketV2Test is Test {
     address feeToAutoExercise = makeAddr("feeToAutoExercise"); // auto exercise tickSpacing to
     address autoExercisoor = makeAddr("autoExercisoor"); // auto exciseroor role
 
-    DopexV2PositionManager positionManager;
-    AerodromeSingleTickLiquidityHarnessV2 positionManagerHarness;
+    DopexV2PositionManagerV2 positionManager;
+    AerodromeSingleTickLiquidityHarnessV3 positionManagerHarness;
     DopexV2OptionMarketV2 optionMarket;
-    AerodromeSingleTickLiquidityHandlerV2 handler;
+    AerodromeSingleTickLiquidityHandlerV3 handler;
     DopexV2ClammFeeStrategyV2 feeStrategy;
     AutoExerciseTimeBased autoExercise;
 
@@ -88,13 +88,13 @@ contract Aerodrome_OptionMarketV2Test is Test {
         token0 = ERC20Mock(pool.token0());
         token1 = ERC20Mock(pool.token1());
 
-        positionManager = new DopexV2PositionManager();
+        positionManager = new DopexV2PositionManagerV2();
 
-        handler = new AerodromeSingleTickLiquidityHandlerV2(
+        handler = new AerodromeSingleTickLiquidityHandlerV3(
             0x5e7BB104d84c7CB9B682AaC2F3d509f5F406809A, 0xBE6D8f0d05cC4be24d5167a3eF062215bE6D18a5
         );
 
-        positionManagerHarness = new AerodromeSingleTickLiquidityHarnessV2(testLib, positionManager, handler);
+        positionManagerHarness = new AerodromeSingleTickLiquidityHarnessV3(testLib, positionManager, handler);
 
         op = new OptionPricingV2(500, 1e8);
         srs = new SwapRouterSwapper(address(testLib.swapRouter()));

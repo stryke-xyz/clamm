@@ -10,21 +10,21 @@ import {ERC20Mock} from "../mocks/ERC20Mock.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
 
-import {DopexV2PositionManager} from "../../src/DopexV2PositionManager.sol";
-import {AerodromeSingleTickLiquidityHandlerV2} from "../../src/handlers/AerodromeSingleTickLiquidityHandlerV2.sol";
-import {IHandler} from "../../src/interfaces/IHandler.sol";
+import {DopexV2PositionManagerV2} from "../../src/DopexV2PositionManagerV2.sol";
+import {AerodromeSingleTickLiquidityHandlerV3} from "../../src/handlers/AerodromeSingleTickLiquidityHandlerV3.sol";
+import {IHandlerV3} from "../../src/interfaces/IHandlerV3.sol";
 
-contract AerodromeSingleTickLiquidityHarnessV2 is Test {
+contract AerodromeSingleTickLiquidityHarnessV3 is Test {
     using TickMath for int24;
 
     AerodromeTestLib testLib;
-    DopexV2PositionManager positionManager;
-    AerodromeSingleTickLiquidityHandlerV2 handler;
+    DopexV2PositionManagerV2 positionManager;
+    AerodromeSingleTickLiquidityHandlerV3 handler;
 
     constructor(
         AerodromeTestLib _testLib,
-        DopexV2PositionManager _positionManager,
-        AerodromeSingleTickLiquidityHandlerV2 _handler
+        DopexV2PositionManagerV2 _positionManager,
+        AerodromeSingleTickLiquidityHandlerV3 _handler
     ) {
         testLib = _testLib;
         positionManager = _positionManager;
@@ -62,9 +62,9 @@ contract AerodromeSingleTickLiquidityHarnessV2 is Test {
         token1.increaseAllowance(address(positionManager), amount1);
 
         (lm) = positionManager.mintPosition(
-            IHandler(address(handler)),
+            IHandlerV3(address(handler)),
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV2.MintPositionParams({
+                AerodromeSingleTickLiquidityHandlerV3.MintPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -83,9 +83,9 @@ contract AerodromeSingleTickLiquidityHarnessV2 is Test {
         vm.startPrank(user);
 
         (lb) = positionManager.burnPosition(
-            IHandler(address(handler)),
+            IHandlerV3(address(handler)),
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV2.BurnPositionParams({
+                AerodromeSingleTickLiquidityHandlerV3.BurnPositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -117,9 +117,9 @@ contract AerodromeSingleTickLiquidityHarnessV2 is Test {
         );
         vm.startPrank(user);
         (tokens, amounts,) = positionManager.usePosition(
-            IHandler(address(handler)),
+            IHandlerV3(address(handler)),
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV2.UsePositionParams({
+                AerodromeSingleTickLiquidityHandlerV3.UsePositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -184,9 +184,9 @@ contract AerodromeSingleTickLiquidityHarnessV2 is Test {
         }
 
         positionManager.unusePosition(
-            IHandler(address(handler)),
+            IHandlerV3(address(handler)),
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV2.UnusePositionParams({
+                AerodromeSingleTickLiquidityHandlerV3.UnusePositionParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
@@ -228,9 +228,9 @@ contract AerodromeSingleTickLiquidityHarnessV2 is Test {
         token1.increaseAllowance(address(positionManager), amount1 + amount1ToDonate);
 
         (amounts,) = positionManager.donateToPosition(
-            IHandler(address(handler)),
+            IHandlerV3(address(handler)),
             abi.encode(
-                AerodromeSingleTickLiquidityHandlerV2.DonateParams({
+                AerodromeSingleTickLiquidityHandlerV3.DonateParams({
                     pool: pool,
                     hook: hook,
                     tickLower: tickLower,
