@@ -4,7 +4,7 @@ pragma solidity >=0.8.0 <0.9.0;
 // Interfaces
 import {IAgniPool} from "../agni-v3/v3-core/contracts/interfaces/IAgniPool.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import {ISwapRouter} from "v3-periphery/SwapRouter.sol";
+import {ISwapRouter} from "v3-periphery/interfaces/ISwapRouter.sol";
 import {IHandler} from "../interfaces/IHandler.sol";
 import {IHook} from "../interfaces/IHook.sol";
 

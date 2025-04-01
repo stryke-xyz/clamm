@@ -4,7 +4,7 @@ pragma solidity >=0.8.0 <0.9.0;
 // Interfaces
 import {IPancakeV3Pool} from "../pancake-v3/v3-core/contracts/interfaces/IPancakeV3Pool.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import {ISwapRouter} from "v3-periphery/SwapRouter.sol";
+import {ISwapRouter} from "v3-periphery/interfaces/ISwapRouter.sol";
 import {IHandler} from "../interfaces/IHandler.sol";
 import {IHook} from "../interfaces/IHook.sol";
 
@@ -179,7 +179,7 @@ contract PancakeV3SingleTickLiquidityHandlerV3 is ERC6909, IHandler, Pausable, A
         onlyWhitelisted();
 
         MintPositionParams memory _params = abi.decode(_mintPositionData, (MintPositionParams));
-        
+
         if (!whitelistedPools[address(_params.pool)]) revert PancakeV3SingleTickLiquidityHandlerV3__NotWhitelistedPool();
 
         uint256 tokenId = _getHandlerIdentifier(_params.pool, _params.hook, _params.tickLower, _params.tickUpper);

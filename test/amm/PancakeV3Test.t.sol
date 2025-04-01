@@ -8,7 +8,7 @@ import {IPancakeV3Pool} from "../../src/pancake-v3/v3-core/contracts/interfaces/
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import {FixedPoint96} from "@uniswap/v3-core/contracts/libraries/FixedPoint96.sol";
 import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
-import {ISwapRouter} from "v3-periphery/SwapRouter.sol";
+import {ISwapRouter} from "v3-periphery/interfaces/ISwapRouter.sol";
 import {SqrtPriceMath} from "@uniswap/v3-core/contracts/libraries/SqrtPriceMath.sol";
 import {FullMath} from "@uniswap/v3-core/contracts/libraries/FullMath.sol";
 import {SwapMath} from "@uniswap/v3-core/contracts/libraries/SwapMath.sol";
