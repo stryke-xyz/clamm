@@ -12,7 +12,7 @@ import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 
 /**
  * @title DopexV2PositionManagerV2
- * @author 0xcarrot & aercwarden
+ * @author 0xcarrot & Aercwarden
  * @dev This contract is an entry point which acts as shared interface
  * between liquidity managers (handlers) and apps utilizing the liquidity.
  * It does not store any user data, it accepts truth from the handlers.
@@ -202,7 +202,7 @@ contract DopexV2PositionManagerV2 is Ownable, ReentrancyGuard, Multicall {
         onlyWhitelistedHandlers(_handler)
         nonReentrant
     {
-        _handler.reserveLiquidity(msg.sender, _withdrawReserveLiquidityData);
+        _handler.withdrawReserveLiquidity(msg.sender, _withdrawReserveLiquidityData);
     }
 
     /**

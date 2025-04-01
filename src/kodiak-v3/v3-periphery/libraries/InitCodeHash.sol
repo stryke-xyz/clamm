@@ -10,5 +10,5 @@ library InitCode {
 
     bytes32 internal constant V2_INIT_CODE_HASH = 0x0489c85ed300c1a9636d09ada5e1bea0e331f778464d45f24cb365c92cafbcb5;
 
-    bytes32 internal constant V3_INIT_CODE_HASH = 0x945f1441b8ff07828f05880b3d67ebdd0962e5fb81cb8d7c32e9610e866ff219;
+    bytes32 internal constant V3_INIT_CODE_HASH = 0xd8e2091bc519b509176fc39aeb148cc8444418d3ce260820edc44e806c2c2339;
 }

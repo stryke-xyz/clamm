@@ -56,9 +56,9 @@ contract KodiakV3TestLib is Test {
     }
 
     constructor() {
-        factory = IUniswapV3Factory(0x217Cd80795EfCa5025d47023da5c03a24fA95356);
+        factory = IUniswapV3Factory(0xD84CBf0B02636E7f53dB9E5e45A616E05d710990);
         liquidityManagement = new KodiakV3LiquidityManagement(address(factory));
-        swapRouter = ISwapRouter(0x66E8F0Cf851cE9be42a2f133a8851Bc6b70B9EBd);
+        swapRouter = ISwapRouter(0xEd158C4b336A6FCb5B193A5570e3a571f6cbe690);
     }
 
     function deployPoolAndInitializePrice(address token0, address token1, uint24 fee, uint160 sqrtPriceX96)
